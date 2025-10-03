@@ -1,0 +1,335 @@
+/* Black & White theme - updated */
+
+:root{
+  --bg: #ffffff;
+  --panel: #f8f8f8;
+  --muted: #6b6b6b;
+  --text: #0b0b0b;
+  --accent: #000000;
+  --accent-contrast: #ffffff;
+  --border: rgba(0,0,0,0.08);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family: "Arial", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  overflow-x: hidden;
+}
+
+/* ensure page is scrollable */
+html, body {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* headings */
+h1,h2,h3{ color:var(--accent) }
+
+/* links */
+a{ color:var(--accent); text-decoration:none }
+a:hover{ text-decoration:underline; opacity:0.9 }
+
+/* layout */
+.container{
+  width:94%;           /* increase usable width */
+  max-width:1200px;   /* allow wider layout on large screens */
+  margin:0 auto;
+  padding:0.5rem;     /* reduced side padding */
+}
+
+/* navbar */
+.navbar{
+  background: var(--accent);
+  color: var(--accent-contrast);
+  padding: 12px 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  position:sticky;
+  top:0;
+  z-index:50;
+}
+.navbar .container{ display:flex; align-items:center; gap:1rem }
+.navbar a{ color:var(--accent-contrast); padding:8px 12px; border-radius:6px }
+.navbar a:hover{ background: rgba(255,255,255,0.06) }
+
+/* cards / product tiles */
+.card{
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius:8px;
+  padding:14px;
+  margin:0;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.03);
+  color:var(--text);
+  /* changed code: make card a column flex container so the button can sit at the bottom */
+  display: flex;
+  flex-direction: column;
+  min-height: 380px; /* optional: gives cards consistent height so button alignment is visible */
+}
+
+/* changed code: push the card's primary button to the bottom center */
+.card > button,
+.card > .button {
+  margin-top: auto;         /* pushes button to bottom of card */
+  align-self: center;       /* centers horizontally */
+  width: auto;              /* keep natural width; change to 100% or set px if you prefer full-width */
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.card img {
+  width: 100%;
+  height: 280px;           /* adjust height as you prefer (e.g. 180-260px) */
+  object-fit: cover;       /* crop to fill while preserving aspect ratio */
+  border-radius: 6px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* fade-in animation for product cards */
+.card.fade-in {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 600ms cubic-bezier(.2,.8,.2,1), transform 600ms cubic-bezier(.2,.8,.2,1);
+  will-change: opacity, transform;
+}
+
+.card.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Tighter spacing between product name, category and price */
+.card h3 {
+  margin: 0 0 16px;          /* small gap below product name */
+  font-size: 1.05rem;       
+  line-height: 1.15;
+}
+
+.card .muted {
+  margin: 0 0 8px;          /* gap between category and price */
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.card strong {
+  display: block;
+  margin: 0 0 30px;         /* distance between price and the button */
+  font-size: 1.03rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* default grid (kept for other pages) */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:1rem;
+  margin-top:1rem;
+}
+
+/* Home page adjustments: smaller card min width and tighter gaps so more cards fit */
+.home + .container .grid,
+.home-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* smaller min width */
+  gap: 1.5rem; /* tighter gap between cards */
+}
+
+/* small stagger effect (optional) */
+.grid .card.fade-in {
+  transition-delay: 0ms;
+}
+
+/* buttons */
+.button, button{
+  display:inline-block;
+  padding:10px 14px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius:8px;
+  cursor:pointer;
+  transition: transform .08s ease, opacity .12s ease;
+}
+.button:hover, button:hover{ opacity:0.9; transform:translateY(-1px) }
+.button.ghost{
+  background:transparent;
+  color:var(--text);
+  border:1px solid var(--border);
+}
+
+/* utility text */
+.muted{ color:var(--muted); font-size:0.95rem }
+.error{ background:#fff0f0; color:#8a0000; padding:8px; border-radius:6px }
+
+/* auth forms */
+.auth{
+  max-width:420px;
+  margin:2rem auto;
+  display:flex;
+  flex-direction:column;
+  gap:.75rem;
+  background:var(--panel);
+  padding:1rem;
+  border-radius:8px;
+  border:1px solid var(--border);
+}
+.auth input{
+  padding:.75rem;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:transparent;
+}
+
+/* search */
+.search input{
+  padding:.5rem .75rem;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--bg);
+}
+
+/* cart rows */
+.cartrow{
+  display:flex;
+  border: 1px solid var(--border);
+  border-radius:8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.03);
+  gap:5rem;
+  align-items:center;
+  border-bottom:1px solid var(--border);
+  padding: 2rem 0;
+  margin-left: 5rem;
+  margin-right: 15rem;
+}
+.cartrow img{ width:100px; height:100px; object-fit:cover; border-radius:8px; margin-left: 2rem; }
+.grow{ flex:1 }
+
+/* footer */
+.footer{
+  text-align:center;
+  padding:20px;
+  background:var(--accent);
+  color:var(--accent-contrast);
+  margin-top:2rem;
+  border-top:1px solid rgba(255,255,255,0.04);
+}
+
+/* small screens tweaks */
+@media (max-width:640px){
+  .navbar .container{ flex-direction:column; align-items:flex-start; gap:.5rem }
+  .grid{ grid-template-columns:repeat(2,1fr) }
+}
+/*home page icons */
+.home-icons {
+  display: flex;
+  justify-content: flex-end;  
+  gap: 4rem;
+}
+
+.home-icons img {
+  height: 30px;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+}
+
+.home-icons img:hover {
+  transform: scale(1.2);
+}
+
+/* home banner */
+/* full-bleed home banner without causing horizontal overflow */
+.home-banner {
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  width: 100vw;
+  overflow: hidden; /* hide any rounding/overflow */
+  margin-top: -12px
+}
+
+.home-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  max-width: none;
+}
+
+/* overlay that holds the hero content positioned inside left */
+.home-banner__overlay {
+  position: absolute;
+  top: 5%;
+  left: 12%;
+  transform: translateY(-5%);
+  z-index: 5;
+  max-width: 80ch;
+}
+
+/* adjust the hero section style to work as an overlay */
+.home-banner__overlay .home {
+  color: #fff;
+  padding: 200px 20px;
+  border-radius: 10px;
+}
+
+.home-banner__overlay .home h1 {
+  font-size: clamp(2.5rem, 6vw, 4rem); /* scales between 2rem and 3.6rem */
+  line-height: 1.05;
+  margin: 0 0 1.5rem;
+  color: rgba(255,255,255,0.95);
+}
+
+.home-banner__overlay .home p {
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  margin: 0 0 1.2rem;
+  color: rgba(255,255,255,0.95);
+}
+
+.home-banner__overlay .home .button {
+  font-size: 1.5rem;
+  padding: 0.6rem 1rem;
+}
+
+/* responsive tweaks */
+@media (max-width: 780px) {
+  .home-banner__overlay { left: 4%; top: 18%; max-width: 60ch; }
+  .home-banner__overlay .home { padding: 14px; }
+}
+
+@media (max-width: 420px) {
+  .home-banner__overlay { left: 3%; top: 16%; transform: none; max-width: 85vw; }
+  .home-banner__overlay .home { padding: 12px; }
+}
+
+/* Black track, grey thumb scrollbar */
+html {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #9a9a9a #000; /* thumb then track (grey thumb, black track) */
+}
+
+/* WebKit browsers (Chrome, Edge, Safari) */
+html::-webkit-scrollbar {
+  width: 12px;
+}
+
+html::-webkit-scrollbar-track {
+  background: #000; /* black track */
+}
+
+html::-webkit-scrollbar-thumb {
+  background: #9a9a9a; /* grey thumb */
+  border-radius: 10px;
+  border: 3px solid #000; /* keep thumb visually separated from track */
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: #bdbdbd;
+}
