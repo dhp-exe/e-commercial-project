@@ -92,7 +92,7 @@ streetwear-shop
 2. Start the frontend application:
    ```
    cd ../client
-   npm start
+   npm run dev
    ```
 
 ### License
