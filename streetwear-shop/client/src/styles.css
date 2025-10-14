@@ -1,4 +1,5 @@
 /* Black & White theme - updated */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital,wght@0,400;1,400&display=swap');
 
 :root{
   --bg: #ffffff;
@@ -13,7 +14,8 @@
 *{box-sizing:border-box}
 body{
   margin:0;
-  font-family: "Arial", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-family: "DM Serif Display", serif;
+  letter-spacing: 1.2px;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing:antialiased;
@@ -22,7 +24,9 @@ body{
 }
 
 /* ensure page is scrollable */
-html, body {
+html, body{
+  margin: 0;
+  padding: 0;
   height: 100%;
   overflow-y: auto;
 }
@@ -102,7 +106,22 @@ a:hover{ text-decoration:underline; opacity:0.9 }
   opacity: 1;
   transform: translateY(0);
 }
+.fade-in {
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: fadeInField 0.3s ease forwards;
+}
 
+@keyframes fadeInField {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 /* Tighter spacing between product name, category and price */
 .card h3 {
   margin: 0 0 16px;          /* small gap below product name */
@@ -131,12 +150,21 @@ a:hover{ text-decoration:underline; opacity:0.9 }
   gap:1rem;
   margin-top:1rem;
 }
-
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+  margin-left: 10rem;
+  margin-right: 10rem;
+}
 /* Home page adjustments: smaller card min width and tighter gaps so more cards fit */
 .home + .container .grid,
 .home-grid {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* smaller min width */
   gap: 1.5rem; /* tighter gap between cards */
+  margin-left: 10rem;
+  margin-right: 10rem;
 }
 
 /* small stagger effect (optional) */
@@ -229,10 +257,11 @@ a:hover{ text-decoration:underline; opacity:0.9 }
   display: flex;
   justify-content: flex-end;  
   gap: 4rem;
+  margin-right: 10rem;
 }
 
 .home-icons img {
-  height: 30px;
+  height: 50px;
   cursor: pointer;
   transition: transform 0.2s ease-in-out;
 }
@@ -332,4 +361,101 @@ html::-webkit-scrollbar-thumb {
 
 html::-webkit-scrollbar-thumb:hover {
   background: #bdbdbd;
+}
+.container{
+  width:100%;           /* increase usable width */
+  max-width:100%;   /* allow wider layout on large screens */
+  margin:0;
+  padding:0;     /* reduced side padding */
+}
+.login-page {
+  height: 100vh;         /* full screen height */
+  overflow: hidden;      /* disable scroll only here */
+}
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;        /* fills full height from parent */
+  width: 100%;         /* fills full width */
+  background-color: #f2f4f8;
+  font-family: "DM Serif Display", serif;
+}
+.login-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: white;
+  padding: 40px 50px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  width: 320px;
+}
+
+/* Title */
+.login-container h2 {
+  margin-bottom: 20px;
+  color: #333;
+  text-align: center;
+  font-size: 30px;
+}
+
+/* Labels and inputs */
+.login-container label {
+  font-weight: bold;
+  color: #000000;
+}
+
+.login-container input {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+  outline: none;
+}
+
+.login-container input:focus {
+  border-color: #000000;
+}
+
+/* Button */
+.login-container button {
+  background-color: #000000;
+  color: white;
+  border: none;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s;
+  font-family: "DM Serif Display", serif;
+}
+
+.login-container button:hover {
+  background-color: #534f4f;
+}
+
+/* Error text */
+.error {
+  color: #ff4d4f;
+  margin-bottom: 15px;
+}
+
+/* Register link */
+.login-container p {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.login-container a {
+  color: #000000;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.toggle-link:hover {
+  cursor: pointer;
+  color: #000000;
+  text-decoration: underline;
 }

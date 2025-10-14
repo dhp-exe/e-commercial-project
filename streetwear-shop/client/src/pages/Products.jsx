@@ -95,7 +95,7 @@ export default function Products(){
         />
       </div>
 
-      <div className="grid">
+      <div className="products-grid">
         {(searchTerm && searchTerm.trim()
           ? items.filter(p => p.name.toLowerCase().includes(searchTerm.trim().toLowerCase()))
           : items
