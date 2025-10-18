@@ -1,7 +1,7 @@
 # Streetwear Shop
 
 ## Overview
-The Streetwear Shop is a full-stack e-commerce application built using React for the frontend, Node.js for the backend, and MySQL for the database. This project allows users to browse products, manage their shopping cart, and authenticate their accounts.
+The Streetwear Shop is a full-stack e-commerce application built using React for the frontend, Node.js for the backend, and MySQL for the database. This project allows users to browse products, manage their shopping cart, and authenticate their accounts. This application also provide payment/transaction method.
 
 ## Project Structure
 ```
