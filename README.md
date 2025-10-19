@@ -1,7 +1,7 @@
 # Streetwear Shop
 
 ## Overview
-The Streetwear Shop is a full-stack e-commerce application built using React for the frontend, Node.js for the backend, and MySQL for the database. This project allows users to browse products, manage their shopping cart, and authenticate their accounts.
+The Streetwear Shop is a full-stack e-commerce application built using React for the frontend, Node.js for the backend, and MySQL for the database. This project allows users to browse products, manage their shopping cart, and authenticate their accounts. This application also provides a payment/transaction method.
 
 ## Project Structure
 ```
@@ -57,7 +57,7 @@ streetwear-shop
 ### Installation
 1. Clone the repository:
    ```
-   git clone <repository-url>
+   git clone https://github.com/dhp-exe/e-commercial-project.git
    cd streetwear-shop
    ```
 
