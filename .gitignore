@@ -5,14 +5,14 @@ node_modules/
 .env
 .env.*     # ignore all env variants
 
-# build outputs
+
 dist/
 build/
 .cache/
 .next/
 .nuxt/
 
-# logs
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
