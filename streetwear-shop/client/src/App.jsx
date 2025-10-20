@@ -4,6 +4,7 @@ import AuthProvider from './context/AuthContext.jsx';
 import CartProvider from './context/CartContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import Home from './pages/Home.jsx';
+import About from './pages/About.jsx';
 import Products from './pages/Products.jsx';
 import Login from './pages/Login.jsx';
 import Feedback from './pages/Feedback.jsx';
@@ -18,6 +19,7 @@ export default function App(){
         <main className="container">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path='/about' element={<About />} />
             <Route path="/products" element={<Products />} />
             <Route path="/login" element={<Login />} />
             <Route path="/feedback" element={<Feedback />} />

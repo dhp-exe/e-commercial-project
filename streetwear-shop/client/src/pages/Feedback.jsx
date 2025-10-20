@@ -55,7 +55,7 @@ export default function Feedback() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="John Doe"
+              placeholder="Peter Parker"
             />
           </div>
           <div>
@@ -64,7 +64,7 @@ export default function Feedback() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="john@example.com"
+              placeholder="peterparker@example.com"
             />
           </div>
           <div>

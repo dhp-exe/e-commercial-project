@@ -459,3 +459,8 @@ html::-webkit-scrollbar-thumb:hover {
   color: #000000;
   text-decoration: underline;
 }
+
+.about-page h1{
+  text-align: center;
+  margin-top: 2rem;
+}

@@ -8,6 +8,7 @@ const Login = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const { login } = useContext(AuthContext);
     const navigate = useNavigate();
@@ -65,11 +66,16 @@ const Login = () => {
                     <div>
                         <label>Password:</label>
                         <input
-                            type="password"
+                            type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
                         />
+                        <input 
+                            type="checkbox"
+                            checked = {showPassword}
+                            onChange={() => setShowPassword(!showPassword)}
+                        /> Show Password
                     </div>
 
                     <button type="submit">{isRegister ? 'Register' : 'Login' }</button>
