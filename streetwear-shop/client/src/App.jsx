@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthProvider from './context/AuthContext.jsx';
 import CartProvider from './context/CartContext.jsx';
 import Navbar from './components/Navbar.jsx';
@@ -18,6 +18,7 @@ export default function App(){
         <Navbar />
         <main className="container">
           <Routes>
+            <Route path="" element={<Home />} />
             <Route path="/" element={<Home />} />
             <Route path='/about' element={<About />} />
             <Route path="/products" element={<Products />} />
