@@ -8,7 +8,7 @@ export default function About() {
         {/* Hero Section */}
         <section className="hero">
             <div className="hero-content">
-            <h1>About Streetwear Shop</h1>
+            <h1>About DHP</h1>
             <p>Driven by passion. Inspired by culture. Designed for everyone.</p>
             </div>
         </section>
