@@ -1,19 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import './styles.css';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const Router =
+  window.location.hostname.includes('github.io')
+    ? HashRouter
+    : BrowserRouter;
 
-root.render(
-  <BrowserRouter>
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <Router>
     <AuthProvider>
       <CartProvider>
         <App />
       </CartProvider>
     </AuthProvider>
-  </BrowserRouter>
+  </Router>
 );
