@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# environment variables
+.env
+.env.*     # ignore all env variants
+
+
+dist/
+build/
+.cache/
+.next/
+.nuxt/
+
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# system files
+.DS_Store
+Thumbs.db
+
+# editor settings
+.vscode/
+.idea/
+
+# test coverage
+coverage/
