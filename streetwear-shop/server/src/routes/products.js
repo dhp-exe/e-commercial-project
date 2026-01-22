@@ -21,26 +21,26 @@ router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(sql, params);
 
-// prepend full URL to image paths
-const products = rows.map(p => {
-  let imageUrl = p.image_url;
+    // prepend full URL to image paths
+    const products = rows.map(p => {
+      let imageUrl = p.image_url;
 
-  // Normalize image URLs
-  if (imageUrl) {
-    if (imageUrl.includes('http://localhost:5001')) {
-      imageUrl = imageUrl.replace('http://localhost:5001', BASE_URL);
-    } 
-    else if (imageUrl.includes('https://ckgkbm1c-5001.asse.devtunnels.ms')) {
-      imageUrl = imageUrl.replace('https://ckgkbm1c-5001.asse.devtunnels.ms', BASE_URL);
-    } 
-    else if (!imageUrl.startsWith('http')) {
-      imageUrl = `${BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-    }
-  }
+      // Normalize image URLs
+      if (imageUrl) {
+        if (imageUrl.includes('http://localhost:5001')) {
+          imageUrl = imageUrl.replace('http://localhost:5001', BASE_URL);
+        } 
+        else if (imageUrl.includes('https://ckgkbm1c-5001.asse.devtunnels.ms')) {
+          imageUrl = imageUrl.replace('https://ckgkbm1c-5001.asse.devtunnels.ms', BASE_URL);
+        } 
+        else if (!imageUrl.startsWith('http')) {
+          imageUrl = `${BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        }
+      }
 
-  return { ...p, image_url: imageUrl };
-});
-  res.json(products);
+      return { ...p, image_url: imageUrl };
+    });
+    res.json(products);
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });

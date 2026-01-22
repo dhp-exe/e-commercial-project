@@ -9,6 +9,7 @@ import Products from './pages/Products.jsx';
 import Login from './pages/Login.jsx';
 import Feedback from './pages/Feedback.jsx';
 import Cart from './pages/Cart.jsx';
+import Account from './pages/Account.jsx';
 import './styles.css';
 
 export default function App(){
@@ -25,6 +26,7 @@ export default function App(){
             <Route path="/login" element={<Login />} />
             <Route path="/feedback" element={<Feedback />} />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/account" element={<Account />} />
           </Routes>
         </main>
       </CartProvider>

@@ -1,0 +1,445 @@
+/* Account Page Styles */
+.account-page {
+  min-height: 100vh;
+  background-color: #f8f8f8;
+  padding: 40px 20px;
+}
+
+.account-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 40px;
+}
+
+/* Sidebar Styles */
+.account-sidebar {
+  position: sticky;
+  top: 120px;
+  height: fit-content;
+}
+
+.profile-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.profile-picture-container {
+  margin-bottom: 20px;
+}
+
+.profile-picture {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #333;
+  margin: 0 auto;
+}
+
+.profile-picture-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  border: 3px solid #333;
+}
+
+.initials {
+  color: white;
+  font-size: 48px;
+  font-weight: bold;
+}
+
+.profile-greeting {
+  font-size: 20px;
+  margin: 20px 0;
+  color: #333;
+  word-break: break-word;
+}
+
+.upload-picture-section {
+  margin: 25px 0;
+}
+
+.upload-btn {
+  display: inline-block;
+  background-color: #333;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.upload-btn:hover {
+  background-color: #555;
+}
+
+.account-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.nav-item {
+  padding: 12px 16px;
+  border: none;
+  background-color: #f0f0f0;
+  color: #333;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background-color: #e0e0e0;
+}
+
+.nav-item.active {
+  background-color: #333;
+  color: white;
+}
+
+.logout-btn {
+  margin-top: 20px;
+  background-color: #d32f2f;
+  color: white;
+}
+
+.logout-btn:hover {
+  background-color: #b71c1c;
+}
+
+/* Main Content Styles */
+.account-main {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.message {
+  padding: 15px 20px;
+  border-radius: 6px;
+  margin-bottom: 25px;
+  font-weight: 500;
+}
+
+.message.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.message.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Account Section Styles */
+.account-section h1 {
+  font-size: 28px;
+  margin-bottom: 30px;
+  color: #333;
+  border-bottom: 2px solid #333;
+  padding-bottom: 15px;
+}
+
+.account-section h2 {
+  font-size: 20px;
+  margin-top: 30px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+/* Orders Grid */
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px;
+}
+
+.order-card {
+  padding: 25px;
+  border-radius: 10px;
+  color: white;
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.order-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.order-card h3 {
+  font-size: 14px;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.order-count {
+  font-size: 40px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.order-card.new {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.order-card.confirmed {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.order-card.shipping {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.order-card.received {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.order-card.cancelled {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+/* Form Styles */
+.info-form,
+.password-form {
+  display: grid;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.form-input {
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #333;
+  box-shadow: 0 0 0 3px rgba(51, 51, 51, 0.1);
+}
+
+.form-input.disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #666;
+}
+
+.form-input.disabled:focus {
+  border-color: #ddd;
+  box-shadow: none;
+}
+
+.save-btn {
+  padding: 12px 30px;
+  background-color: #333;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  align-self: flex-start;
+}
+
+.save-btn:hover {
+  background-color: #555;
+}
+
+/* Vouchers Section */
+.vouchers-section {
+  margin-top: 40px;
+  padding-top: 30px;
+  border-top: 2px solid #eee;
+}
+
+.vouchers-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.voucher-card {
+  border: 2px dashed #333;
+  border-radius: 10px;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  align-items: center;
+  background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
+}
+
+.voucher-code {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  word-break: break-all;
+}
+
+.voucher-details {
+  text-align: right;
+}
+
+.voucher-discount {
+  font-size: 16px;
+  font-weight: 600;
+  color: #d32f2f;
+  margin: 0 0 8px 0;
+}
+
+.voucher-expiry {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+}
+
+.no-vouchers {
+  color: #999;
+  font-style: italic;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .account-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .account-sidebar {
+    position: static;
+  }
+
+  .account-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .nav-item {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .account-main {
+    padding: 25px;
+  }
+
+  .account-section h1 {
+    font-size: 22px;
+  }
+
+  .orders-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .order-card {
+    padding: 15px;
+  }
+
+  .order-count {
+    font-size: 28px;
+  }
+
+  .vouchers-list {
+    grid-template-columns: 1fr;
+  }
+
+  .voucher-card {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .voucher-details {
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .account-page {
+    padding: 20px 10px;
+  }
+
+  .account-container {
+    gap: 15px;
+  }
+
+  .profile-card {
+    padding: 20px 15px;
+  }
+
+  .profile-picture {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-picture-placeholder {
+    width: 80px;
+    height: 80px;
+  }
+
+  .initials {
+    font-size: 32px;
+  }
+
+  .profile-greeting {
+    font-size: 16px;
+  }
+
+  .account-main {
+    padding: 15px;
+  }
+
+  .account-section h1 {
+    font-size: 18px;
+  }
+
+  .orders-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .order-card h3 {
+    font-size: 12px;
+  }
+
+  .order-count {
+    font-size: 24px;
+  }
+}

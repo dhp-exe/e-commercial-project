@@ -69,13 +69,11 @@ a:hover{ text-decoration:underline; opacity:0.9 }
   margin:0;
   box-shadow: 0 8px 28px rgba(0,0,0,0.03);
   color:var(--text);
-  /* changed code: make card a column flex container so the button can sit at the bottom */
   display: flex;
   flex-direction: column;
   min-height: 380px; /* optional: gives cards consistent height so button alignment is visible */
 }
 
-/* changed code: push the card's primary button to the bottom center */
 .card > button,
 .card > .button {
   margin-top: auto;         /* pushes button to bottom of card */

@@ -36,7 +36,7 @@ export default function CartDrawer({ isOpen, onClose }) {
 
       <div className="cart-footer">
         <h3>Total: ${Number(total).toFixed(2)}</h3>
-        <button className="checkout-btn">Checkout</button>
+        <button onClick={() => alert("Checkout coming soon!")} className="checkout-btn">Checkout</button>
       </div>
     </div>
   );
