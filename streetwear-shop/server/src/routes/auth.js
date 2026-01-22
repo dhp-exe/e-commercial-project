@@ -3,10 +3,12 @@ import { pool } from '../db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { requireAuth } from '../middleware/auth.js';
 dotenv.config();
 
 const router = Router();
 
+// POST /register - Register a new user
 router.post('/register', async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) return res.status(400).json({ message: 'Missing fields' });
@@ -25,6 +27,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// POST /login - Authenticate a user and return a JWT
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -41,4 +44,27 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// GET /profile - Retrieve current user's details
+router.get('/profile', requireAuth, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, name, email FROM users WHERE id=?', 
+      [req.user.id]
+    );
+
+    const user = rows[0];
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json({
+      name: user.name,
+      email: user.email,
+      phone: '', 
+      address: '',
+      profilePicture: null
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 export default router;
