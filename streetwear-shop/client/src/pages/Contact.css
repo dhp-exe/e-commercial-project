@@ -1,0 +1,68 @@
+/* Simple styles for Contact page layout */
+.contact-page {
+  padding: 24px;
+}
+.contact-title {
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+.contact-grid {
+  display: flex;
+  gap: 24px;
+}
+.contact-left {
+  width: 44%;
+}
+.city-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #555;
+  font-weight: 600;
+}
+.city-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+.showroom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 720px;
+  overflow: auto;
+}
+.showroom-item {
+  border: 1px solid #e6e6e6;
+  padding: 14px;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+.showroom-item:hover { border-color: #ccc; }
+.showroom-item.active { box-shadow: 0 1px 0 rgba(0,0,0,0.03); border-left: 4px solid #333; }
+.showroom-name { font-size: 16px; margin: 0 0 8px 0; }
+.showroom-address, .showroom-hours, .showroom-phone { margin: 4px 0; color: #555; font-size: 14px; }
+
+.contact-right {
+  width: 56%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.map-frame { height: 720px; border-radius: 4px; overflow: hidden; }
+.map-card {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 4px;
+}
+.map-card h3 { margin: 0 0 6px 0; }
+.directions-link { display: inline-block; margin-top: 8px; color: #0070f3; text-decoration: none; }
+
+@media (max-width: 900px) {
+  .contact-grid { flex-direction: column; }
+  .contact-left, .contact-right { width: 100%; }
+  .map-frame { height: 360px; }
+}

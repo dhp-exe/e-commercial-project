@@ -10,6 +10,7 @@ import Login from './pages/Login.jsx';
 import Feedback from './pages/Feedback.jsx';
 import Cart from './pages/Cart.jsx';
 import Account from './pages/Account.jsx';
+import Contact from './pages/Contact.jsx';
 import './styles.css';
 
 export default function App(){
@@ -23,6 +24,7 @@ export default function App(){
             <Route path="/" element={<Home />} />
             <Route path='/about' element={<About />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/contacts" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/feedback" element={<Feedback />} />
             <Route path="/cart" element={<Cart />} />

@@ -38,7 +38,7 @@ const Navbar = () => {
       </div>
 
       <div className="navbar-right" style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '7rem', alignItems: 'center', marginRight: '4rem' }}>
-        <Link to="contacts">Contacts</Link>
+        <Link to="contacts">Contact</Link>
         {user ? (
           <>
             <button onClick={() => setCartOpen(true)}>Cart ({items?.length ?? 0})</button>
