@@ -1,31 +1,51 @@
+/* Import both DM Serif Display (headers) and DM Sans (text) */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;700&family=DM+Serif+Display:ital@0;1&display=swap');
+
 /* Simple styles for Contact page layout */
 .contact-page {
   padding: 24px;
+  /* Apply the readable font to the whole page by default */
+  font-family: "DM Sans", sans-serif;
+  color: #333;
 }
+
 .contact-title {
-  font-size: 20px;
-  margin-bottom: 16px;
+  font-size: 24px; /* Increased slightly for the fancy font */
+  margin-bottom: 20px;
+  /* Apply the fancy font to the main title */
+  font-family: "DM Serif Display", serif;
+  letter-spacing: 0.5px;
 }
+
 .contact-grid {
   display: flex;
   gap: 24px;
 }
+
 .contact-left {
   width: 44%;
 }
+
 .city-label {
   display: block;
   margin-bottom: 8px;
   color: #555;
-  font-weight: 600;
+  font-weight: 700; /* Made slightly bolder for hierarchy */
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
+
 .city-select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   margin-bottom: 16px;
+  font-family: "DM Sans", sans-serif; /* Ensure dropdown uses the font */
+  font-size: 15px;
 }
+
 .showroom-list {
   display: flex;
   flex-direction: column;
@@ -33,17 +53,42 @@
   max-height: 720px;
   overflow: auto;
 }
+
 .showroom-item {
   border: 1px solid #e6e6e6;
-  padding: 14px;
+  padding: 18px; /* Increased padding for breathing room */
   border-radius: 4px;
   background: #fff;
   cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.showroom-item:hover { border-color: #ccc; }
-.showroom-item.active { box-shadow: 0 1px 0 rgba(0,0,0,0.03); border-left: 4px solid #333; }
-.showroom-name { font-size: 16px; margin: 0 0 8px 0; }
-.showroom-address, .showroom-hours, .showroom-phone { margin: 4px 0; color: #555; font-size: 14px; }
+
+.showroom-item:hover {
+  border-color: #ccc;
+}
+
+.showroom-item.active {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-color: #333;
+  border-left: 4px solid #333;
+}
+
+.showroom-name {
+  font-size: 18px;
+  margin: 0 0 10px 0;
+  /* Apply the fancy font to showroom names */
+  font-family: "DM Serif Display", serif;
+}
+
+.showroom-address, 
+.showroom-hours, 
+.showroom-phone {
+  margin: 6px 0;
+  color: #555;
+  font-size: 14px;
+  /* Critical for readability */
+  line-height: 1.6;
+}
 
 .contact-right {
   width: 56%;
@@ -51,18 +96,60 @@
   flex-direction: column;
   gap: 12px;
 }
-.map-frame { height: 720px; border-radius: 4px; overflow: hidden; }
+
+.map-frame {
+  height: 720px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
 .map-card {
-  padding: 12px;
+  padding: 20px;
   background: #fff;
   border: 1px solid #e6e6e6;
   border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
-.map-card h3 { margin: 0 0 6px 0; }
-.directions-link { display: inline-block; margin-top: 8px; color: #0070f3; text-decoration: none; }
+
+.map-card h3 {
+  margin: 0 0 10px 0;
+  font-family: "DM Serif Display", serif;
+  font-size: 20px;
+}
+
+.map-card p {
+  margin: 8px 0;
+  line-height: 1.6;
+  color: #444;
+}
+
+.directions-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  color: #000;
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid transparent;
+  transition: border-bottom 0.2s;
+}
+
+.directions-link:hover {
+  border-bottom: 1px solid #000;
+}
 
 @media (max-width: 900px) {
-  .contact-grid { flex-direction: column; }
-  .contact-left, .contact-right { width: 100%; }
-  .map-frame { height: 360px; }
+  .contact-grid {
+    flex-direction: column;
+  }
+  .contact-left, .contact-right {
+    width: 100%;
+  }
+  .map-frame {
+    height: 360px;
+  }
+  .showroom-list {
+    max-height: 400px;
+  }
 }

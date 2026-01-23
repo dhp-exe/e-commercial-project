@@ -35,21 +35,21 @@ export default function Feedback() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-container">
+    <div className="feedback-page">
+      <div className="feedback-container">
         <h2>Send Feedback</h2>
-        <p style={{ textAlign: 'center', marginBottom: '1rem', color: '#555' }}>
+        <p className="description">
           We'd love to hear your thoughts or any issues you've experienced.
         </p>
 
         {status && (
-          <div className={status.type === 'error' ? 'error' : 'success'} style={{ marginBottom: 12 }}>
+          <div className={status.type === 'error' ? 'error' : 'success'} style={{ marginBottom: 20, width: '100%', textAlign: 'center' }}>
             {status.text}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div>
+          <div className="form-group">
             <label>Your Name (optional)</label>
             <input
               type="text"
@@ -58,7 +58,8 @@ export default function Feedback() {
               placeholder="Peter Parker"
             />
           </div>
-          <div>
+
+          <div className="form-group">
             <label>Your Email (optional)</label>
             <input
               type="email"
@@ -67,23 +68,17 @@ export default function Feedback() {
               placeholder="peterparker@example.com"
             />
           </div>
-          <div>
+
+          <div className="form-group">
             <label>Your Message</label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              rows={6}
-              style={{
-                padding: 10,
-                border: '1px solid #ccc',
-                borderRadius: 6,
-                fontFamily: 'inherit',
-                fontSize: 15,
-              }}
               placeholder="Write your feedback here..."
               required
             />
           </div>
+
           <button type="submit" disabled={loading}>
             {loading ? 'Sending...' : 'Send Feedback'}
           </button>
