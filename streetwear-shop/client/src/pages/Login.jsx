@@ -1,7 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-// You don't need to import 'api' here because AuthContext handles it
 
 const Login = () => {
     const [isRegister, setIsRegister] = useState(false);
@@ -11,7 +10,6 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
 
-    // 1. Get both login AND register from context
     const { login, register } = useContext(AuthContext);
     const navigate = useNavigate();
 
@@ -20,20 +18,15 @@ const Login = () => {
         setError('');
         try {
             if(isRegister) {
-                // 2. Fix: Use 'name' to match backend requirements
-                // 3. Fix: Use context function which handles the correct path ('/api/auth/register')
                 await register({ name: username, email, password });
                 
-                // Optional: Navigate home immediately since register() usually logs you in
                 navigate('/'); 
             } else {
-                // 4. Fix: Pass credentials to login(), not the token
                 await login(email, password);
                 navigate('/');
             }
         } catch (err) {
             console.error(err);
-            // specific error message
             setError(err.response?.data?.message || 'Something went wrong');
         }
     };

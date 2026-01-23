@@ -139,7 +139,7 @@ export default function Account() {
                 </div>
               )}
             </div>
-            <h2 className="profile-greeting">Hello, {userInfo.name}</h2>
+            <h2 className="profile-greeting">Hello, {userInfo.name}!</h2>
             
             <div className="upload-picture-section">
               <label htmlFor="picture-input" className="upload-btn">

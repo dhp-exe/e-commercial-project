@@ -6,7 +6,7 @@ import logo from "../assets/logo.png";
 import CartDrawer from "./CartDrawer";
 
 const Navbar = () => {
-  const { user, logout } = useAuth();
+  const { token, logout } = useAuth();
   const { items } = useCart();
   const navigate = useNavigate();
   const [isCartOpen, setCartOpen] = useState(false);
@@ -39,10 +39,10 @@ const Navbar = () => {
 
       <div className="navbar-right" style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '7rem', alignItems: 'center', marginRight: '4rem' }}>
         <Link to="contacts">Contact</Link>
-        {user ? (
+        {token ? (
           <>
-            <button onClick={() => setCartOpen(true)}>Cart ({items?.length ?? 0})</button>
-            <button onClick={logout}>Logout</button>
+            <Link to="/account">Account</Link>
+            <Link to="/feedback">Feedback</Link>
           </>
         ) : (
           <>
