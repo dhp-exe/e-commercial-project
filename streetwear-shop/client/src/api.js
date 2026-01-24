@@ -1,13 +1,11 @@
 import axios from 'axios';
 
-// Detect if you are visiting from your local environment
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-// Always prefer localhost backend when you're coding locally
-// Fallback to the forwarded backend only when you're NOT on localhost
 const baseURL = isLocal
   ? 'http://localhost:5001/api'
-  : 'https://ckgkbm1c-5001.asse.devtunnels.ms/api';
+  : 'https://2flhl94d-5001.asse.devtunnels.ms/api';
+;
   
 
 export const api = axios.create({ baseURL });

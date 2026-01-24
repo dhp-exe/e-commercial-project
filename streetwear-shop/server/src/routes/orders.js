@@ -1,0 +1,84 @@
+import {Router} from 'express';
+import {pool} from '../db.js';
+import {requireAuth} from '../middleware/auth.js';
+
+const router = Router();
+
+// POST /api/orders - Create a new order from user's cart
+router.post('/', requireAuth, async (req, res) => {
+    const userId = req.user.id;
+    let connection;
+    
+    try {
+        // Start transaction
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // Get active cart
+        const [carts] = await connection.execute(
+            'SELECT * FROM carts WHERE user_id=? AND status="active"',
+            [userId]
+        );
+        if (carts.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({message: 'No active cart found'});
+        }
+        const cartId = carts[0].id;
+
+        // Get cart items
+        const [cartItems] = await connection.execute(
+            `SELECT ci.product_id, ci.qty, p.price 
+            FROM cart_items ci 
+            JOIN products p ON ci.product_id = p.id 
+            WHERE ci.cart_id = ?`,
+            [cartId]
+        );
+        if (items.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({message: 'Cart is empty'});
+        }
+
+        // Calculate total amount
+        let totalAmount = 0;
+        for (const item of cartItems) {
+            totalAmount += item.price * item.qty;
+        }
+
+        // Create order
+        const [orderResult] = await connection.execute(
+            'INSERT INTO orders (user_id, total, status) VALUES (?, ?, "new")',
+            [userId, total]
+        );
+        const orderId = orderResult.insertId;
+
+        // Insert order to order_items table
+        for (const item of cartItems) {
+            await connection.execute(
+                'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
+                [orderId, item.product_id, item.qty, item.price]
+            );
+        }
+        // Clear the Cart
+        await connection.execute('DELETE FROM cart_items WHERE cart_id = ?', [cartId]);
+
+        // Commit the Transaction
+        await connection.commit();
+
+        res.json({ message: 'Order placed successfully', orderId });
+
+    }
+    catch (error){
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+    finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+});
+
+export default router;

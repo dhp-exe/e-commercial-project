@@ -143,7 +143,7 @@ export default function Home() {
           {items
             .filter((p) => {
               if (searchTerm.trim() === "") {
-                return true; // ✅ show all products if search is empty
+                return true; 
               }
               return p.name.toLowerCase().includes(searchTerm.toLowerCase());
             })

@@ -9,12 +9,13 @@ dotenv.config();
 
 const app = express();
 app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
-app.use(cors({ origin: ['http://localhost:5173', 'https://ckgkbm1c-5173.asse.devtunnels.ms'], credentials: true }));
+app.use(cors({ origin: ['http://localhost:5173', 'https://2flhl94d-5173.asse.devtunnels.ms'], credentials: true }));
 app.use(express.json());
 
 app.use('/api/auth', auth);
 app.use('/api/products', products);
 app.use('/api/cart', cart);
+app.use('/api/orders', orders);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
