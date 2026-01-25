@@ -7,6 +7,8 @@ import './Account.css';
 export default function Account() {
   const { token, name, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // --- States ---
   const [userInfo, setUserInfo] = useState({
     name: '',
     email: '',
@@ -27,10 +29,16 @@ export default function Account() {
     new: '',
     confirm: '',
   });
+  
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('orders');
+  
+  // Popup States
+  const [selectedStatus, setSelectedStatus] = useState(null); 
+  const [statusOrders, setStatusOrders] = useState([]); 
 
+  // --- Effects ---
   useEffect(() => {
     if (!token) {
       navigate('/login');
@@ -39,6 +47,7 @@ export default function Account() {
     fetchUserData();
   }, [token, navigate]);
 
+  // --- Functions ---
   async function fetchUserData() {
     try {
       const { data } = await api.get('/auth/profile');
@@ -61,10 +70,8 @@ export default function Account() {
   async function handleProfilePictureUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-
     const formData = new FormData();
     formData.append('profilePicture', file);
-
     try {
       setMessage('');
       const { data } = await api.post('/auth/upload-profile-picture', formData, {
@@ -101,7 +108,6 @@ export default function Account() {
       setMessage('New password must be at least 6 characters!');
       return;
     }
-
     try {
       setMessage('');
       await api.post('/auth/change-password', {
@@ -118,6 +124,21 @@ export default function Account() {
   function handleLogout() {
     logout();
     navigate('/');
+  }
+
+  async function handleOrderClick(status) {
+    try {
+      const { data } = await api.get(`/orders?status=${status}`);
+      setStatusOrders(data);
+      setSelectedStatus(status);
+    } catch (error) {
+      console.error("Failed to fetch orders", error);
+    }
+  }
+
+  function closePopup() {
+    setSelectedStatus(null);
+    setStatusOrders([]);
   }
 
   if (loading) {
@@ -142,136 +163,98 @@ export default function Account() {
             <h2 className="profile-greeting">Hello, {userInfo.name}!</h2>
             
             <div className="upload-picture-section">
-              <label htmlFor="picture-input" className="upload-btn">
-                Update Profile Picture
-              </label>
-              <input
-                id="picture-input"
-                type="file"
-                accept="image/*"
-                onChange={handleProfilePictureUpload}
-                style={{ display: 'none' }}
-              />
+              <label htmlFor="picture-input" className="upload-btn">Update Profile Picture</label>
+              <input id="picture-input" type="file" accept="image/*" onChange={handleProfilePictureUpload} style={{ display: 'none' }} />
             </div>
 
             <nav className="account-nav">
-              <button
-                className={`nav-item ${activeTab === 'orders' ? 'active' : ''}`}
+              <button 
+                className={`nav-item ${activeTab === 'orders' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('orders')}
               >
                 My Orders
               </button>
-              <button
-                className={`nav-item ${activeTab === 'info' ? 'active' : ''}`}
+              <button 
+                className={`nav-item ${activeTab === 'info' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('info')}
               >
                 My Information
               </button>
-              <button
-                className={`nav-item ${activeTab === 'password' ? 'active' : ''}`}
+              
+              {/* 👇 NEW: Vouchers Tab Button */}
+              <button 
+                className={`nav-item ${activeTab === 'vouchers' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('vouchers')}
+              >
+                My Vouchers
+              </button>
+
+              <button 
+                className={`nav-item ${activeTab === 'password' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('password')}
               >
                 Change Password
               </button>
-              <button className="nav-item logout-btn" onClick={handleLogout}>
-                Log Out
-              </button>
+              <button className="nav-item logout-btn" onClick={handleLogout}>Log Out</button>
             </nav>
           </div>
         </aside>
 
         {/* Main Content */}
         <main className="account-main">
-          {message && (
-            <div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>
-              {message}
-            </div>
-          )}
+          {message && <div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>{message}</div>}
 
-          {/* My Orders Section */}
+          {/* Orders Section */}
           {activeTab === 'orders' && (
             <section className="account-section">
               <h1>My Orders</h1>
               <div className="orders-grid">
-                <div className="order-card new">
-                  <h3>New Orders</h3>
-                  <p className="order-count">{orders.new}</p>
-                </div>
-                <div className="order-card confirmed">
-                  <h3>Confirmed</h3>
-                  <p className="order-count">{orders.confirmed}</p>
-                </div>
-                <div className="order-card shipping">
-                  <h3>Shipping</h3>
-                  <p className="order-count">{orders.shipping}</p>
-                </div>
-                <div className="order-card received">
-                  <h3>Received</h3>
-                  <p className="order-count">{orders.received}</p>
-                </div>
-                <div className="order-card cancelled">
-                  <h3>Cancelled</h3>
-                  <p className="order-count">{orders.cancelled}</p>
-                </div>
+                {['new', 'confirmed', 'shipping', 'received', 'cancelled'].map(status => (
+                  <div 
+                    key={status} 
+                    className={`order-card ${status}`} 
+                    onClick={() => handleOrderClick(status)} 
+                    style={{cursor: 'pointer'}}
+                  >
+                    <h3 style={{textTransform: 'capitalize'}}>{status}</h3>
+                    <p className="order-count">{orders[status]}</p>
+                  </div>
+                ))}
               </div>
             </section>
           )}
 
-          {/* My Information Section */}
+          {/* Info Section */}
           {activeTab === 'info' && (
             <section className="account-section">
               <h1>My Information</h1>
               <form onSubmit={handleUpdateInfo} className="info-form">
                 <div className="form-group">
                   <label>Username</label>
-                  <input
-                    type="text"
-                    value={userInfo.name}
-                    disabled
-                    className="form-input disabled"
-                  />
+                  <input type="text" value={userInfo.name} disabled className="form-input disabled" />
                 </div>
-
                 <div className="form-group">
                   <label>Email</label>
-                  <input
-                    type="email"
-                    value={userInfo.email}
-                    disabled
-                    className="form-input disabled"
-                  />
+                  <input type="email" value={userInfo.email} disabled className="form-input disabled" />
                 </div>
-
                 <div className="form-group">
                   <label>Phone Number</label>
-                  <input
-                    type="tel"
-                    value={userInfo.phone}
-                    onChange={(e) => setUserInfo({ ...userInfo, phone: e.target.value })}
-                    className="form-input"
-                    placeholder="Enter your phone number"
-                  />
+                  <input type="tel" value={userInfo.phone} onChange={(e) => setUserInfo({ ...userInfo, phone: e.target.value })} className="form-input" placeholder="Enter phone number" />
                 </div>
-
                 <div className="form-group">
                   <label>Address</label>
-                  <textarea
-                    value={userInfo.address}
-                    onChange={(e) => setUserInfo({ ...userInfo, address: e.target.value })}
-                    className="form-input"
-                    placeholder="Enter your address"
-                    rows="4"
-                  />
+                  <textarea value={userInfo.address} onChange={(e) => setUserInfo({ ...userInfo, address: e.target.value })} className="form-input" rows="4" placeholder="Enter address" />
                 </div>
-
-                <button type="submit" className="save-btn">
-                  Save Information
-                </button>
+                <button type="submit" className="save-btn">Save Information</button>
               </form>
+            </section>
+          )}
 
-              {/* Vouchers Section */}
+          {/* Vouchers Section  */}
+          {activeTab === 'vouchers' && (
+            <section className="account-section">
+              <h1>Available Vouchers</h1>
               <div className="vouchers-section">
-                <h2>Available Vouchers</h2>
                 {vouchers.length > 0 ? (
                   <div className="vouchers-list">
                     {vouchers.map((voucher, index) => (
@@ -285,58 +268,79 @@ export default function Account() {
                     ))}
                   </div>
                 ) : (
-                  <p className="no-vouchers">No vouchers available</p>
+                  <p className="no-vouchers">No vouchers available at the moment.</p>
                 )}
               </div>
             </section>
           )}
 
-          {/* Change Password Section */}
+          {/* Password Section */}
           {activeTab === 'password' && (
             <section className="account-section">
               <h1>Change Password</h1>
               <form onSubmit={handleChangePassword} className="password-form">
                 <div className="form-group">
                   <label>Current Password</label>
-                  <input
-                    type="password"
-                    value={passwords.current}
-                    onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                    className="form-input"
-                    placeholder="Enter your current password"
-                    required
-                  />
+                  <input type="password" value={passwords.current} onChange={(e) => setPasswords({ ...passwords, current: e.target.value })} className="form-input" required />
                 </div>
-
                 <div className="form-group">
                   <label>New Password</label>
-                  <input
-                    type="password"
-                    value={passwords.new}
-                    onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                    className="form-input"
-                    placeholder="Enter your new password"
-                    required
-                  />
+                  <input type="password" value={passwords.new} onChange={(e) => setPasswords({ ...passwords, new: e.target.value })} className="form-input" required />
                 </div>
-
                 <div className="form-group">
                   <label>Confirm New Password</label>
-                  <input
-                    type="password"
-                    value={passwords.confirm}
-                    onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                    className="form-input"
-                    placeholder="Confirm your new password"
-                    required
-                  />
+                  <input type="password" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} className="form-input" required />
                 </div>
-
-                <button type="submit" className="save-btn">
-                  Change Password
-                </button>
+                <button type="submit" className="save-btn">Change Password</button>
               </form>
             </section>
+          )}
+
+          {/* ORDER DETAILS POPUP*/}
+          {selectedStatus && (
+            <div className="modal-overlay" onClick={closePopup}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2>{selectedStatus} Orders</h2>
+                  <button className="close-btn" onClick={closePopup}>&times;</button>
+                </div>
+
+                {statusOrders.length === 0 ? (
+                  <p className="muted">No orders found in this category.</p>
+                ) : (
+                  <div className="order-list">
+                    {statusOrders.map(order => (
+                      <div key={order.id} className="order-item">
+                        <div className="order-item-header">
+                          <span>Order #{order.id}</span>
+                          <span>${Number(order.total).toFixed(2)}</span>
+                        </div>
+                        <p className="order-date">
+                          Placed on: {new Date(order.created_at).toLocaleDateString()}
+                        </p>
+                        <div className="order-items-container">
+                          {order.items && order.items.map(item => (
+                            <div key={item.id} className="mini-product-row">
+                              <img 
+                                src={item.image_url || 'https://via.placeholder.com/50'} 
+                                alt={item.name} 
+                                className="mini-product-img"
+                              />
+                              <div className="mini-product-info">
+                                <p className="mini-product-name">{item.name}</p>
+                                <p className="mini-product-meta">
+                                  Qty: {item.quantity} &times; ${Number(item.price).toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </main>
       </div>

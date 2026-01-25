@@ -81,4 +81,41 @@ router.post('/', requireAuth, async (req, res) => {
     }
 });
 
+// GET /api/orders?status=new - Get user's orders (filtered by status)
+router.get('/', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { status } = req.query; // status filter
+
+  try {
+    let query = 'SELECT * FROM orders WHERE user_id = ?';
+    const params = [userId];
+
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+    
+    query += ' ORDER BY created_at DESC'; // Newest first
+
+    const [orders] = await pool.execute(query, params);
+    const ordersWithItems = await Promise.all(orders.map(async (order) => {
+      const [items] = await pool.execute(
+        `SELECT oi.id, oi.quantity, oi.price, p.name, p.image_url 
+         FROM order_items oi 
+         JOIN products p ON oi.product_id = p.id 
+         WHERE oi.order_id = ?`,
+        [order.id]
+      );
+      // Return the order combined with its items
+      return { ...order, items };
+    }));
+
+    // Map items to their respective orders
+    res.json(ordersWithItems);
+  } 
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 export default router;

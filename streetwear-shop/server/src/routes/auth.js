@@ -71,6 +71,10 @@ router.get('/profile', requireAuth, async (req, res) => {
       received: 0,
       cancelled: 0
     };
+    const dummyVouchers = [
+      { code: 'WELCOME20', discount: '20% OFF', expiryDate: '2025-12-31' },
+      { code: 'FREESHIP', discount: 'Free Shipping', expiryDate: '2025-06-30' }
+    ];
 
     counts.forEach(row => {
       if (orderStats[row.status] !== undefined) {
@@ -85,7 +89,8 @@ router.get('/profile', requireAuth, async (req, res) => {
       phone: '', 
       address: '',
       profilePicture: null,
-      orders: orderStats
+      orders: orderStats,
+      vouchers: dummyVouchers
     });
   } catch (e) {
     console.error(e);
