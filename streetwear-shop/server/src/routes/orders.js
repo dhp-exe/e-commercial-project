@@ -33,7 +33,7 @@ router.post('/', requireAuth, async (req, res) => {
             WHERE ci.cart_id = ?`,
             [cartId]
         );
-        if (items.length === 0) {
+        if (cartItems.length === 0) {
             await connection.rollback();
             return res.status(400).json({message: 'Cart is empty'});
         }
@@ -47,7 +47,7 @@ router.post('/', requireAuth, async (req, res) => {
         // Create order
         const [orderResult] = await connection.execute(
             'INSERT INTO orders (user_id, total, status) VALUES (?, ?, "new")',
-            [userId, total]
+            [userId, totalAmount] 
         );
         const orderId = orderResult.insertId;
 

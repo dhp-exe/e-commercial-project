@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import auth from './routes/auth.js';
 import products from './routes/products.js';
 import cart from './routes/cart.js';
+import orders from './routes/orders.js';
 import path from "path";
 dotenv.config();
 

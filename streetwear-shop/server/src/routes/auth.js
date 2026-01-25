@@ -47,24 +47,50 @@ router.post('/login', async (req, res) => {
 // GET /profile - Retrieve current user's details
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    const [rows] = await pool.execute(
+    // Get User Details
+    const [users] = await pool.execute(
       'SELECT id, name, email FROM users WHERE id=?', 
       [req.user.id]
     );
-
-    const user = rows[0];
+    const user = users[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Get Order Counts by Status
+    const [counts] = await pool.execute(
+      `SELECT status, COUNT(*) as count 
+       FROM orders 
+       WHERE user_id = ? 
+       GROUP BY status`, 
+      [req.user.id]
+    );
+
+    const orderStats = {
+      new: 0,
+      confirmed: 0,
+      shipping: 0,
+      received: 0,
+      cancelled: 0
+    };
+
+    counts.forEach(row => {
+      if (orderStats[row.status] !== undefined) {
+        orderStats[row.status] = row.count;
+      }
+    });
+
+    // Return everything
     res.json({
       name: user.name,
       email: user.email,
       phone: '', 
       address: '',
-      profilePicture: null
+      profilePicture: null,
+      orders: orderStats
     });
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 export default router;
