@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 
 export default function Feedback() {
@@ -7,6 +7,15 @@ export default function Feedback() {
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.get('/auth/profile').then(({ data }) => {
+      setName(data.name || '');
+      setEmail(data.email || '');
+    }).catch(() => {
+      // not logged in or error, ignore
+    });
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -23,13 +32,15 @@ export default function Feedback() {
       setName('');
       setEmail('');
       setMessage('');
-    } catch (err) {
+    } 
+    catch (err) {
       console.error('Feedback error:', err);
       setStatus({
         type: 'error',
-        text: 'Something went wrong while sending. You can also email us directly at owner@example.com.',
+        text: 'Something went wrong while sending. You can also email us directly at dhpStore@gmail.com.',
       });
-    } finally {
+    } 
+    finally {
       setLoading(false);
     }
   }
@@ -50,22 +61,24 @@ export default function Feedback() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Your Name (optional)</label>
+            <label>Your Name </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Peter Parker"
+              required
             />
           </div>
 
           <div className="form-group">
-            <label>Your Email (optional)</label>
+            <label>Your Email </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="peterparker@example.com"
+              required
             />
           </div>
 

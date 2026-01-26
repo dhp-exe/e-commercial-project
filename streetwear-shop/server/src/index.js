@@ -5,6 +5,7 @@ import auth from './routes/auth.js';
 import products from './routes/products.js';
 import cart from './routes/cart.js';
 import orders from './routes/orders.js';
+import feedback from './routes/feedback.js';
 import path from "path";
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use('/api/auth', auth);
 app.use('/api/products', products);
 app.use('/api/cart', cart);
 app.use('/api/orders', orders);
+app.use('/api/feedback', feedback);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

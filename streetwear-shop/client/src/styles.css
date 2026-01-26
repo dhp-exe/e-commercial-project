@@ -509,6 +509,14 @@ html::-webkit-scrollbar-thumb:hover {
   color: #555;
   font-size: 1.05rem;
 }
+.success {
+  background-color: #d1fae5;   /* light green */
+  color: #065f46;              /* dark green text */
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 18px;
+  font-weight: 500;
+}
 
 .feedback-container label {
   font-weight: 600;

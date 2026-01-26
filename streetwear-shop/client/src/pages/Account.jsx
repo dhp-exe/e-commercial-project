@@ -148,7 +148,7 @@ export default function Account() {
   return (
     <div className="account-page">
       <div className="account-container">
-        {/* Left Sidebar */}
+        {/* LEFT SIDEBAR */}
         <aside className="account-sidebar">
           <div className="profile-card">
             <div className="profile-picture-container">
@@ -181,7 +181,7 @@ export default function Account() {
                 My Information
               </button>
               
-              {/* 👇 NEW: Vouchers Tab Button */}
+              {/* Vouchers Tab Button */}
               <button 
                 className={`nav-item ${activeTab === 'vouchers' ? 'active' : ''}`} 
                 onClick={() => setActiveTab('vouchers')}
