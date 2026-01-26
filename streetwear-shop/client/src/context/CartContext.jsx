@@ -100,9 +100,9 @@ export function CartProvider({ children }) {
   }
 
   const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-
+  const totalQty = items.reduce((sum, item) => sum + Number(item.qty), 0);
   return (
-    <CartCtx.Provider value={{ items, total, add, update, refresh }}>
+    <CartCtx.Provider value={{ items, total, totalQty, add, update, refresh }}>
       {children}
     </CartCtx.Provider>
   );

@@ -12,7 +12,7 @@ import { CartContext } from "../context/CartContext";
 
 export default function Home() {
   const [items, setItems] = useState([]);
-  const { add } = useCart();
+  const { add, totalQty } = useCart();
   const { token, name } = useAuth();
   const navigate = useNavigate();
   const [message, setMessage] = useState(null);
@@ -26,7 +26,6 @@ export default function Home() {
   const inputRef = useRef(null);
   //cart quantity
   const { items: cartItems } = useContext(CartContext);
-  const totalQty = (cartItems || []).reduce((sum, item) => sum + item.qty, 0);
 
   useEffect(() => {
     let mounted = true;
