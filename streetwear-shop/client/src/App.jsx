@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthProvider from './context/AuthContext.jsx';
 import CartProvider from './context/CartContext.jsx';
@@ -11,8 +11,10 @@ import Feedback from './pages/Feedback.jsx';
 import Cart from './pages/Cart.jsx';
 import Account from './pages/Account.jsx';
 import Contact from './pages/Contact.jsx';
-import Checkout from './pages/Checkout.jsx';
+
 import './styles.css';
+
+const Checkout = lazy(() => import('./pages/Checkout'));
 
 export default function App(){
   return (
@@ -29,7 +31,7 @@ export default function App(){
             <Route path="/login" element={<Login />} />
             <Route path="/feedback" element={<Feedback />} />
             <Route path="/cart" element={<Cart />} />
-            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/checkout" element={<Suspense fallback={<div style={{padding:'50px', textAlign:'center'}}>Loading Checkout...</div>}><Checkout /></Suspense>} />
             <Route path="/account" element={<Account />} />
           </Routes>
         </main>

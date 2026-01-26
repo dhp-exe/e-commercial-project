@@ -118,8 +118,6 @@ router.get('/', requireAuth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-export default router;
-
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -160,3 +158,7 @@ router.post('/create-payment', requireAuth, async (req, res) => {
         res.status(500).json({ message: 'Server error creating payment' });
     }
 });
+
+export default router;
+
+
