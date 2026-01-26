@@ -151,7 +151,6 @@ export default function Home() {
               <div key={p.id} className="card fade-in">
                 <img src={p.image_url} alt={p.name} />
                 <h3>{p.name}</h3>
-                <p className="muted">{p.category_name}</p>
                 <strong>${Number(p.price).toFixed(2)}</strong>
                 <button
                   onClick={async () => {

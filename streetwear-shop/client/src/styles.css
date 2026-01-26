@@ -125,9 +125,9 @@ a:hover{ text-decoration:underline; opacity:0.9 }
 }
 /* Tighter spacing between product name, category and price */
 .card h3 {
-  margin: 0 0 16px;          /* small gap below product name */
-  font-size: 1.05rem;       
-  line-height: 1.15;
+  min-height: 3em;        /* aligns cards */
+  line-height: 1.5;
+  overflow: hidden;
 }
 
 .card .muted {
@@ -168,9 +168,8 @@ a:hover{ text-decoration:underline; opacity:0.9 }
   margin-right: 10rem;
 }
 
-/* small stagger effect (optional) */
 .grid .card.fade-in {
-  transition-delay: 0ms;
+  transition-delay: 2ms;
 }
 
 /* buttons */
