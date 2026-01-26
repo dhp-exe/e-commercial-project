@@ -14,21 +14,8 @@ export default function CartDrawer({ isOpen, onClose }) {
       alert("Your cart is empty!");
       return;
     }
-    setIsLoading(true);
-    try {
-      await api.post("/orders");
-      await refresh();
-      onClose();
-      navigate("/account");
-      alert("Order placed successfully!");
-    }
-    catch (error) {
-      console.error("Checkout error:", error);
-      alert("Failed to place order. Please try again.");
-    }
-    finally {
-      setIsLoading(false);
-    }
+    onClose(); 
+    navigate("/checkout");
   }
 
   return (

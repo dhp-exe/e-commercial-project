@@ -1,6 +1,8 @@
 import {Router} from 'express';
 import {pool} from '../db.js';
 import {requireAuth} from '../middleware/auth.js';
+import Stripe from 'stripe';
+
 
 const router = Router();
 
@@ -95,7 +97,7 @@ router.get('/', requireAuth, async (req, res) => {
       params.push(status);
     }
     
-    query += ' ORDER BY created_at DESC'; // Newest first
+    query += ' ORDER BY created_at DESC'; 
 
     const [orders] = await pool.execute(query, params);
     const ordersWithItems = await Promise.all(orders.map(async (order) => {
@@ -106,11 +108,9 @@ router.get('/', requireAuth, async (req, res) => {
          WHERE oi.order_id = ?`,
         [order.id]
       );
-      // Return the order combined with its items
       return { ...order, items };
     }));
 
-    // Map items to their respective orders
     res.json(ordersWithItems);
   } 
   catch (error) {
@@ -119,3 +119,44 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 export default router;
+
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// POST /api/orders/create-payment - Create Stripe Payment Intent
+router.post('/create-payment', requireAuth, async (req, res) => {
+    const userId = req.user.id;
+    try{
+        const [carts] = await pool.execute(
+            'SELECT * FROM carts WHERE user_id=? AND status="active"',
+            [userId]
+        );
+        if (carts.length === 0) return res.status(400).json({message: 'No active cart found'});
+
+        const cartId = carts[0].id;
+        const [cartItems] = await pool.execute(
+            `SELECT ci.qty, p.price FROM cart_items ci 
+            JOIN products p ON ci.product_id = p.id 
+            WHERE ci.cart_id = ?`,
+            [cartId]
+        );
+        if (cartItems.length === 0) return res.status(400).json({message: 'Cart is empty'});
+        
+        let totalAmount = 0;
+        for (const item of cartItems){
+            totalAmount += item.price * item.qty;
+        }
+
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(totalAmount * 100), // in CENTS
+            currency: 'usd',
+            automatic_payment_methods: { enabled: true },
+        });
+
+        res.json({ clientSecret: paymentIntent.client_secret });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error creating payment' });
+    }
+});

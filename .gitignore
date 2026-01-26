@@ -28,3 +28,9 @@ Thumbs.db
 
 # test coverage
 coverage/
+
+# Ignore all uploaded files
+streetwear-shop/server/src/uploads/*
+
+# But allow the gitkeep file (see Step 2)
+!streetwear-shop/server/src/uploads/.gitkeep
