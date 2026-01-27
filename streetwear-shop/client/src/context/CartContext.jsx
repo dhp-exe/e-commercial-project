@@ -28,15 +28,23 @@ export function CartProvider({ children }) {
     try {
       const local = JSON.parse(localStorage.getItem('local_cart') || '[]');
       if (!local || local.length === 0) { setItems([]); return; }
-      // fetch products list and map local entries to product details
       const { data: all } = await api.get('/products');
       const mapped = local.map(l => {
         const p = all.find(a => a.id === l.product_id);
         if (!p) return null;
-        return { product_id: p.id, qty: l.qty, name: p.name, price: p.price, image_url: p.image_url };
+    
+        return { 
+            product_id: p.id, 
+            qty: l.qty, 
+            size: l.size, 
+            name: p.name, 
+            price: p.price, 
+            image_url: p.image_url 
+        };
       }).filter(Boolean);
       setItems(mapped);
-    } catch (e) {
+    } 
+    catch (e) {
       console.error('refreshLocal error', e);
       setItems([]);
     }
@@ -47,10 +55,11 @@ export function CartProvider({ children }) {
   async function add(productId, qty = 1) {
     if (token) {
       try {
-        await api.post('/cart/add', { productId, qty });
+        await api.post('/cart/add', { productId, qty, size });
         await refreshServer();
         return true;
-      } catch (e) {
+      } 
+      catch (e) {
         console.error('Cart add error', e);
         return false;
       }
@@ -64,7 +73,8 @@ export function CartProvider({ children }) {
       localStorage.setItem('local_cart', JSON.stringify(local));
       await refreshLocal();
       return true;
-    } catch (e) {
+    } 
+    catch (e) {
       console.error('local add error', e);
       return false;
     }
@@ -100,9 +110,9 @@ export function CartProvider({ children }) {
   }
 
   const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-
+  const totalQty = items.reduce((sum, item) => sum + Number(item.qty), 0);
   return (
-    <CartCtx.Provider value={{ items, total, add, update, refresh }}>
+    <CartCtx.Provider value={{ items, total, totalQty, add, update, refresh }}>
       {children}
     </CartCtx.Provider>
   );

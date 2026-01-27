@@ -12,7 +12,7 @@ import { CartContext } from "../context/CartContext";
 
 export default function Home() {
   const [items, setItems] = useState([]);
-  const { add } = useCart();
+  const { add, totalQty } = useCart();
   const { token, name } = useAuth();
   const navigate = useNavigate();
   const [message, setMessage] = useState(null);
@@ -26,7 +26,6 @@ export default function Home() {
   const inputRef = useRef(null);
   //cart quantity
   const { items: cartItems } = useContext(CartContext);
-  const totalQty = (cartItems || []).reduce((sum, item) => sum + item.qty, 0);
 
   useEffect(() => {
     let mounted = true;
@@ -151,7 +150,6 @@ export default function Home() {
               <div key={p.id} className="card fade-in">
                 <img src={p.image_url} alt={p.name} />
                 <h3>{p.name}</h3>
-                <p className="muted">{p.category_name}</p>
                 <strong>${Number(p.price).toFixed(2)}</strong>
                 <button
                   onClick={async () => {

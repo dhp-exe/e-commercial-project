@@ -13,7 +13,7 @@ import Account from './pages/Account.jsx';
 import Contact from './pages/Contact.jsx';
 
 import './styles.css';
-
+const ProductDetails = lazy(() => import('./pages/ProductDetails'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 
 export default function App(){
@@ -27,6 +27,7 @@ export default function App(){
             <Route path="/" element={<Home />} />
             <Route path='/about' element={<About />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/product/:id" element={<Suspense fallback={<div>Loading...</div>}><ProductDetails /></Suspense>} />
             <Route path="/contacts" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/feedback" element={<Feedback />} />

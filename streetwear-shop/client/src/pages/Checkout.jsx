@@ -262,7 +262,7 @@ export default function Checkout() {
                    </div>
                    <div className="summary-details">
                      <div className="summary-name">{item.name}</div>
-                     <div style={{fontSize:12, color:'#666'}}>Standard Size</div>
+                     <div style={{fontSize:12, color:'#666'}}>Size: {item.size || "Standard"}</div>
                    </div>
                    <div className="summary-price">${(item.price * item.qty).toFixed(2)}</div>
                  </div>

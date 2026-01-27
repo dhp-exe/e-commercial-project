@@ -34,6 +34,9 @@ export default function CartDrawer({ isOpen, onClose }) {
               <img src={item.image_url} alt={item.name} />
               <div>
                 <h4>{item.name}</h4>
+                <p style={{ fontSize: "13px", color: "#666", margin: "4px 0" }}>
+                  Size: {item.size || "Standard"}
+                </p>
                 <p>${Number(item.price*item.qty).toFixed(2)}</p>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <button onClick={() => update(item.product_id, Math.max(0, item.qty - 1))}>-</button>
