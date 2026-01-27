@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link} from 'react-router-dom';
 import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +36,7 @@ export default function Products(){
   const [sortOption, setSortOption] = useState('relevant');
   const [priceFilter, setPriceFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sizeFilter, setSizeFilter] = useState(q.size || 'all');
 
   // Fetch Products
   useEffect(()=>{
@@ -86,6 +87,12 @@ export default function Products(){
       if (priceFilter === '10-20') return price >= 10 && price <= 20;
       if (priceFilter === '20-plus') return price > 20;
       
+      // Size Filter
+      if(sizeFilter !== 'all'){
+        const availableSizes = p.sizes ? p.sizes.split(',') : [];
+        if(!availableSizes.includes(sizeFilter)) return false;
+      }
+
       return true;
     })
     .sort((a, b) => {
@@ -205,6 +212,19 @@ export default function Products(){
               <option key={catName} value={catName}>{catName}</option>
             ))}
           </select>
+
+          {/* Size Filter */}
+          <select
+            value ={sizeFilter}
+            onChange={(e) => setSizeFilter(e.target.value)}
+            style={filterSelectStyle}
+          >
+            <option value="all">Size: All</option>
+            <option value="S">Small (S)</option>
+            <option value="M">Medium (M)</option>
+            <option value="L">Large (L)</option>
+            <option value="XL">Extra Large (XL)</option>
+          </select>
         </div>
 
         <div className="sort-container">
@@ -225,17 +245,16 @@ export default function Products(){
       <div className="products-grid">
         {processedItems.length > 0 ? (
           processedItems.map(p=> (
-            <div key={p.id} className="card fade-in">
+            <div 
+                key={p.id} 
+                className="card fade-in" 
+                style={{cursor: 'pointer'}}
+                onClick={() => navigate(`/product/${p.id}`)} // Navigate on click
+            >
               <img src={p.image_url} alt={p.name} />
               <h3>{p.name}</h3>
+              <span style={{fontSize:'13px', color:'#666'}}>{CATEGORY_MAP[p.category_id]}</span>
               <strong>${Number(p.price).toFixed(2)}</strong>
-              <button onClick={async () => {
-                const ok = await add(p.id,1);
-                if (ok) { setAddedId(p.id); setCartOpen(true); setTimeout(()=>setAddedId(null),2000); }
-              }}>Add to Cart</button>
-              {addedId === p.id && (
-                <p style={{ color: 'green', textAlign: 'center', marginTop: 8 }}>✅ Added to Cart</p>
-              )}
             </div>
           ))
         ) : (

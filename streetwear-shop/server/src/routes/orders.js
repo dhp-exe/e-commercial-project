@@ -29,7 +29,7 @@ router.post('/', requireAuth, async (req, res) => {
 
         // Get cart items
         const [cartItems] = await connection.execute(
-            `SELECT ci.product_id, ci.qty, p.price 
+            `SELECT ci.product_id, ci.qty, ci.size, p.price 
             FROM cart_items ci 
             JOIN products p ON ci.product_id = p.id 
             WHERE ci.cart_id = ?`,
@@ -56,14 +56,13 @@ router.post('/', requireAuth, async (req, res) => {
         // Insert order to order_items table
         for (const item of cartItems) {
             await connection.execute(
-                'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
-                [orderId, item.product_id, item.qty, item.price]
+                'INSERT INTO order_items (order_id, product_id, quantity, size, price) VALUES (?, ?, ?, ?, ?)',
+                [orderId, item.product_id, item.qty, item.size, item.price]
             );
         }
-        // Clear the Cart
+        // Clear the Cart & Commit
         await connection.execute('DELETE FROM cart_items WHERE cart_id = ?', [cartId]);
 
-        // Commit the Transaction
         await connection.commit();
 
         res.json({ message: 'Order placed successfully', orderId });
@@ -102,7 +101,7 @@ router.get('/', requireAuth, async (req, res) => {
     const [orders] = await pool.execute(query, params);
     const ordersWithItems = await Promise.all(orders.map(async (order) => {
       const [items] = await pool.execute(
-        `SELECT oi.id, oi.quantity, oi.price, p.name, p.image_url 
+        `SELECT oi.id, oi.quantity, oi.size, oi.price, p.name, p.image_url 
          FROM order_items oi 
          JOIN products p ON oi.product_id = p.id 
          WHERE oi.order_id = ?`,

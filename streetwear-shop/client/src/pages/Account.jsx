@@ -328,6 +328,7 @@ export default function Account() {
                               />
                               <div className="mini-product-info">
                                 <p className="mini-product-name">{item.name}</p>
+                                <p className="mini-product-meta">Size: {item.size || "Standard"}</p>
                                 <p className="mini-product-meta">
                                   Qty: {item.quantity} &times; ${Number(item.price).toFixed(2)}
                                 </p>

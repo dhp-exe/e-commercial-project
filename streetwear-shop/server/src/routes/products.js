@@ -78,4 +78,22 @@ router.get('/categories', async (_req, res) => {
   }
 });
 
+// GET /api/products/:id - Get a single product by ID
+router.get('/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Query database for the specific ID
+        const [rows] = await pool.execute('SELECT * FROM products WHERE id = ?', [id]);
+        
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+
+        res.json(rows[0]); // Return the single product object
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 export default router;
