@@ -20,15 +20,45 @@
   flex-direction: column;
   gap: 30px;
 }
-
+.left-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
 .section-title {
   font-family: "DM Serif Display", serif;
-  font-size: 22px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #eee;
+  font-size: 30px;
+  margin-bottom: 12px;
   padding-bottom: 10px;
 }
-
+.login-link-btn {
+  background: none;
+  border: none;
+  color: #005baa;
+  font-size: 16px;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin-top: 20;
+}
+.page-header {
+  height: 25px;
+}
+.back-btn{
+  position: 'relative';
+  color: #000;
+  font-size: 14;
+  cursor: 'pointer';
+  border-radius: 8;
+  background: #fff;
+  top: 10;
+  left: 30;
+  padding: '10px 14px';
+  font-size: 16px;
+  transition: opacity 0.2s;
+}
 /* Form Styles */
 .form-grid {
   display: grid;

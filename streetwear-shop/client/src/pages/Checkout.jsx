@@ -86,11 +86,11 @@ export default function Checkout() {
   useEffect(() => {
     // Only fetch payment intent if we have a total > 0
     if(total > 0) {
-        api.post("/orders/create-payment")
+        api.post("/orders/create-payment", {items})
         .then((res) => setClientSecret(res.data.clientSecret))
         .catch(console.error);
     }
-  }, [total]);
+  }, [total, items]);
 
   const handleInput = (e) => {
     const { name, value } = e.target;
@@ -149,13 +149,22 @@ export default function Checkout() {
 
   return (
     <div className="checkout-page">
+      <div className="page-header">
+        <button className="back-btn" onClick={() => navigate(-1)}>&larr; Back to Shop</button>
+      </div>
       <div className="checkout-container">
         
         {/* --- LEFT: DELIVERY & SELECTION --- */}
         <div className="checkout-left">
           
           <section>
-            <h2 className="section-title">Delivery Information</h2>
+            <div className="left-header">
+              <h2 className="section-title">Delivery Information</h2>
+              <button className="login-link-btn" onClick={() => navigate('/login')}>
+                {`Login / Register`}
+              </button>
+            </div>
+            
             <div className="form-grid">
                
                <div className="input-group">

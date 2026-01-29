@@ -122,47 +122,71 @@ export default function ProductDetails() {
         )}
         
         {/* --- HEADER ICONS --- */}
-        <div className="home-icons" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '20px 40px' }}>
-            {/* Cart Icon */}
-            <div 
-                ref={cartIconRef}
-                style={{ position: "relative", display: "inline-block" }}
-            > 
+        <div className="home-icons" 
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '20px 40px',
+            }}>
+            {/* Back Button */}
+            <button
+                onClick={() => navigate(-1)}
+                style={{
+                position: 'relative',
+                color: 'black',
+                fontSize: 18,
+                cursor: 'pointer',
+                borderRadius: 8,
+                border: '1px solid rgba(0,0,0,0.12)',
+                background: 'white',
+                top: 10,
+                left: 30,
+                padding: '10px 14px',
+                }}>
+                ← Back
+            </button>
+
+            {/* Right-side icons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginLeft: 'auto'}}>
+                {/* Cart Icon */}
+                <div ref={cartIconRef} style={{ position: 'relative' }}>
                 <img
                     src={bagIcon}
                     alt="Cart"
                     title="Cart"
                     onClick={() => setCartOpen(true)}
-                    style={{ width: 28, height: 28, cursor: 'pointer' }}
+                    style={{ width: 32, height: 32, cursor: 'pointer' }}
                 />
                 {totalQty > 0 && (
-                <span style={{
-                    position: "absolute",
-                    bottom: -5,
-                    left: -5,
-                    background: "black",
-                    color: "white",
-                    borderRadius: "50%",
-                    padding: "2px 6px",
-                    fontSize: "12px",
-                    fontWeight: "bold",
-                    lineHeight: 1,
-                    minWidth: "18px",
-                    textAlign: "center"
-                    }}>
+                    <span
+                    style={{
+                        position: 'absolute',
+                        bottom: -5,
+                        left: -5,
+                        background: 'black',
+                        color: 'white',
+                        borderRadius: '50%',
+                        padding: '2px 6px',
+                        fontSize: 12,
+                        fontWeight: 'bold',
+                        minWidth: 18,
+                        textAlign: 'center',
+                    }}
+                    >
                     {totalQty}
-                </span>
+                    </span>
                 )}
-            </div>
-    
-            {/* Account Icon */}
-            <img
+                </div>
+
+                {/* Account Icon */}
+                <img
                 src={accountIcon}
                 alt="Account"
                 title={token ? `Account (${name || 'me'})` : 'Login / Register'}
                 onClick={() => navigate(token ? '/account' : '/login')}
-                style={{ width: 28, height: 28, cursor: 'pointer' }}
-            />
+                style={{ width: 32, height: 32, cursor: 'pointer' }}
+                />
+            </div>
         </div>
 
         {/* --- MAIN PRODUCT CONTENT --- */}

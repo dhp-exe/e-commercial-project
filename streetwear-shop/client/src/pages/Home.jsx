@@ -92,7 +92,7 @@ export default function Home() {
             alt="Search"
             title="Search"
             onClick={() => setShowSearch(s => !s)}
-            style={{ width: 28, height: 28, cursor: 'pointer' }}
+            style={{ width: 32, height: 32, cursor: 'pointer' }}
           />
         </form>
 
@@ -102,7 +102,7 @@ export default function Home() {
             alt="Cart"
             title="Cart"
             onClick={() => setCartOpen(true)}
-            style={{ width: 28, height: 28, cursor: "pointer" }}
+            style={{ width: 32, height: 32, cursor: "pointer" }}
           />
           <span style={{
             position: "absolute",
@@ -129,7 +129,7 @@ export default function Home() {
           alt="Account"
           title={token ? `Account (${name || 'me'})` : 'Login / Register'}
           onClick={() => navigate(token ? '/account' : '/login')}
-          style={{ width: 28, height: 28, cursor: 'pointer' }}
+          style={{ width: 32, height: 32, cursor: 'pointer' }}
         />
       </div>
 

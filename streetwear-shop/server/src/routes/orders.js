@@ -222,4 +222,29 @@ router.post('/create-payment', async (req, res) => {
     }
 });
 
+// PUT /api/orders/:id - Cancel an order
+router.put('/:id/cancel', requireAuth, async (req,res) =>{
+    const userId = req.user.id;
+    const orderId = req.params.id;
+    try{
+        const [orders] = await pool.execute(
+            'SELECT id, status FROM orders WHERE id = ? AND user_id = ? ',
+            [orderId, userId]
+        );
+        if (orders.length === 0){
+            return res.status(404).json({message: 'Order not found'});
+        }
+        if (orders[0].status !== 'new') {
+            return res.status(400).json({ message: 'Only "New" orders can be cancelled' });
+        }
+
+        await pool.execute('UPDATE orders SET status = "cancelled" WHERE id = ?',[orderId]);
+        res.json({message: 'Order cancelled successfully'});
+    }
+    catch (error) {
+        console.error('Cancel order error:', error);
+        res.status(500).json({ message: 'Server error cancelling order' });
+    } 
+})
+
 export default router;
