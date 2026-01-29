@@ -52,7 +52,7 @@ export function CartProvider({ children }) {
 
   async function refresh() { if (token) return refreshServer(); return refreshLocal(); }
 
-  async function add(productId, qty = 1) {
+  async function add(productId, qty = 1, size = null) {
     if (token) {
       try {
         await api.post('/cart/add', { productId, qty, size });
@@ -67,9 +67,11 @@ export function CartProvider({ children }) {
     // guest/local cart
     try {
       const local = JSON.parse(localStorage.getItem('local_cart') || '[]');
-      const ex = local.find(x => x.product_id === productId);
+      const ex = local.find(x => x.product_id === productId && x.size === size);
+      
       if (ex) ex.qty = Number(ex.qty) + Number(qty);
-      else local.push({ product_id: productId, qty: Number(qty) });
+      else local.push({ product_id: productId, qty: Number(qty), size });
+      
       localStorage.setItem('local_cart', JSON.stringify(local));
       await refreshLocal();
       return true;
@@ -80,10 +82,10 @@ export function CartProvider({ children }) {
     }
   }
 
-  async function update(productId, qty) {
+  async function update(productId, qty, size) { 
     if (token) {
       try {
-        await api.post('/cart/update', { productId, qty });
+        await api.post('/cart/update', { productId, qty, size });
         await refreshServer();
         return true;
       } catch (e) {
@@ -91,21 +93,24 @@ export function CartProvider({ children }) {
         return false;
       }
     }
+    
+      // GUEST USER LOGIC
     try {
       let local = JSON.parse(localStorage.getItem('local_cart') || '[]');
       if (qty <= 0) {
-        local = local.filter(x => x.product_id !== productId);
-      } else {
-        const ex = local.find(x => x.product_id === productId);
+        local = local.filter(x => !(x.product_id === productId && x.size === size));
+      } 
+      else {
+        const ex = local.find(x => x.product_id === productId && x.size === size);
         if (ex) ex.qty = Number(qty);
-        else local.push({ product_id: productId, qty: Number(qty) });
       }
       localStorage.setItem('local_cart', JSON.stringify(local));
       await refreshLocal();
       return true;
-    } catch (e) {
-      console.error('local update error', e);
-      return false;
+    } 
+    catch (e) {
+        console.error('local update error', e);
+        return false;
     }
   }
 

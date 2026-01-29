@@ -56,55 +56,65 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState("vnpay");
   const [showModal, setShowModal] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
+  
+  // 1. Added Email to state
   const [deliveryInfo, setDeliveryInfo] = useState({
-    name: "", phone: "", address: "", city: "", district: ""
+    name: "", email: "", phone: "", address: "", city: "", district: ""
   });
   
   const [errors, setErrors] = useState({});
-
   const [voucher, setVoucher] = useState("");
   const [discount, setDiscount] = useState(0);
 
   // Autofill
   useEffect(() => {
+    // Attempt to get profile (works if logged in)
     api.get('/auth/profile').then(({data}) => {
-      setDeliveryInfo(prev => ({...prev, ...data}));
-    }).catch(console.error);
+      setDeliveryInfo(prev => ({
+          ...prev, 
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          address: data.address || ""
+      }));
+    }).catch(() => {
+        // Guest user - do nothing
+    });
   }, []);
 
   // Load Stripe
   useEffect(() => {
-    api.post("/orders/create-payment")
-       .then((res) => setClientSecret(res.data.clientSecret))
-       .catch(console.error);
-  }, []);
+    // Only fetch payment intent if we have a total > 0
+    if(total > 0) {
+        api.post("/orders/create-payment")
+        .then((res) => setClientSecret(res.data.clientSecret))
+        .catch(console.error);
+    }
+  }, [total]);
 
-  // Handle Input Changes (and clear errors)
   const handleInput = (e) => {
     const { name, value } = e.target;
     setDeliveryInfo({ ...deliveryInfo, [name]: value });
-    
-    // Clear the error for this field as soon as user types
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: null });
-    }
+    if (errors[name]) setErrors({ ...errors, [name]: null });
   };
 
-  // Validation Logic
+  // 2. Updated Validation
   const validateForm = () => {
     const newErrors = {};
     if (!deliveryInfo.name.trim()) newErrors.name = "Please enter your full name";
+    if (!deliveryInfo.email.trim()) newErrors.email = "Please enter your email"; // Check Email
+    else if (!/\S+@\S+\.\S+/.test(deliveryInfo.email)) newErrors.email = "Invalid email format";
+    
     if (!deliveryInfo.phone.trim()) newErrors.phone = "Please enter your phone number";
     if (!deliveryInfo.address.trim()) newErrors.address = "Please enter your address";
     if (!deliveryInfo.city.trim()) newErrors.city = "Please enter your city";
     if (!deliveryInfo.district.trim()) newErrors.district = "Please enter your district";
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0; // Return true if no errors
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleCompleteOrder = () => {
-    // Check validation before opening modal
     if (validateForm()) {
         if (paymentMethod === 'cod') {
             handleSuccess("Cash on Delivery");
@@ -116,13 +126,22 @@ export default function Checkout() {
 
   const handleSuccess = async (methodName) => {
     try {
-      await api.post("/orders"); 
+      await api.post("/orders", {
+          items: items, 
+          total: (total - discount),
+          deliveryInfo: deliveryInfo,
+          paymentMethod: methodName
+      }); 
+
+      localStorage.removeItem('local_cart');
       await refresh(); 
+      
       navigate("/account"); 
       alert(`Order Successful via ${methodName}!`);
     } 
     catch (err) {
-      alert("Order failed to save.");
+      console.error(err);
+      alert("Order failed to save: " + (err.response?.data?.message || err.message));
     }
   };
 
@@ -148,6 +167,18 @@ export default function Checkout() {
                    onChange={handleInput} 
                  />
                  {errors.name && <span className="error-msg">{errors.name}</span>}
+               </div>
+
+               <div className="input-group">
+                 <input 
+                   className={`checkout-input ${errors.email ? 'error' : ''}`}
+                   name="email" 
+                   type="email"
+                   placeholder="Email Address" 
+                   value={deliveryInfo.email} 
+                   onChange={handleInput} 
+                 />
+                 {errors.email && <span className="error-msg">{errors.email}</span>}
                </div>
 
                <div className="input-group">
@@ -215,12 +246,10 @@ export default function Checkout() {
           <section>
             <h2 className="section-title">Payment method</h2>
             <div className="payment-methods">
-                {/* Cash on delivery */}
                 <div className={`payment-option ${paymentMethod === 'cod' ? 'selected' : ''}`} onClick={() => setPaymentMethod('cod')}>
                     <input type="radio" checked={paymentMethod === 'cod'} readOnly />
                     <span>Cash on Delivery (COD)</span>
                 </div>
-                {/* VNPay */}
                 <div className={`payment-option ${paymentMethod === 'vnpay' ? 'selected' : ''}`} onClick={() => setPaymentMethod('vnpay')}>
                     <input type="radio" checked={paymentMethod === 'vnpay'} readOnly />
                     <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
@@ -228,15 +257,11 @@ export default function Checkout() {
                         <span>VNPay Gateway</span>
                     </div>
                 </div>
-
-                {/* Stripe */}
                 <div className={`payment-option ${paymentMethod === 'stripe' ? 'selected' : ''}`} onClick={() => setPaymentMethod('stripe')}>
                     <input type="radio" checked={paymentMethod === 'stripe'} readOnly />
                     <img src="https://cdn-icons-png.flaticon.com/512/6963/6963703.png" height="24" alt="stripe"/>
                     <span>Credit Card (Stripe)</span>
                 </div>
-
-                {/* PayPal */}
                 <div className={`payment-option ${paymentMethod === 'paypal' ? 'selected' : ''}`} onClick={() => setPaymentMethod('paypal')}>
                     <input type="radio" checked={paymentMethod === 'paypal'} readOnly />
                     <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
@@ -255,7 +280,7 @@ export default function Checkout() {
              
              <div className="order-items-scroll">
                {items.map(item => (
-                 <div key={item.product_id} className="summary-item">
+                 <div key={`${item.product_id}-${item.size}`} className="summary-item">
                    <div style={{position:'relative'}}>
                       <img src={item.image_url} className="summary-img" alt={item.name} />
                       <span style={{position:'absolute', top:-8, right:-8, background:'#666', color:'#fff', borderRadius:'50%', width:20, height:20, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center'}}>{item.qty}</span>

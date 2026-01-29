@@ -32,11 +32,12 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/add', requireAuth, async (req, res) => {
   const { productId, qty, size } = req.body;
   const userId = req.user.id;
+
   if(!productId || !qty || !size) {
     return res.status(400).json({ message: 'Invalid data' });
   }
-  let connection;
 
+  let connection;
   try {
       connection = await pool.getConnection();
       await connection.beginTransaction();
@@ -54,13 +55,13 @@ router.post('/add', requireAuth, async (req, res) => {
 
       // Check if product with SAME SIZE exists in cart
       const [existing] = await connection.execute(
-          'SELECT id, quantity FROM cart_items WHERE cart_id = ? AND product_id = ? AND size = ?',
+          'SELECT id, qty FROM cart_items WHERE cart_id = ? AND product_id = ? AND size = ?',
           [cartId, productId, size]
       );
 
       if (existing.length > 0) {
           // Update quantity if same size exists
-          const newQty = existing[0].quantity + qty;
+          const newQty = existing[0].qty + qty;
           await connection.execute('UPDATE cart_items SET qty = ? WHERE id = ?', [newQty, existing[0].id]);
       } 
       else {
@@ -87,15 +88,25 @@ router.post('/add', requireAuth, async (req, res) => {
   }
 });
 
-// POST /cart/update - Update the quantity of an item in the cart
+// POST /cart/update - Update quantity
 router.post('/update', requireAuth, async (req, res) => {
-  const { productId, qty } = req.body;
+  const { productId, qty, size } = req.body; // 1. Get size from request
+  
   try {
     const cart = await getOrCreateCart(req.user.id);
+    
     if (qty <= 0) {
-      await pool.execute('DELETE FROM cart_items WHERE cart_id=? AND product_id=?', [cart.id, productId]);
+      // Delete specific size
+      await pool.execute(
+          'DELETE FROM cart_items WHERE cart_id=? AND product_id=? AND size=?', 
+          [cart.id, productId, size]
+      );
     } else {
-      await pool.execute('UPDATE cart_items SET qty=? WHERE cart_id=? AND product_id=?', [qty, cart.id, productId]);
+      // Update specific size
+      await pool.execute(
+          'UPDATE cart_items SET qty=? WHERE cart_id=? AND product_id=? AND size=?', 
+          [qty, cart.id, productId, size]
+      );
     }
     res.json({ ok: true });
   } catch (e) {
