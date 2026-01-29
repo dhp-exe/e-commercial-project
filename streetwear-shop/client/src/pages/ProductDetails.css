@@ -87,6 +87,7 @@
 }
 
 .qty-btn {
+  color: #333;
   padding: 10px 16px;
   background: none;
   border: none;
@@ -139,4 +140,10 @@
         grid-template-columns: 1fr; /* Stack on mobile */
         gap: 30px;
     }
+}
+
+.flying-item {
+    pointer-events: none; /* Let clicks pass through */
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3); /* Nice shadow while flying */
+    object-fit: cover;
 }

@@ -58,7 +58,6 @@ export default function Home() {
 
   function submitSearch(e) {
     e?.preventDefault();
-    // Live search handled client-side via searchTerm filter
   }
 
 
@@ -67,7 +66,6 @@ export default function Home() {
       <div className="home-banner">
         <img src={homeBanner} alt="Streetwear Banner" />
 
-        {/* moved: home hero section placed inside banner, left aligned */}
         <div className="home-banner__overlay">
           <section className="home">
             <h1>New Drop</h1>
@@ -94,7 +92,7 @@ export default function Home() {
             alt="Search"
             title="Search"
             onClick={() => setShowSearch(s => !s)}
-            style={{ width: 28, height: 28, cursor: 'pointer' }}
+            style={{ width: 32, height: 32, cursor: 'pointer' }}
           />
         </form>
 
@@ -104,12 +102,12 @@ export default function Home() {
             alt="Cart"
             title="Cart"
             onClick={() => setCartOpen(true)}
-            style={{ width: 28, height: 28, cursor: "pointer" }}
+            style={{ width: 32, height: 32, cursor: "pointer" }}
           />
           <span style={{
             position: "absolute",
-            bottom: -5,   // adjust as needed
-            left: -5,     // adjust as needed
+            bottom: -5,   
+            left: -5,    
             background: "black",
             color: "white",
             borderRadius: "50%",
@@ -131,13 +129,12 @@ export default function Home() {
           alt="Account"
           title={token ? `Account (${name || 'me'})` : 'Login / Register'}
           onClick={() => navigate(token ? '/account' : '/login')}
-          style={{ width: 28, height: 28, cursor: 'pointer' }}
+          style={{ width: 32, height: 32, cursor: 'pointer' }}
         />
       </div>
 
-      {/* removed duplicate home section (now inside banner) */}
       <section className="container">
-        <h2 style={{ textAlign: "center", fontSize: "40px" }}> All Products</h2>
+        <h2 role = "button" onClick={() => navigate('/products')} style={{ cursor: 'pointer', textAlign: "center", fontSize: "40px" }}> All Products</h2>
         <div className="grid home-grid">
           {items
             .filter((p) => {
@@ -147,26 +144,10 @@ export default function Home() {
               return p.name.toLowerCase().includes(searchTerm.toLowerCase());
             })
             .map(p => (
-              <div key={p.id} className="card fade-in">
+              <div key={p.id} className="card fade-in" style ={{cursor: 'pointer'}} onClick={() => navigate(`/product/${p.id}`)}>
                 <img src={p.image_url} alt={p.name} />
                 <h3>{p.name}</h3>
                 <strong>${Number(p.price).toFixed(2)}</strong>
-                <button
-                  onClick={async () => {
-                    const ok = await add(p.id, 1);
-                    if (ok) {
-                      setAddedId(p.id);
-                      setTimeout(() => setAddedId(null), 2000);
-                    }
-                  }}
-                >
-                  Add to Cart
-                </button>
-                {addedId === p.id && (
-                  <p style={{ color: 'green', textAlign: 'center', marginTop: 8 }}>✅ Added to Cart</p>
-                )}
-
-
               </div>
             ))}
         </div>

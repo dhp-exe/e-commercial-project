@@ -19,7 +19,7 @@ const Navbar = () => {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0.5rem 1rem',
-        height: '140px',
+        height: '130px',
       }}
     >
       <div className="navbar-left" style={{ flex: 1, display: 'flex', gap: '7rem', alignItems: 'center', marginLeft: '4rem' }}>
@@ -33,7 +33,7 @@ const Navbar = () => {
           src={logo}
           alt="Streetwear logo"
           onClick={() => navigate('/')}
-          style={{ height: 180, display: 'block', margin: '0 auto', cursor: 'pointer' }}
+          style={{ height: 220, display: 'block', margin: '40px auto 0', cursor: 'pointer' }}
         />
       </div>
 

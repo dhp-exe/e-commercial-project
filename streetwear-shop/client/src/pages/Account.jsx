@@ -136,6 +136,24 @@ export default function Account() {
     }
   }
 
+  async function handleCancelOrder(orderId) {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;   
+    try{
+      await api.put(`orders/${orderId}/cancel`);
+      setStatusOrders(prev => prev.filter(order => order.id !== orderId));
+      setOrders(prev => ({ 
+          ...prev, 
+          new: Math.max(0, prev.new - 1),
+          cancelled: prev.cancelled + 1 
+      }));
+      setMessage('Order cancelled successfully.');
+    }
+    catch (error) {
+      console.error("Error cancelling order", error);
+      setMessage('Error cancelling order:' );
+    }
+  }
+
   function closePopup() {
     setSelectedStatus(null);
     setStatusOrders([]);
@@ -299,7 +317,7 @@ export default function Account() {
           {/* ORDER DETAILS POPUP*/}
           {selectedStatus && (
             <div className="modal-overlay" onClick={closePopup}>
-              <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                   <h2>{selectedStatus} Orders</h2>
                   <button className="close-btn" onClick={closePopup}>&times;</button>
@@ -309,32 +327,68 @@ export default function Account() {
                   <p className="muted">No orders found in this category.</p>
                 ) : (
                   <div className="order-list">
-                    {statusOrders.map(order => (
+                    {statusOrders.map((order) => (
                       <div key={order.id} className="order-item">
                         <div className="order-item-header">
                           <span>Order #{order.id}</span>
-                          <span>${Number(order.total).toFixed(2)}</span>
+                          <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+                            <span style={{ fontWeight: "bold" }}>
+                              ${Number(order.total).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                         <p className="order-date">
                           Placed on: {new Date(order.created_at).toLocaleDateString()}
                         </p>
-                        <div className="order-items-container">
-                          {order.items && order.items.map(item => (
-                            <div key={item.id} className="mini-product-row">
-                              <img 
-                                src={item.image_url || 'https://via.placeholder.com/50'} 
-                                alt={item.name} 
-                                className="mini-product-img"
-                              />
-                              <div className="mini-product-info">
-                                <p className="mini-product-name">{item.name}</p>
-                                <p className="mini-product-meta">Size: {item.size || "Standard"}</p>
-                                <p className="mini-product-meta">
-                                  Qty: {item.quantity} &times; ${Number(item.price).toFixed(2)}
-                                </p>
-                              </div>
+
+                        {/* Wrapper to align List (Left) and Button (Right) */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          
+                          {/* Left: List of Items */}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
+                            {order.items &&
+                              order.items.map((item) => (
+                                <div key={item.id} className="mini-product-row">
+                                  <img
+                                    src={item.image_url || "https://via.placeholder.com/50"}
+                                    alt={item.name}
+                                    className="mini-product-img"
+                                  />
+                                  <div className="mini-product-info">
+                                    <p className="mini-product-name">{item.name}</p>
+                                    <p className="mini-product-meta">
+                                      Size: {item.size || "Standard"}
+                                    </p>
+                                    <p className="mini-product-meta">
+                                      Qty: {item.quantity} &times; $
+                                      {Number(item.price).toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+
+                          {/* Right: Cancel Button */}
+                          {selectedStatus === "new" && (
+                            <div style={{ marginLeft: "20px" }}>
+                              <button
+                                onClick={() => handleCancelOrder(order.id)}
+                                style={{
+                                  backgroundColor: "#ff4d4f",
+                                  color: "white",
+                                  border: "none",
+                                  padding: "8px 16px", // Increased padding slightly for better look
+                                  borderRadius: "4px",
+                                  cursor: "pointer",
+                                  fontSize: "13px",
+                                  fontWeight: "500",
+                                  whiteSpace: "nowrap" // Prevents text wrapping
+                                }}
+                              >
+                                Cancel Order
+                              </button>
                             </div>
-                          ))}
+                          )}
                         </div>
                       </div>
                     ))}

@@ -39,9 +39,9 @@ export default function CartDrawer({ isOpen, onClose }) {
                 </p>
                 <p>${Number(item.price*item.qty).toFixed(2)}</p>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <button onClick={() => update(item.product_id, Math.max(0, item.qty - 1))}>-</button>
+                  <button onClick={() => update(item.product_id, Math.max(0, item.qty - 1), item.size)}>-</button>
                   <span style={{ fontWeight: "bold", minWidth: "20px", textAlign: "center" }}>{item.qty}</span>
-                  <button onClick={() => update(item.product_id, item.qty + 1)}>+</button>
+                  <button onClick={() => update(item.product_id, item.qty + 1, item.size)}>+</button>
                   </div>
               </div>
             </div>

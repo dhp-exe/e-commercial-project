@@ -118,7 +118,7 @@ export default function Products(){
 
   return (
     <>
-      <div className="home-icons" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '8px 1rem' }}>
+      <div className="home-icons" style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, padding: '16px 1rem' }}>
         <form onSubmit={submitSearch} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {showSearch && (
             <input
@@ -134,7 +134,7 @@ export default function Products(){
             alt="Search"
             title="Search"
             onClick={() => setShowSearch(s => !s)}
-            style={{ width: 28, height: 28, cursor: 'pointer' }}
+            style={{ width: 32, height: 32, cursor: 'pointer' }}
           />
         </form>
 
@@ -145,7 +145,7 @@ export default function Products(){
             alt="Cart"
             title="Cart"
             onClick={() => setCartOpen(true)}
-            style={{ width: 28, height: 28, cursor: 'pointer' }}
+            style={{ width: 32, height: 32, cursor: 'pointer' }}
           />
           {totalQty > 0 && (
             <span style={{
@@ -172,7 +172,7 @@ export default function Products(){
           alt="Account"
           title={token ? `Account (${name || 'me'})` : 'Login / Register'}
           onClick={() => navigate(token ? '/account' : '/login')}
-          style={{ width: 28, height: 28, cursor: 'pointer' }}
+          style={{ width: 32, height: 32, cursor: 'pointer' }}
         />
       </div>
 
