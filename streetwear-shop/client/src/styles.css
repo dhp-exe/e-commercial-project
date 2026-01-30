@@ -378,8 +378,8 @@ html::-webkit-scrollbar-thumb:hover {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100%;        /* fills full height from parent */
-  width: 100%;         /* fills full width */
+  height: 100%;        
+  width: 100%;     
   background-color: #f2f4f8;
   font-family: "DM Serif Display", serif;
 }
