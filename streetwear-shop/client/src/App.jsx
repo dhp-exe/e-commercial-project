@@ -11,6 +11,7 @@ import Feedback from './pages/Feedback.jsx';
 import Cart from './pages/Cart.jsx';
 import Account from './pages/Account.jsx';
 import Contact from './pages/Contact.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 
 import './styles.css';
 const ProductDetails = lazy(() => import('./pages/ProductDetails'));
@@ -34,6 +35,7 @@ export default function App(){
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Suspense fallback={<div style={{padding:'50px', textAlign:'center'}}>Loading Checkout...</div>}><Checkout /></Suspense>} />
             <Route path="/account" element={<Account />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
           </Routes>
         </main>
       </CartProvider>

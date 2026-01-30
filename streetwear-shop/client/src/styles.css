@@ -391,7 +391,7 @@ html::-webkit-scrollbar-thumb:hover {
   padding: 40px 50px;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-  width: 320px;
+  width: 30%;
 }
 
 /* Title */
@@ -399,7 +399,7 @@ html::-webkit-scrollbar-thumb:hover {
   margin-bottom: 20px;
   color: #333;
   text-align: center;
-  font-size: 30px;
+  font-size: 36px;
 }
 
 /* Labels and inputs */
@@ -414,6 +414,11 @@ html::-webkit-scrollbar-thumb:hover {
   border-radius: 6px;
   font-size: 15px;
   outline: none;
+}
+.input-group{
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .login-container input:focus {
