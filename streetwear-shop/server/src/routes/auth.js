@@ -5,11 +5,69 @@ import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
+import crypto from 'crypto';
 import { requireAuth } from '../middleware/auth.js'; 
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
 const router = Router();
+
+async function sendEmail(to, link) {
+  try {
+    // Configure Transporter 
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      logger: true, // Logs SMTP traffic to the console
+      debug: true   // Includes debug info in the logs
+    });
+
+    // Define Options
+    const mailOptions = {
+      from: `"Streetwear Support" <${process.env.EMAIL_USER}>`,
+      to: to,
+      subject: 'Password Reset Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Password Reset</h2>
+          <p>Click below to reset:</p>
+          <a href="${link}">Reset Password</a>
+        </div>
+      `
+    };
+
+    // Verify connection configuration (Optional but helpful)
+    await transporter.verify();
+    console.log("Server is ready to take our messages");
+
+    // Send Email and Log Result
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log("---------------------------------------");
+    console.log("📧 EMAIL SENT SUCCESSFULLY");
+    console.log("Message ID:", info.messageId);
+    console.log("Response:", info.response);
+    console.log("---------------------------------------");
+
+  } catch (error) {
+    console.error("---------------------------------------");
+    console.error("❌ EMAIL FAILED TO SEND");
+    console.error("Error Message:", error.message);
+    
+    // Check for common Gmail errors
+    if (error.code === 'EAUTH') {
+        console.error("👉 CAUSE: Invalid Login. Check EMAIL_USER and EMAIL_PASS in .env");
+        console.error("👉 TIP: You must use an 'App Password', not your login password.");
+    }
+    console.error("---------------------------------------");
+    
+    throw error; 
+  }
+}
 
 // image upload setup
 const storage = multer.diskStorage({
@@ -128,6 +186,50 @@ router.put('/profile', requireAuth, async (req, res) => {
   }
 });
 
+// POST /forgot-password
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (rows.length > 0) {
+      const user = rows[0];
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(rawToken)
+        .digest('hex');
+
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+      await pool.execute(
+        `INSERT INTO password_resets (user_id, token_hash, expires_at, used)
+         VALUES (?, ?, ?, false)`,
+        [user.id, tokenHash, expiresAt]
+      );
+
+      const resetLink = `http://localhost:5173/reset-password?token=${rawToken}&email=${email}`;
+      await sendEmail(email, resetLink);
+    }
+
+    return res.json({
+      message: 'If the email exists, a reset link has been sent.'
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
 // POST /change-password
 router.post('/change-password', requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
@@ -151,6 +253,53 @@ router.post('/change-password', requireAuth, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error changing password' });
+  }
+});
+
+// POST /reset-password
+router.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ message: 'Missing token or password' });
+  }
+
+  try {
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const [rows] = await pool.execute(
+      'SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > NOW() AND used = 0',
+      [tokenHash]
+    );
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
+
+    const resetRecord = rows[0];
+
+    // Hash the new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    await pool.execute(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [newPasswordHash, resetRecord.user_id]
+    );
+
+    // Mark token as used so it cannot be used again
+    await pool.execute(
+      'UPDATE password_resets SET used = 1 WHERE id = ?',
+      [resetRecord.id]
+    );
+
+    res.json({ message: 'Password has been reset successfully' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
