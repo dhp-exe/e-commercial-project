@@ -1,40 +1,77 @@
-import React, { createContext, useContext, useState } from 'react';
-import { api, setAuth } from '../api';
+import { createContext, useContext, useEffect, useState } from 'react';
+import api from '../api'; 
 
-const AuthCtx = createContext();
-export const AuthContext = AuthCtx;
-export const useAuth = () => useContext(AuthCtx);
+const AuthContext = createContext(null);
+
+export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [name, setName] = useState(localStorage.getItem('name'));
-  if (token) setAuth(token);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  async function login(email, password) {
-    const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', data.token);
-    setToken(data.token);
-    if (data.name) { localStorage.setItem('name', data.name); setName(data.name); }
-  }
+  // Check auth status on app load / refresh
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await api.get('/auth/profile');
+        setUser(res.data);
+        setIsAuthenticated(true);
+      } 
+      catch (err) {
+        setUser(null);
+        setIsAuthenticated(false);
+      } 
+      finally {
+        setLoading(false);
+      }
+    }
 
-  async function register(payload) {
-    const { data } = await api.post('/auth/register', payload);
-    localStorage.setItem('token', data.token);
-    setToken(data.token);
-  }
+    checkAuth();
+  }, []);
 
-  function logout() {
-    localStorage.clear();
-    setToken(null);
-    setName(null);
-    setAuth(null);
+  // Login
+  const login = async (email, password) => {
+  try {
+    await api.post('/auth/login', { email, password });
+    const res = await api.get('/auth/profile');
+    setUser(res.data);
+    setIsAuthenticated(true);
+  } 
+  catch (err) {
+    console.error("Login sync failed", err);
+    throw err;
   }
+};
+
+  // Register
+  const register = async (name, email, password) => {
+    await api.post('/auth/register', { name, email, password });
+    const res = await api.get('/auth/profile');
+    setUser(res.data);
+    setIsAuthenticated(true);
+  };
+
+  // Logout
+  const logout = async () => {
+    await api.post('/auth/logout');
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
+  const value = {
+    user,
+    isAuthenticated,
+    loading,
+    login,
+    register,
+    logout
+  };
 
   return (
-    <AuthCtx.Provider value={{ token, name, login, register, logout }}>
-      {children}
-    </AuthCtx.Provider>
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
   );
 }
 
-export default AuthProvider;
