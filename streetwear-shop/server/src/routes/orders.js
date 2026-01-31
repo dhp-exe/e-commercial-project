@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
