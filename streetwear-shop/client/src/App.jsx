@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import AuthProvider from './context/AuthContext.jsx';
+import { AuthProvider } from './context/AuthContext';
 import CartProvider from './context/CartContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import Home from './pages/Home.jsx';

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import api from '../api'; 
+import api from '../api';
 
 const AuthContext = createContext(null);
 
@@ -15,14 +15,12 @@ export function AuthProvider({ children }) {
     async function checkAuth() {
       try {
         const res = await api.get('/auth/profile');
-        setUser(res.data);
+        setUser(res.data);          // full user object
         setIsAuthenticated(true);
-      } 
-      catch (err) {
+      } catch (err) {
         setUser(null);
         setIsAuthenticated(false);
-      } 
-      finally {
+      } finally {
         setLoading(false);
       }
     }
@@ -32,17 +30,16 @@ export function AuthProvider({ children }) {
 
   // Login
   const login = async (email, password) => {
-  try {
-    await api.post('/auth/login', { email, password });
-    const res = await api.get('/auth/profile');
-    setUser(res.data);
-    setIsAuthenticated(true);
-  } 
-  catch (err) {
-    console.error("Login sync failed", err);
-    throw err;
-  }
-};
+    try {
+      await api.post('/auth/login', { email, password });
+      const res = await api.get('/auth/profile');
+      setUser(res.data);
+      setIsAuthenticated(true);
+    } catch (err) {
+      console.error('Login sync failed', err);
+      throw err;
+    }
+  };
 
   // Register
   const register = async (name, email, password) => {
@@ -60,9 +57,15 @@ export function AuthProvider({ children }) {
   };
 
   const value = {
+    // legacy fields
+    token: isAuthenticated ? '__COOKIE_AUTH__' : null,
+    name: user?.name || null,
+
     user,
     isAuthenticated,
     loading,
+
+    // actions
     login,
     register,
     logout
@@ -74,4 +77,3 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
-

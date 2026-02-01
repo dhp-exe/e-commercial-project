@@ -30,7 +30,7 @@ export default function CartDrawer({ isOpen, onClose }) {
           <p>Your cart is empty</p>
         ) : (
           items.map((item) => (
-            <div key={item.product_id} className="cart-item">
+            <div key={`${item.id}-${item.size}`} className="cart-item">
               <img src={item.image_url} alt={item.name} />
               <div>
                 <h4>{item.name}</h4>

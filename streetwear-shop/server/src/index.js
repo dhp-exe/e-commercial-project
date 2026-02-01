@@ -7,9 +7,13 @@ import cart from './routes/cart.js';
 import orders from './routes/orders.js';
 import feedback from './routes/feedback.js';
 import path from "path";
+import cookieParser from 'cookie-parser';
+
+
 dotenv.config();
 
 const app = express();
+app.use(cookieParser());
 app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
 app.use(cors({ origin: ['http://localhost:5173', 'https://2flhl94d-5173.asse.devtunnels.ms'], credentials: true }));
 app.use(express.json());

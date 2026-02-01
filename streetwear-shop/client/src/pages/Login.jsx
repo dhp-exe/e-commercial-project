@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../api'; 
 
 const Login = () => {
@@ -11,7 +11,7 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
 
-    const { login, register } = useContext(AuthContext);
+    const { login, register } = useAuth();
     const navigate = useNavigate();
     const [showRecovery, setShowRecovery] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');

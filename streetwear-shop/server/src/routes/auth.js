@@ -92,9 +92,23 @@ router.post('/register', async (req, res) => {
       'INSERT INTO users (email, password_hash, name) VALUES (?,?,?)',
       [email, hash, name]
     );
-    const token = jwt.sign({ id: result.insertId, email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token });
-  } catch (e) {
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    res.cookie('access_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000
+    });
+
+    res.json({ name: user.name });
+  } 
+  catch (e) {
     if (e && e.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Email already used' });
     console.error(e);
     res.status(500).json({ message: 'Server error' });
@@ -110,12 +124,32 @@ router.post('/login', async (req, res) => {
     if (!user) return res.status(401).json({ message: 'Invalid email or password' });
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ message: 'Invalid email or password' });
-    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, name: user.name });
-  } catch (e) {
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    res.cookie('access_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000
+    });
+
+    res.json({ name: user.name });
+  } 
+  catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
   }
+});
+
+// POST /logout
+router.post('/logout', (_req, res) => {
+  res.clearCookie('access_token');
+  res.json({ message: 'Logged out' });
 });
 
 // GET /profile - Get current user info
