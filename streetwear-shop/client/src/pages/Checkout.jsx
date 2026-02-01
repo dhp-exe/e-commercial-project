@@ -5,6 +5,7 @@ import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
 import "./Checkout.css";
 
 // API KEYS
@@ -51,6 +52,7 @@ function StripeModalContent({ onSuccess }) {
 export default function Checkout() {
   const { items, total, refresh } = useCart();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   
   // State
   const [paymentMethod, setPaymentMethod] = useState("vnpay");
@@ -160,9 +162,11 @@ export default function Checkout() {
           <section>
             <div className="left-header">
               <h2 className="section-title">Delivery Information</h2>
-              <button className="login-link-btn" onClick={() => navigate('/login')}>
-                {`Login / Register`}
-              </button>
+              {!isAuthenticated && (
+                <button className="login-link-btn" onClick={() => navigate('/login')}>
+                  {`Login / Register`}
+                </button>
+              )}
             </div>
             
             <div className="form-grid">

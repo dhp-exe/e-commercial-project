@@ -3,25 +3,24 @@ import { pool } from '../db.js';
 import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { apiLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // POST /api/orders - Create a new order (Guest & User)
-router.post('/', async (req, res) => {
+router.post('/',apiLimiter, async (req, res) => {
     let connection;
     try {
-        // Auth Check 
+        // Auth Check (from cookie `access_token`)
         let userId = null;
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.split(' ')[1];
+        const token = req.cookies?.access_token;
+        if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 userId = decoded.id;
-            } 
-            catch (err) {
-                console.log("Invalid token, proceeding as guest");
+            } catch (err) {
+                console.log('Invalid token, proceeding as guest');
             }
         }
 
@@ -158,12 +157,11 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/orders/create-payment - Create Stripe Payment Intent
-router.post('/create-payment', async (req, res) => {
-    // auth check
+router.post('/create-payment', apiLimiter, async (req, res) => {
+    // Auth check (from cookie `access_token`)
     let userId = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.split(' ')[1];
+    const token = req.cookies?.access_token;
+    if (token) {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             userId = decoded.id;
@@ -223,7 +221,7 @@ router.post('/create-payment', async (req, res) => {
 });
 
 // PUT /api/orders/:id - Cancel an order
-router.put('/:id/cancel', requireAuth, async (req,res) =>{
+router.put('/:id/cancel', apiLimiter, requireAuth, async (req,res) =>{
     const userId = req.user.id;
     const orderId = req.params.id;
     try{

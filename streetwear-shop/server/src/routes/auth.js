@@ -8,6 +8,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { requireAuth } from '../middleware/requireAuth.js'; 
 import nodemailer from 'nodemailer';
+import { authLimiter } from '../middleware/rateLimit.js';
 
 dotenv.config();
 
@@ -83,7 +84,7 @@ const upload = multer({ storage: storage });
 
 
 // POST /register
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter ,async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) return res.status(400).json({ message: 'Missing fields' });
   const hash = await bcrypt.hash(password, 10);
@@ -92,9 +93,9 @@ router.post('/register', async (req, res) => {
       'INSERT INTO users (email, password_hash, name) VALUES (?,?,?)',
       [email, hash, name]
     );
-
+    const userId = result.insertId;
     const token = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: userId, email },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }
     );
@@ -116,7 +117,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /login
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
     const [rows] = await pool.execute('SELECT * FROM users WHERE email=?', [email]);
@@ -221,7 +222,7 @@ router.put('/profile', requireAuth, async (req, res) => {
 });
 
 // POST /forgot-password
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ message: 'Email is required' });
@@ -265,7 +266,7 @@ router.post('/forgot-password', async (req, res) => {
 
 
 // POST /change-password
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', authLimiter, requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) return res.status(400).json({ message: 'Missing fields' });
 
@@ -291,7 +292,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
 });
 
 // POST /reset-password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authLimiter, async (req, res) => {
   const { token, newPassword } = req.body;
 
   if (!token || !newPassword) {
