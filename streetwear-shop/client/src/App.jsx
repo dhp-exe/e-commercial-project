@@ -3,6 +3,11 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import CartProvider from './context/CartContext.jsx';
 import Navbar from './components/Navbar.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
+import AdminLayout from './pages/admin/AdminLayout.jsx';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+import ManageOrders from './pages/admin/ManageOrders.jsx';
+import ManageProducts from './pages/admin/ManageProducts.jsx';
 import Home from './pages/Home.jsx';
 import About from './pages/About.jsx';
 import Products from './pages/Products.jsx';
@@ -24,6 +29,7 @@ export default function App(){
         <Navbar />
         <main className="container">
           <Routes>
+            {/* Public Storefront */}
             <Route path="" element={<Home />} />
             <Route path="/" element={<Home />} />
             <Route path='/about' element={<About />} />
@@ -36,6 +42,15 @@ export default function App(){
             <Route path="/checkout" element={<Suspense fallback={<div style={{padding:'50px', textAlign:'center'}}>Loading Checkout...</div>}><Checkout /></Suspense>} />
             <Route path="/account" element={<Account />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Admin / Staff Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['admin', 'staff']} />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminDashboard />} /> {/* Overview */}
+                  <Route path="orders" element={<ManageOrders />} />
+                  <Route path="products" element={<ManageProducts />} />
+              </Route>
+          </Route>
           </Routes>
         </main>
       </CartProvider>
