@@ -1,17 +1,13 @@
 import axios from 'axios';
 
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-const baseURL = isLocal
-  ? 'http://localhost:5001/api'
-  : 'https://2flhl94d-5001.asse.devtunnels.ms/api';
-;
-  
+// "DEV" is true when running 'npm run dev', false when running the built app
+const BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:5001/api' // Development: Talk to separate backend server
+  : '/api';                      // Production/Ngrok: Talk to same origin
 
 export const api = axios.create({ 
-  baseURL, 
-  withCredentials: true // for cookies
+  baseURL: BASE_URL, 
+  withCredentials: true 
 });
-
 
 export default api;

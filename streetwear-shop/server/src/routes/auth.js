@@ -13,6 +13,16 @@ dotenv.config();
 
 const router = Router();
 
+// Determine cookie options that work with ngrok / forwarded requests.
+// When behind a proxy or using ngrok with HTTPS, cookies must be `secure: true` and `sameSite: 'none'`.
+const isSecureCookie = process.env.NODE_ENV === 'production' || process.env.USE_NGROK === 'true' || process.env.TRUST_PROXY === '1';
+const cookieOptions = {
+  httpOnly: true,
+  secure: isSecureCookie,
+  sameSite: isSecureCookie ? 'none' : 'strict',
+  maxAge: 60 * 60 * 1000
+};
+
 async function sendEmail(to, link) {
   try {
     // Configure Transporter 
@@ -87,12 +97,7 @@ router.post('/register', authLimiter ,async (req, res) => {
       { expiresIn: '60m' }
     );
 
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000
-    });
+    res.cookie('access_token', token, cookieOptions);
 
     res.json({ name });
   } 
@@ -119,12 +124,7 @@ router.post('/login', authLimiter, async (req, res) => {
       { expiresIn: '60m' }
     );
 
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000
-    });
+    res.cookie('access_token', token, cookieOptions);
 
     res.json({ name: user.name });
   } 
@@ -136,7 +136,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
 // POST /logout
 router.post('/logout', (_req, res) => {
-  res.clearCookie('access_token');
+  res.clearCookie('access_token', cookieOptions);
   res.json({ message: 'Logged out' });
 });
 
