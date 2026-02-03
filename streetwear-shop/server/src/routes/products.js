@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-
+import { requireAuth } from '../middleware/requireAuth.js';
+import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
+import upload from '../middleware/upload.js';
 const router = Router();
 
 // GET /api/products
@@ -8,7 +10,7 @@ router.get('/', async (req, res) => {
   const { q, categoryId } = req.query;
   const where = [];
   const params = [];
-
+  where.push('p.is_active = true')
   if (q) {
     where.push('p.name LIKE ?');
     params.push('%' + q + '%');
@@ -24,8 +26,8 @@ router.get('/', async (req, res) => {
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY p.id DESC
-  `;
+    ORDER BY p.id DESC`
+  ;
 
   try {
     const [rows] = await pool.query(sql, params);
@@ -82,18 +84,128 @@ router.get('/categories', async (_req, res) => {
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        // Query database for the specific ID
-        const [rows] = await pool.execute('SELECT * FROM products WHERE id = ?', [id]);
+        const [rows] = await pool.execute('SELECT * FROM products WHERE id = ? AND is_active = true', [id]);
         
         if (rows.length === 0) {
             return res.status(404).json({ message: 'Product not found' });
         }
 
-        res.json(rows[0]); // Return the single product object
-    } catch (error) {
+        res.json(rows[0]); 
+    } 
+    catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
+});
+
+// POST /api/products - Create a new product (admin only)
+router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, res) => {
+    const { name, description, price, category_id, stock } = req.body;
+
+    // Validation
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      return res.status(400).json({ message: 'Product name is required' });
+    }
+    
+    const parsedPrice = Number(price);
+    if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+      return res.status(400).json({ message: 'Invalid price' });
+    }
+
+    const parsedStock = Number(stock);
+    if (!Number.isInteger(parsedStock) || parsedStock < 0) {
+      return res.status(400).json({ message: 'Invalid stock value' });
+    }
+
+    if (!category_id) {
+      return res.status(400).json({ message: 'Category is required' });
+    }
+
+  try {
+    // Check if Category Exists
+    const [categoryRows] = await pool.execute('SELECT id FROM categories WHERE id = ?', [category_id]);
+    if (categoryRows.length === 0) {
+      return res.status(400).json({ message: 'Category does not exist' });
+    }
+
+    // Handle Image
+    let imageUrl = null;
+    if (req.file) {
+        imageUrl = `/uploads/${req.file.filename}`; 
+    }
+
+    const [result] = await pool.execute(
+      'INSERT INTO products (name, description, price, category_id, stock, image_url, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, description, parsedPrice, category_id, parsedStock, imageUrl, true]
+    );
+
+    res.status(201).json({ 
+        id: result.insertId, 
+        name, 
+        price: parsedPrice, 
+        stock: parsedStock, 
+        image_url: imageUrl 
+    });
+
+  } 
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/products/:id/stock - Update product stock (staff and admin)
+router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
+  const productId = Number(req.params.id);
+  const { stock } = req.body;
+
+  if (Number.isNaN(productId) || productId < 0) {
+    return res.status(400).json({ message: 'Invalid product ID' });
+  }
+
+  const parsedStock = Number(stock);
+  if (!Number.isInteger(parsedStock) || parsedStock < 0) {
+    return res.status(400).json({ message: 'Invalid stock value' });
+  }
+
+  try {
+      const [rows] = await pool.execute('SELECT id FROM products WHERE id = ?', [productId]);
+      if(rows.length === 0){
+        return res.status(404).json({ message: 'Product not found'});
+      }
+
+      await pool.execute('UPDATE products SET stock = ? WHERE id = ?', [parsedStock, productId]);
+
+      res.json({ message: 'Stock updated', productId, stock: parsedStock });
+  } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE /api/products/:id - Delete a product (admin only)
+router.delete('/:id', requireAuth, verifyAdmin, async (req, res) => {
+  const productId = Number(req.params.id); 
+
+  if(Number.isNaN(productId) || productId < 0){
+    return res.status(400).json({ message: 'Invalid product id' });
+  }
+
+  try{
+    const [rows] = await pool.execute('SELECT id FROM products WHERE id = ?', [productId]);
+    if(rows.length === 0){
+      return res.status(404).json({ message: 'Product not found'});
+    }
+
+    // Soft Delete
+    await pool.execute('UPDATE products SET is_active = false WHERE id = ?', [productId]);
+    
+    res.status(200).json({ message: 'Product deleted successfully' }); 
+  } 
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 export default router;

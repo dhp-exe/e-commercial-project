@@ -58,7 +58,8 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState("vnpay");
   const [showModal, setShowModal] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
-  
+  const [note, setNote] = useState("");
+
   // 1. Added Email to state
   const [deliveryInfo, setDeliveryInfo] = useState({
     name: "", email: "", phone: "", address: "", city: "", district: ""
@@ -132,7 +133,8 @@ export default function Checkout() {
           items: items, 
           total: (total - discount),
           deliveryInfo: deliveryInfo,
-          paymentMethod: methodName
+          paymentMethod: methodName,
+          note: note
       }); 
 
       localStorage.removeItem('local_cart');
@@ -240,7 +242,13 @@ export default function Checkout() {
                  </div>
                </div>
                
-               <textarea className="checkout-input" placeholder="Order notes (optional)" rows={3} />
+               <textarea 
+                className="checkout-input" 
+                placeholder="Order notes (optional)" 
+                rows={3} 
+                value = {note}
+                onChange={(e) => setNote(e.target.value)}
+                />
             </div>
           </section>
 

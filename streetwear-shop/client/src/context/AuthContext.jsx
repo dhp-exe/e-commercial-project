@@ -43,10 +43,15 @@ export function AuthProvider({ children }) {
 
   // Register
   const register = async (name, email, password) => {
-    await api.post('/auth/register', { name, email, password });
-    const res = await api.get('/auth/profile');
-    setUser(res.data);
-    setIsAuthenticated(true);
+    try{
+      await api.post('/auth/register', { name, email, password });
+      const res = await api.get('/auth/profile');
+      setUser(res.data);
+      setIsAuthenticated(true);
+    } catch (err) {
+      console.error('Register sync failed', err);
+      throw err;
+    }
   };
 
   // Logout

@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { apiLimiter } from '../middleware/rateLimit.js';
+import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -24,7 +25,7 @@ router.post('/',apiLimiter, async (req, res) => {
             }
         }
 
-        const { items, total, deliveryInfo } = req.body;
+        const { items, total, deliveryInfo, paymentMethod, note } = req.body;
         
         // Basic Validation
         if (!items || items.length === 0) {
@@ -64,7 +65,7 @@ router.post('/',apiLimiter, async (req, res) => {
         // --- GUEST OR FALLBACK ---
         if (finalItemsToOrder.length === 0) {
             for (const item of items) {
-                const [rows] = await connection.execute('SELECT price FROM products WHERE id = ?', [item.product_id]);
+                const [rows] = await connection.execute('SELECT price FROM products WHERE id = ? AND is_active = true', [item.product_id]);
                 if (rows.length > 0) {
                     finalItemsToOrder.push({
                         product_id: item.product_id,
@@ -85,8 +86,8 @@ router.post('/',apiLimiter, async (req, res) => {
         // (With Delivery Info)
         const [orderResult] = await connection.execute(
             `INSERT INTO orders 
-            (user_id, total, status, name, email, phone, address, city, district) 
-            VALUES (?, ?, "new", ?, ?, ?, ?, ?, ?)`,
+            (user_id, total, status, name, email, phone, address, city, district, payment_method, note) 
+            VALUES (?, ?, "new", ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 userId, // Can be NULL
                 finalTotal, 
@@ -95,7 +96,9 @@ router.post('/',apiLimiter, async (req, res) => {
                 deliveryInfo?.phone || '', 
                 deliveryInfo?.address || '', 
                 deliveryInfo?.city || '', 
-                deliveryInfo?.district || ''
+                deliveryInfo?.district || '',
+                paymentMethod || 'cod',
+                note || ''
             ]
         );
         
@@ -244,5 +247,126 @@ router.put('/:id/cancel', apiLimiter, requireAuth, async (req,res) =>{
         res.status(500).json({ message: 'Server error cancelling order' });
     } 
 })
+// GET /api/admin/all (Admin/Staff)
+router.get('/admin/all', requireAuth, verifyStaff, async (req, res) => {
+    try{
+        const [orders] = await pool.execute('SELECT * FROM orders ORDER BY created_at DESC');
+        const ordersWithItems = await Promise.all(orders.map(async (order) => {
+            const [items] = await pool.execute(
+                `SELECT oi.id, oi.quantity, oi.size, oi.price, p.name, p.image_url
+                FROM order_items oi
+                JOIN products p ON oi.product_id = p.id
+                WHERE oi.order_id = ?`,
+                [order.id ]
+            );
+            return {...order, items};
+        }));
+        res.json(ordersWithItems);
+    }
+    catch (err){
+        console.error("Admin Fetch Orders Error:", err);
+        res.status(500).json({ message: 'Server error fetching orders' });
+    }
+});
 
+// PUT /api/orders/:id/status (Admin/ Staff)
+router.put('/:id/status', requireAuth, verifyStaff, async (req, res) => {
+    const { status: newStatus } = req.body; 
+    const orderId = req.params.id;
+
+    if (!['new', 'confirmed', 'shipping', 'received', 'cancelled'].includes(newStatus)) {
+        return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // Get Current Order Status & Items
+        const [orders] = await connection.execute(
+            'SELECT id, status FROM orders WHERE id = ? FOR UPDATE', 
+            [orderId]
+        );
+
+        if (orders.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        const currentStatus = orders[0].status;
+
+        // If status isn't changing, do nothing
+        if (currentStatus === newStatus) {
+            await connection.rollback();
+            return res.json({ message: 'Status unchanged' });
+        }
+
+        const [items] = await connection.execute(
+            'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
+            [orderId]
+        );
+
+        // 1 - Decrease Stock
+        if (currentStatus === 'new' && newStatus !== 'new' && newStatus !== 'cancelled') {
+            for (const item of items) {
+                // Check if we have enough stock first
+                const [product] = await connection.execute(
+                    'SELECT stock, name FROM products WHERE id = ?', 
+                    [item.product_id]
+                );
+
+                if (product.length === 0 || product[0].stock < item.quantity) {
+                    await connection.rollback();
+                    return res.status(400).json({ 
+                        message: `Insufficient stock for product: ${product[0]?.name || 'Unknown'}` 
+                    });
+                }
+
+                // Deduct stock
+                await connection.execute(
+                    'UPDATE products SET stock = stock - ? WHERE id = ?',
+                    [item.quantity, item.product_id]
+                );
+            }
+        }
+
+        // 2 - Increase Stock on Cancellation
+        else if (['confirmed', 'shipping'].includes(currentStatus) && newStatus === 'cancelled') {
+            for (const item of items) {
+                await connection.execute(
+                    'UPDATE products SET stock = stock + ? WHERE id = ?',
+                    [item.quantity, item.product_id]
+                );
+            }
+        }
+
+        // 3- Revert status -> restock
+        else if ( ['confirmed','shipping'].includes(currentStatus) && newStatus === 'new') {
+            for (const item of items) {
+                await connection.execute(
+                    'UPDATE products SET stock = stock + ? WHERE id = ?',
+                    [item.quantity, item.product_id]
+                );
+            }
+        }
+
+        await connection.execute(
+            'UPDATE orders SET status = ? WHERE id = ?',
+            [newStatus, orderId]
+        );
+
+        await connection.commit();
+        res.json({ message: `Order status updated to ${newStatus}` });
+
+    } 
+    catch (error) {
+        if (connection) await connection.rollback();
+        console.error(error);
+        res.status(500).json({ message: 'Server error updating status' });
+    } 
+    finally {
+        if (connection) connection.release();
+    }
+});
 export default router;

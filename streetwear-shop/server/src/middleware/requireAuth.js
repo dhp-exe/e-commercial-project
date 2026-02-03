@@ -1,9 +1,10 @@
 import jwt from 'jsonwebtoken';
+import { pool } from '../db.js'; 
 import dotenv from 'dotenv';
 dotenv.config();
 
-export function requireAuth(req, res, next) {
-  const token = req.cookies?.access_token;
+export async function requireAuth(req, res, next) {
+  const token = req.cookies?.access_token || req.cookies?.token;
 
   if (!token) {
     return res.status(401).json({ message: 'Not authenticated' });
@@ -11,10 +12,23 @@ export function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload;
+
+    const [rows] = await pool.execute(
+      'SELECT id, email, role FROM users WHERE id = ?',
+      [payload.id]
+    );
+
+    const user = rows[0];
+
+    if (!user) {
+      return res.status(401).json({ message: 'User no longer exists' });
+    }
+
+    req.user = user; 
     next();
   } 
-  catch {
+  catch (error) {
+    res.clearCookie('access_token'); 
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
 }

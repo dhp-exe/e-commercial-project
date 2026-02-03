@@ -3,16 +3,25 @@ import { pool } from '../db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import multer from 'multer';
-import path from 'path';
 import crypto from 'crypto';
 import { requireAuth } from '../middleware/requireAuth.js'; 
-import nodemailer from 'nodemailer';
+import upload from '../middleware/upload.js';
 import { authLimiter } from '../middleware/rateLimit.js';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
 const router = Router();
+
+// Determine cookie options that work with ngrok / forwarded requests.
+// When behind a proxy or using ngrok with HTTPS, cookies must be `secure: true` and `sameSite: 'none'`.
+const isSecureCookie = process.env.NODE_ENV === 'production' || process.env.USE_NGROK === 'true' || process.env.TRUST_PROXY === '1';
+const cookieOptions = {
+  httpOnly: true,
+  secure: isSecureCookie,
+  sameSite: isSecureCookie ? 'none' : 'strict',
+  maxAge: 60 * 60 * 1000
+};
 
 async function sendEmail(to, link) {
   try {
@@ -70,22 +79,10 @@ async function sendEmail(to, link) {
   }
 }
 
-// image upload setup
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'src/uploads/'); 
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage: storage });
-
-
 // POST /register
 router.post('/register', authLimiter ,async (req, res) => {
   const { email, password, name } = req.body;
+  console.log("Register Request Received:", { email, name, passwordPresent: !!password });
   if (!email || !password || !name) return res.status(400).json({ message: 'Missing fields' });
   const hash = await bcrypt.hash(password, 10);
   try {
@@ -97,17 +94,12 @@ router.post('/register', authLimiter ,async (req, res) => {
     const token = jwt.sign(
       { id: userId, email },
       process.env.JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '60m' }
     );
 
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 15 * 60 * 1000
-    });
+    res.cookie('access_token', token, cookieOptions);
 
-    res.json({ name: user.name });
+    res.json({ name });
   } 
   catch (e) {
     if (e && e.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Email already used' });
@@ -129,15 +121,10 @@ router.post('/login', authLimiter, async (req, res) => {
     const token = jwt.sign(
       { id: user.id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '60m' }
     );
 
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 15 * 60 * 1000
-    });
+    res.cookie('access_token', token, cookieOptions);
 
     res.json({ name: user.name });
   } 
@@ -149,14 +136,14 @@ router.post('/login', authLimiter, async (req, res) => {
 
 // POST /logout
 router.post('/logout', (_req, res) => {
-  res.clearCookie('access_token');
+  res.clearCookie('access_token', cookieOptions);
   res.json({ message: 'Logged out' });
 });
 
 // GET /profile - Get current user info
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    const [rows] = await pool.execute('SELECT id, name, email, phone, address, profile_picture FROM users WHERE id=?', [req.user.id]);
+    const [rows] = await pool.execute('SELECT id, name, email, role ,phone, address, profile_picture FROM users WHERE id=?', [req.user.id]);
     const user = rows[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -178,6 +165,7 @@ router.get('/profile', requireAuth, async (req, res) => {
     res.json({
       name: user.name,
       email: user.email,
+      role: user.role,
       phone: user.phone || '',
       address: user.address || '',
       profilePicture: user.profile_picture ? `http://localhost:5001/uploads/${user.profile_picture}` : null,

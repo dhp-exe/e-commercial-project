@@ -24,7 +24,7 @@ const Login = () => {
         setError('');
         try {
             if(isRegister) {
-                await register({ name: username, email, password });
+                await register( username, email, password );
                 navigate('/'); 
             } else {
                 await login(email, password);
@@ -74,6 +74,7 @@ const Login = () => {
                                 type="text" 
                                 value={username} 
                                 onChange={(e) => setUsername(e.target.value)} 
+                                placeholder='Peter Parker'
                                 required 
                             />
                         </div>
@@ -94,7 +95,6 @@ const Login = () => {
                             type={showPassword ? "text" : "password"} 
                             value={password} 
                             onChange={(e) => setPassword(e.target.value)} 
-                            placeholder='Peter Parker'
                             required 
                         />
                         <div style={{marginTop: '10px'}}>
