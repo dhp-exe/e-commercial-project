@@ -1,20 +1,19 @@
 {
   "name": "dhp-store",
-  "version": "1.0.0",
-  "description": "A full-stack streetwear shop application using React, Node.js, and MySQL.",
-  "main": "index.js",
+  "private": true,
+  "description": "Full-stack deployment manager",
   "scripts": {
-    "start": "node server/src/index.js",
-    "client": "npm start --prefix client",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "nodemon server/src/index.js"
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && nodemon src/index.js",
+    "dev:client": "npm start --prefix client",
+
+    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "start": "cd server && npm start"
   },
   "dependencies": {
-    "concurrently": "^6.0.0"
+    "concurrently": "^8.0.0"
   },
-  "devDependencies": {
-    "nodemon": "^2.0.0"
-  },
-  "author": "Your Name",
-  "license": "MIT"
+  "engines": {
+    "node": ">=16.0.0"
+  }
 }
