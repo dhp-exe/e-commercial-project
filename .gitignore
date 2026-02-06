@@ -6,7 +6,7 @@ node_modules/
 .env.*     # ignore all env variants
 
 
-dist/
+
 build/
 .cache/
 .next/
