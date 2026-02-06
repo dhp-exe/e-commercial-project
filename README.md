@@ -1,5 +1,5 @@
 # DHP Store
-
+*Website link: https://dhp-store.onrender.com*
 ## Overview
 DHP Store is a full-stack e-commerce application implementing a modern React (Vite) frontend and a Node.js + Express backend with MySQL. The project includes user authentication, a shopping flow, admin management tools, file uploads, role-based access control, and server-side protections such as rate limiting. Orders and inventory updates use transactional operations to maintain data integrity.
 
