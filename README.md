@@ -1,99 +1,184 @@
-# Streetwear Shop
+# DHP Store
 
 ## Overview
-The Streetwear Shop is a full-stack e-commerce application built using React for the frontend, Node.js for the backend, and MySQL for the database. This project allows users to browse products, manage their shopping cart, and authenticate their accounts. This application also provides a payment/transaction method.
+DHP Store is a full-stack e-commerce application implementing a modern React (Vite) frontend and a Node.js + Express backend with MySQL. The project includes user authentication, a shopping flow, admin management tools, file uploads, role-based access control, and server-side protections such as rate limiting. Orders and inventory updates use transactional operations to maintain data integrity.
 
 ## Project Structure
-```
-streetwear-shop
+The client code appears before the server code below (important files included):
+
+```text
+streetwear-shop/
+├── docker-compose.yml
 ├── package.json
-├── .gitignore
-├── README.md
-├── server
+├── client/                       # Frontend (React + Vite)
+│   ├── Dockerfile
+│   ├── index.html
+│   ├── nginx.conf
 │   ├── package.json
-│   ├── .env
+│   ├── vite.config.js
 │   └── src
-│       ├── index.js
-│       ├── db.js
-│       ├── middleware
-│       │   └── auth.js
-│       └── routes
-│           ├── auth.js
-│           ├── products.js
-│           └── cart.js
-└── client
-    ├── package.json
-    ├── index.html
-    └── src
-        ├── main.jsx
-        ├── App.jsx
-        ├── api.js
-        ├── context
-        │   ├── AuthContext.jsx
-        │   └── CartContext.jsx
-        ├── components
-        │   └── Navbar.jsx
-        ├── pages
-        │   ├── Home.jsx
-        │   ├── Products.jsx
-        │   ├── Login.jsx
-        │   ├── Register.jsx
-        │   └── Cart.jsx
-        └── styles.css
+│       ├── api.js
+│       ├── main.jsx
+│       ├── App.jsx
+│       ├── styles.css
+│       ├── assets/
+│       ├── components/
+│       │   ├── Navbar.jsx
+│       │   ├── CartDrawer.jsx
+│       │   └── ProtectedRoute.jsx
+│       ├── context/
+│       │   ├── AuthContext.jsx
+│       │   └── CartContext.jsx
+│       └── pages/
+│           ├── Home.jsx
+│           ├── Products.jsx
+│           ├── ProductDetails.jsx
+│           ├── Cart.jsx
+│           ├── Checkout.jsx
+│           ├── Login.jsx
+│           ├── Account.jsx
+│           ├── ResetPassword.jsx
+│           ├── Contact.jsx
+│           └── admin/
+│               ├── AdminLayout.jsx
+│               ├── AdminDashboard.jsx
+│               ├── ManageProducts.jsx
+│               └── ManageOrders.jsx
+├── server/                       # Backend (Node.js + Express)
+│   ├── Dockerfile
+│   ├── package.json
+│   └── src
+│       ├── index.js              # Express app entry
+│       ├── db.js                 # MySQL connection + transaction helpers
+│       ├── middleware/
+│       │   ├── requireAuth.js
+│       │   ├── requireRole.js
+│       │   ├── rateLimit.js
+│       │   └── upload.js
+│       ├── routes/
+│       │   ├── auth.js
+│       │   ├── products.js
+│       │   ├── cart.js
+│       │   ├── orders.js
+│       │   └── feedback.js
+│       └── uploads/              # Uploaded images/files
+└── README.md
 ```
 
-## Features
-- **User Authentication**: Users can register and log in to their accounts.
-- **Product Browsing**: Users can view a list of products with filtering options.
-- **Shopping Cart**: Users can add products to their cart and manage quantities.
-- **Responsive Design**: The application is designed to be mobile-friendly.
+## Key Features
+### Customer experience
+
+- **User Authentication:** Secure Login & Registration with JWT based sessions and Bcrypt hashing and password-reset flows.
+
+- **Profile Management:** Users can update personal info, upload profile pictures, and change passwords.
+
+- **Product Browsing:** Browse products with search functionality and category filtering.
+
+- **Shopping Cart:** Real-time cart management (add, remove, update quantities) and sent to server to update database.
+
+- **Checkout System:**
+   - Delivery information validation.
+
+   - Multiple Payment Gateways: Stripe (Credit Card), VNPay (QR/ATM), PayPal, and COD.
+
+- **Order History:** Users can track the status of their orders (New, Confirmed, Shipping, etc.) via their account dashboard.
+- **Feedback System**: Customers can leave feedback; backend stores and exposes feedback entries.
+### Admin & Staff Dashboard
+- **Role-Based Access (RBAC)**: `requireRole` middleware for admin-only routes and protected admin UI.
+- **Product and Order management**: 
+   - View all orders with customer details and item breakdowns, update order statuses.
+   - Product listing, filtering, product details with images (uploads supported).
+### Security
+- **Rate limiting:** IP rate limiting middleware to protect endpoints
+- **Secure cookies:** HttpOnly cookies for session management.
+- **Protected Routes**: Frontend protected routes for authenticated areas (`ProtectedRoute` component).
+### Technical
+- **Unified Deployment:** The backend is configured to serve the React frontend static build, allowing for single-port deployment (ideal for Ngrok tunneling).
+
+- **Database:** Optimized MySQL queries with connection pooling.
+- **Docker Support**: `docker-compose.yml` + `Dockerfile` for client and server to run in containers.
+
+### 🛠️ Tech Stack
+Frontend: React.js, Vite, CSS3
+
+Backend: Node.js, Express.js
+
+Database: MySQL
+
+Payments: Stripe API, PayPal SDK, VNPay integration
+
+Tools: Multer (File Uploads), Nodemailer (Emails), Ngrok (Tunneling)
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js
-- MySQL
+- Node.js (v16+)
+- MYSQL server
+- Docker (optional, for containerized setup)
 
-### Installation
-1. Clone the repository:
-   ```
-   git clone https://github.com/dhp-exe/e-commercial-project.git
-   cd streetwear-shop
-   ```
+### Installation (local)
+1. Clone the repository and enter the project folder:
+
+```bash
+git clone https://github.com/dhp-exe/e-commercial-project.git
+cd streetwear-shop
+```
 
 2. Install server dependencies:
-   ```
-   cd server
-   npm install
-   ```
 
-3. Set up the environment variables in the `.env` file:
-   ```
-   DB_HOST=your_database_host
-   DB_USER=your_database_user
-   DB_PASSWORD=your_database_password
-   DB_NAME=your_database_name
-   JWT_SECRET=your_jwt_secret
-   ```
+```bash
+cd server
+npm install
+```
+
+3. Create a `.env` file in `server/` with these variables:
+
+```env
+DB_HOST=your_database_host
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
+DB_NAME=your_database_name
+JWT_SECRET=your_jwt_secret
+PORT=...
+```
 
 4. Install client dependencies:
-   ```
-   cd ../client
-   npm install
-   ```
 
-### Running the Application
-1. Start the backend server:
-   ```
-   cd server
-   npm start
-   ```
+```bash
+cd ../client
+npm install
+```
+5. Create `.env` file in `client/`
+```bash
+VITE_STRIPE_PUBLIC_KEY=your_stripe_public_key
+```
+### Running the Application (local)
 
-2. Start the frontend application:
-   ```
-   cd ../client
-   npm run dev
-   ```
+Start the backend:
+
+```bash
+cd server
+npm start
+```
+
+Start the frontend (dev server):
+
+```bash
+cd ../client
+npm run dev
+```
+
+### Running with Docker
+
+From the `dhp-store` root (requires Docker & Docker Compose):
+
+```bash
+docker-compose up --build
+```
+
+## Notes
+- Database migrations and seed scripts can be added to `server/src` to initialize sample data.
+- Add automated tests for critical routes and payment/checkout flows.
 
 ### License
 This project is licensed under the MIT License.
