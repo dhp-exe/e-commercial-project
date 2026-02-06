@@ -16,6 +16,7 @@ import fs from 'fs';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Define Paths
 const __filename = fileURLToPath(import.meta.url);
