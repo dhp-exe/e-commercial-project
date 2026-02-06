@@ -1,5 +1,5 @@
 {
-  "name": "streetwear-shop",
+  "name": "dhp-store",
   "version": "1.0.0",
   "description": "A full-stack streetwear shop application using React, Node.js, and MySQL.",
   "main": "index.js",

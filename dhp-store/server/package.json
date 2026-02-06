@@ -1,5 +1,5 @@
 {
-  "name": "streetwear-shop-server",
+  "name": "dhp-store-server",
   "type": "module",
   "version": "1.0.0",
   "main": "src/index.js",

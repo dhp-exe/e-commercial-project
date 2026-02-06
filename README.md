@@ -4,10 +4,8 @@
 DHP Store is a full-stack e-commerce application implementing a modern React (Vite) frontend and a Node.js + Express backend with MySQL. The project includes user authentication, a shopping flow, admin management tools, file uploads, role-based access control, and server-side protections such as rate limiting. Orders and inventory updates use transactional operations to maintain data integrity.
 
 ## Project Structure
-The client code appears before the server code below (important files included):
-
 ```text
-streetwear-shop/
+dhp-store/
 ├── docker-compose.yml
 ├── package.json
 ├── client/                       # Frontend (React + Vite)
@@ -121,7 +119,7 @@ Tools: Multer (File Uploads), Nodemailer (Emails), Ngrok (Tunneling)
 
 ```bash
 git clone https://github.com/dhp-exe/e-commercial-project.git
-cd streetwear-shop
+cd dhp-store
 ```
 
 2. Install server dependencies:
