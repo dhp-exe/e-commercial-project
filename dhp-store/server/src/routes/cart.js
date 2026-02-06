@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 const router = Router();
 
 async function getOrCreateCart(userId) {
-  const [rows] = await pool.execute('SELECT * FROM carts WHERE user_id=? AND status="active"', [userId]);
+  const [rows] = await pool.execute('SELECT * FROM carts WHERE user_id=? AND status = ?', [userId, 'active']);
   if (rows[0]) return rows[0];
   const [r] = await pool.execute('INSERT INTO carts (user_id) VALUES (?)', [userId]);
   return { id: r.insertId, user_id: userId, status: 'active' };
@@ -43,7 +43,7 @@ router.post('/add', requireAuth, async (req, res) => {
       await connection.beginTransaction();
 
       // Get or create active cart
-      const [carts] = await connection.execute('SELECT id FROM carts WHERE user_id = ? AND status = "active"', [userId]);
+      const [carts] = await connection.execute('SELECT id FROM carts WHERE user_id = ? AND status = ?', [userId, 'active']);
       let cartId;
       if (carts.length > 0) {
           cartId = carts[0].id;
