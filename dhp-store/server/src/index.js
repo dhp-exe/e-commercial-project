@@ -15,7 +15,6 @@ import helmet from 'helmet'
 import fs from 'fs';
 
 dotenv.config();
-const morgan = require('morgan');
 
 const app = express();
 app.set('trust proxy', 1);
