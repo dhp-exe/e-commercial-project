@@ -11,7 +11,8 @@ import cookieParser from 'cookie-parser';
 import { globalLimiter } from './middleware/rateLimit.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import helmet from 'helmet'
+import helmet from 'helmet';
+import morgan from 'morgan';
 import fs from 'fs';
 
 dotenv.config();
