@@ -15,6 +15,7 @@ import helmet from 'helmet'
 import fs from 'fs';
 
 dotenv.config();
+const morgan = require('morgan');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -38,7 +39,7 @@ app.use(
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   })
 );
-
+app.use(morgan('common'));
 app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
 app.use(express.static(clientBuildPath));
 
