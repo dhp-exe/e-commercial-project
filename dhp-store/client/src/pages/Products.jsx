@@ -7,6 +7,7 @@ import searchIcon from "../assets/search_icon.png";
 import bagIcon from "../assets/shopping_bag.png";
 import accountIcon from "../assets/account_icon.png";
 import CartDrawer from "../components/CartDrawer";
+import RecommendRow from "../components/RecommendRow";
 
 function useQuery(){ const { search } = useLocation(); return Object.fromEntries(new URLSearchParams(search)); }
 
@@ -37,6 +38,7 @@ export default function Products(){
   const [priceFilter, setPriceFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState(q.size || 'all');
+  const [recommendations, setRecommendations] = useState([]);
 
   // Fetch Products
   useEffect(()=>{
@@ -69,9 +71,31 @@ export default function Products(){
 
   function submitSearch(e){ e?.preventDefault?.(); }
 
+  // Fetch recommendations
+  useEffect(() => {
+    if (token) {
+      api.get('/recommend/user')
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          setRecommendations(res.data);
+        } 
+        else {
+          setRecommendations([]);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setRecommendations([]); 
+      });
+    }
+    else {
+        setRecommendations([]);
+    }
+  }, [token]);
+
+
   // Helper: Filter & Sort Logic
-  const processedItems = items
-    .filter(p => {
+  const processedItems = items.filter(p => {
       // Search Filter
       if (searchTerm && !p.name.toLowerCase().includes(searchTerm.trim().toLowerCase())) return false;
       
@@ -241,6 +265,9 @@ export default function Products(){
           </select>
         </div>
       </div>
+
+      {/* Recommend for you */}
+      <RecommendRow title="Recommended For You" products={recommendations} />
 
       <div className="products-grid">
         {processedItems.length > 0 ? (

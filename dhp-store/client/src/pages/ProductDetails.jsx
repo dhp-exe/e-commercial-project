@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext'; 
 import CartDrawer from '../components/CartDrawer';
+import RecommendRow from '../components/RecommendRow';
 import './ProductDetails.css';
 
 import bagIcon from "../assets/shopping_bag.png";
@@ -26,6 +27,7 @@ export default function ProductDetails() {
     const productImgRef = useRef(null);
     const cartIconRef = useRef(null);
     const [flyingItem, setFlyingItem] = useState(null);
+    const [similarProducts, setSimilarProducts] = useState([]);
 
     useEffect(() => {
         api.get(`/products/${id}`)
@@ -38,6 +40,24 @@ export default function ProductDetails() {
                setLoading(false);
            });
     }, [id]);
+
+    useEffect(() => {
+    if (!id) return;
+    
+    api.get(`/recommend/product/${id}`)
+    .then(res => {
+        if (Array.isArray(res.data)) {
+            setSimilarProducts(res.data);
+        } else {
+            console.warn("Unexpected AI response:", res.data);
+            setSimilarProducts([]); // Default to empty if API fails
+        }
+    })
+    .catch(err => {
+        console.error("Recs error:", err);
+        setSimilarProducts([]); // Default to empty on error
+    });
+}, [id]);
 
     if (loading) return <div style={{padding: 40, textAlign:'center'}}>Loading product...</div>;
     if (!product) return <div style={{padding: 40, textAlign:'center'}}>Product not found.</div>;
@@ -248,6 +268,10 @@ export default function ProductDetails() {
                 </div>
             </div>
         </div>
+        {/* Similar products */}
+        <RecommendRow title="Similar Products" products={similarProducts} />
+
+        <CartDrawer isOpen={isCartOpen} onClose={() => setCartOpen(false)} />
 
         <CartDrawer isOpen={isCartOpen} onClose={() => setCartOpen(false)} />
     </>
