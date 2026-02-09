@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+mysql-connector-python
+pandas
+scikit-learn
+python-dotenv
+requests

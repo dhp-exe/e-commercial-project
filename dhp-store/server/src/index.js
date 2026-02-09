@@ -6,6 +6,7 @@ import products from './routes/products.js';
 import cart from './routes/cart.js';
 import orders from './routes/orders.js';
 import feedback from './routes/feedback.js';
+import recommendations from './routes/recommendations.js';
 import path from "path";
 import cookieParser from 'cookie-parser';
 import { globalLimiter } from './middleware/rateLimit.js';
@@ -60,6 +61,7 @@ app.use('/api/products', products);
 app.use('/api/cart', cart);
 app.use('/api/orders', orders);
 app.use('/api/feedback', feedback);
+app.use('/api/recommend', recommendations);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.get('*', (req, res) => {
