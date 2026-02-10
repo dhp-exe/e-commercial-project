@@ -4,10 +4,13 @@ import { AuthProvider } from './context/AuthContext';
 import CartProvider from './context/CartContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ChatBot from './components/Chatbot.jsx';
+
 import AdminLayout from './pages/admin/AdminLayout.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import ManageOrders from './pages/admin/ManageOrders.jsx';
 import ManageProducts from './pages/admin/ManageProducts.jsx';
+
 import Home from './pages/Home.jsx';
 import About from './pages/About.jsx';
 import Products from './pages/Products.jsx';
@@ -27,6 +30,7 @@ export default function App(){
     <AuthProvider>
       <CartProvider>
         <Navbar />
+        <ChatBot />
         <main className="container">
           <Routes>
             {/* Public Storefront */}

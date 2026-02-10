@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useLocation, useNavigate, Link} from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -21,11 +21,9 @@ export default function Products(){
   const [items, setItems] = useState([]);
   const q = useQuery();
   
-  const { add, totalQty } = useCart(); 
-  
+  const { totalQty } = useCart(); 
   const { token, name } = useAuth();
   const navigate = useNavigate();
-  const [addedId, setAddedId] = useState(null);
   const [isCartOpen, setCartOpen] = useState(false);
 
   // Search state
@@ -93,13 +91,12 @@ export default function Products(){
     }
   }, [token]);
 
-
   // Helper: Filter & Sort Logic
   const processedItems = items.filter(p => {
       // Search Filter
       if (searchTerm && !p.name.toLowerCase().includes(searchTerm.trim().toLowerCase())) return false;
       
-      // Category Filter (Using the Map)
+      // Category Filter
       if (categoryFilter !== 'all') {
         const productCategoryName = CATEGORY_MAP[p.category_id]; 
         if (productCategoryName !== categoryFilter) return false;
@@ -122,11 +119,15 @@ export default function Products(){
     .sort((a, b) => {
       const priceA = Number(a.price);
       const priceB = Number(b.price);
+      
+      // 👇 UPDATED SORT LOGIC
+      const soldA = Number(a.sold_count) || 0;
+      const soldB = Number(b.sold_count) || 0;
 
       switch (sortOption) {
         case 'asc': return priceA - priceB;
         case 'desc': return priceB - priceA;
-        case 'best-seller': return (b.sold || 0) - (a.sold || 0);
+        case 'best-seller': return soldB - soldA; // Sort by sold_count (Highest first)
         default: return 0; 
       }
     });
@@ -162,7 +163,6 @@ export default function Products(){
           />
         </form>
 
-        {/* Cart Icon with Fixed Badge */}
         <div style={{ position: "relative", display: "inline-block" }}> 
           <img
             src={bagIcon}
@@ -200,7 +200,6 @@ export default function Products(){
         />
       </div>
 
-      {/* Filter Bar */}
       <div className="filter-bar" style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -213,7 +212,6 @@ export default function Products(){
         gap: '10px'
       }}>
         <div style={{ display: 'flex', gap: '15px' }}>
-          {/* Price Filter */}
           <select 
             value={priceFilter} 
             onChange={(e) => setPriceFilter(e.target.value)}
@@ -225,7 +223,6 @@ export default function Products(){
             <option value="20-plus">$20+</option>
           </select>
 
-          {/* Category Filter */}
           <select 
             value={categoryFilter} 
             onChange={(e) => setCategoryFilter(e.target.value)}
@@ -237,7 +234,6 @@ export default function Products(){
             ))}
           </select>
 
-          {/* Size Filter */}
           <select
             value ={sizeFilter}
             onChange={(e) => setSizeFilter(e.target.value)}
@@ -266,7 +262,6 @@ export default function Products(){
         </div>
       </div>
 
-      {/* Recommend for you */}
       <RecommendRow title="Recommended For You" products={recommendations} />
 
       <div className="products-grid">
@@ -276,7 +271,7 @@ export default function Products(){
                 key={p.id} 
                 className="card fade-in" 
                 style={{cursor: 'pointer'}}
-                onClick={() => navigate(`/product/${p.id}`)} // Navigate on click
+                onClick={() => navigate(`/product/${p.id}`)}
             >
               <img src={p.image_url} alt={p.name} />
               <h3>{p.name}</h3>

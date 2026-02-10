@@ -22,12 +22,15 @@ router.get('/', async (req, res) => {
   }
 
   const sql = `
-    SELECT p.*, c.name AS category_name
+    SELECT 
+      p.*, 
+      c.name AS category_name,
+      (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE product_id = p.id) AS sold_count
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY p.id DESC`
-  ;
+    ORDER BY p.id DESC
+  `;
 
   try {
     const [rows] = await pool.query(sql, params);
