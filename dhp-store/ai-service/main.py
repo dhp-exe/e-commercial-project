@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from recommender import Recommender
 import uvicorn
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -38,6 +39,14 @@ def refresh_model():
     """Call this when you add new products to update the AI"""
     rec_engine.refresh()
     return {"status": "Refreshed"}
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/chat")
+def chat_endpoint(req: ChatRequest):
+    response_text = rec_engine.chat(req.message)
+    return {"reply": response_text}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=10000)
