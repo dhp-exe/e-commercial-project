@@ -37,6 +37,7 @@ app.use(
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "https:", "http:", "blob:"],
         connectSrc: ["'self'", "https://dhp-store.onrender.com", "http://localhost:5001"],
+        frameSrc: ["'self'", "https://www.google.com", "https://maps.google.com"],
       },
     },
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
