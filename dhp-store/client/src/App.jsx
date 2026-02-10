@@ -4,7 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import CartProvider from './context/CartContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
-import ChatBot from './components/Chatbot.jsx';
+import ChatBot from './components/ChatBot.jsx';
 
 import AdminLayout from './pages/admin/AdminLayout.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';

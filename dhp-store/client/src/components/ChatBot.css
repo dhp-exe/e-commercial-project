@@ -15,6 +15,7 @@
   font-size: 36px;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  animation: chatbot-attention 7s ease-in-out infinite;
 }
 
 .chat-window {
@@ -86,4 +87,13 @@
   color: blue;
   font-weight: bold;
   cursor: pointer;
+}
+@keyframes chatbot-attention {
+  0%   { transform: scale(1) translateX(0); }
+  2%   { transform: scale(1.2) translateX(-1px); }
+  4%   { transform: scale(1.18) translateX(1px) translateY(-15px); }
+  6%   { transform: scale(1.15) translateX(-1px) translateY(-12px); }
+  8%   { transform: scale(1.12) translateX(1px) translateY(-10px); }
+  10%  { transform: scale(1.05) translateX(0) translateY(-5px); }
+  100% { transform: scale(1) translateX(0); }
 }
