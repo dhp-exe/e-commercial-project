@@ -15,7 +15,13 @@ router.post('/', async (req, res) => {
     res.json({ reply: aiResponse.data.reply });
 
   } catch (error) {
-    console.error("Chat Error:", error.message);
+    if (error.response) {
+        console.error("Chat Error Status:", error.response.status);
+        console.error("Chat Error Data:", error.response.data);
+    } 
+    else {
+        console.error("Chat Error:", error.message);
+    }
     res.json({ reply: "I'm sorry, I can't connect to the server right now." });
   }
 });
