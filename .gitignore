@@ -11,6 +11,8 @@ build/
 .cache/
 .next/
 .nuxt/
+__pycache__/
+*.pyc
 
 
 npm-debug.log*

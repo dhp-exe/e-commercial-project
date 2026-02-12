@@ -27,6 +27,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const clientBuildPath = join(__dirname, '../../client/dist');
 
+app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
+app.use(express.static(clientBuildPath));
+
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -45,8 +48,6 @@ app.use(
   })
 );
 app.use(morgan('common'));
-app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
-app.use(express.static(clientBuildPath));
 
 app.use(globalLimiter); 
 app.use(cookieParser());
