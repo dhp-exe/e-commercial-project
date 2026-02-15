@@ -1,0 +1,143 @@
+/* ============================================
+   Home page – banner, overlay, icons
+   ============================================ */
+
+/* Full-bleed home banner without horizontal overflow */
+.home-banner {
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  width: 100vw;
+  overflow: hidden;
+  margin-top: -12px;
+}
+
+.home-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  max-width: none;
+}
+
+/* Hero content overlay (left-aligned) */
+.home-banner__overlay {
+  position: absolute;
+  top: 5%;
+  left: 12%;
+  transform: translateY(-5%);
+  z-index: 5;
+  max-width: 80ch;
+}
+
+.home-banner__overlay .home {
+  color: var(--accent-contrast);
+  padding: 200px 20px;
+  border-radius: var(--radius-lg);
+}
+
+.home-banner__overlay .home h1 {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  line-height: 1.05;
+  margin: 0 0 var(--space-lg);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.home-banner__overlay .home p {
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  margin: 0 0 1.2rem;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.home-banner__overlay .home .button {
+  font-size: 1.5rem;
+  padding: 0.6rem 1rem;
+  font-family: var(--font-noto);
+}
+
+/* Home page icons */
+.home-icons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4rem;
+  margin-right: 10rem;
+}
+
+.home-icons img {
+  height: 50px;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+}
+
+.home-icons img:hover {
+  transform: scale(1.2);
+}
+
+/* ----- Mobile-first responsiveness ----- */
+@media (max-width: 767px) {
+  .home-banner__overlay {
+    left: 4%;
+    top: 18%;
+    max-width: 60ch;
+  }
+
+  .home-banner__overlay .home {
+    padding: 14px;
+  }
+
+  .home-icons {
+    justify-content: center;
+    margin-right: 0;
+    gap: var(--space-xl);
+  }
+
+  .home-icons img {
+    height: 40px;
+  }
+}
+
+@media (max-width: 420px) {
+  .home-banner__overlay {
+    left: 3%;
+    top: 16%;
+    transform: none;
+    max-width: 85vw;
+  }
+
+  .home-banner__overlay .home {
+    padding: 12px;
+  }
+
+  .home-icons {
+    gap: var(--space-lg);
+  }
+
+  .home-icons img {
+    height: 36px;
+  }
+}
+
+@media (min-width: 780px) {
+  .home-banner__overlay {
+    left: 12%;
+    top: 5%;
+    max-width: 80ch;
+  }
+
+  .home-banner__overlay .home {
+    padding: 200px 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-icons {
+    margin-right: 10rem;
+    gap: 4rem;
+  }
+
+  .home-icons img {
+    height: 50px;
+  }
+}

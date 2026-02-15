@@ -1,0 +1,98 @@
+/* ============================================
+   CSS Variables – Single source of truth
+   ============================================ */
+
+:root {
+  /* ----- Colors: Brand & UI ----- */
+  --bg: #ffffff;
+  --bg-alt: #f8f8f8;
+  --bg-page: #f2f4f8;  /* login / feedback page background */
+  --panel: #f8f8f8;
+  --panel-hover: #f9f9f9;
+  --text: #0b0b0b;
+  --text-secondary: #333333;
+  --text-muted: #555555;
+  --muted: #6b6b6b;
+  --muted-light: #777777;
+  --muted-lighter: #999999;
+  --accent: #000000;
+  --accent-contrast: #ffffff;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-solid: #e0e0e0;
+  --border-light: #eee;
+  --border-input: #ddd;
+  --border-input-light: #e6e6e6;
+
+  /* ----- Semantic ----- */
+  --error-bg: #fff0f0;
+  --error-text: #8a0000;
+  --error-border: #d32f2f;
+  --error-form: #ff4d4f;
+  --error-light-bg: #f8d7da;
+  --error-light-text: #721c24;
+  --error-light-border: #f5c6cb;
+  --success-bg: #d1fae5;
+  --success-text: #065f46;
+  --success-border: #c3e6cb;
+  --success-message-bg: #d4edda;
+  --success-message-text: #155724;
+  --warning-bg: #fff8f8;
+  --link-color: #005baa;
+  --link-hover: #005baa;
+
+  /* ----- Surfaces (cards, inputs, modals) ----- */
+  --input-bg: #fafafa;
+  --card-shadow: 0 8px 28px rgba(0, 0, 0, 0.03);
+  --card-shadow-strong: 0 4px 20px rgba(0, 0, 0, 0.15);
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+  --modal-overlay-dark: rgba(0, 0, 0, 0.6);
+
+  /* ----- Scrollbar ----- */
+  --scrollbar-track: #000;
+  --scrollbar-thumb: #9a9a9a;
+  --scrollbar-thumb-hover: #bdbdbd;
+
+  /* ----- Account / UI specifics ----- */
+  --nav-inactive-bg: #f0f0f0;
+  --nav-inactive-hover: #e0e0e0;
+  --logout-btn: #d32f2f;
+  --logout-btn-hover: #b71c1c;
+  --profile-border: #333333;
+  --placeholder-gradient-start: #2b2b2e;
+  --placeholder-gradient-end: #300d62;
+  --voucher-border: #333333;
+  --voucher-discount: #d32f2f;
+  --payment-highlight: #f4f8ff;
+  --payment-option-hover: #f0f9ff;
+
+  /* ----- Typography ----- */
+  --font-serif: "DM Serif Display", serif;
+  --font-sans: "DM Sans", sans-serif;
+  --font-noto: "Noto Serif", serif;
+  --letter-spacing: 1.2px;
+  --letter-spacing-tight: 0.5px;
+
+  /* ----- Spacing ----- */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 2.5rem;
+  --space-3xl: 3rem;
+  --container-padding: 0.5rem;
+  --section-gap: 1rem;
+  --section-gap-lg: 1.5rem;
+
+  /* ----- Sizing ----- */
+  --container-max: 1200px;
+  --container-wide: 1400px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --input-height: auto;
+  --navbar-padding: 12px 0;
+  --footer-padding: 20px;
+}

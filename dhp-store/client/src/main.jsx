@@ -4,7 +4,6 @@ import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import './styles.css';
 
 const Router =
   window.location.hostname.includes('github.io')

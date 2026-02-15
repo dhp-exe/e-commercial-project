@@ -1,124 +1,233 @@
+/* ============================================
+   About page – hero, quote, mission, values, scroll animations
+   ============================================ */
+
 .about-page {
-    background-color: #000;
-    color: #fff;
-    font-family: "DM Serif Display", serif;
-    line-height: 1.6;
-    min-height: 100vh;
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+  font-family: var(--font-serif);
+  line-height: 1.6;
+  min-height: 100vh;
 }
 
+.about-page h1 {
+  text-align: center;
+  margin-top: var(--space-xl);
+}
+
+/* Base: mobile (stacked, reduced padding) */
 .hero {
-    color: #fff;
-    text-align: center;
-    padding: 3rem 3rem;
-    animation: fade-out linear forwards;
-    animation-timeline: view();
-    animation-range: exit -200px;
+  color: var(--accent-contrast);
+  text-align: center;
+  padding: var(--space-xl) var(--space-lg);
+  animation: fade-out linear forwards;
+  animation-timeline: view();
+  animation-range: exit -200px;
 }
 
 .hero-content h1 {
-    color: #fff;
-    font-size: 3rem;
-    font-weight: bold;
+  color: var(--accent-contrast);
+  font-size: 2rem;
+  font-weight: bold;
 }
 
 .hero-content p {
-    font-size: 1.2rem;
-    margin-top: 1rem;
-    color: #ddd;
+  font-size: 1rem;
+  margin-top: var(--space-md);
+  color: #ddd;
 }
 
-.image-section img{
-    width: 80%;
-    max-height: 610px;
-    object-fit: cover;
-    object-position: 90%;
-    display: block;
-    margin: 0 auto;
-    animation: fade-out linear forwards;
-    animation-timeline: view();
-    animation-range: exit -100px;
+.image-section img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  object-position: 90%;
+  display: block;
+  margin: 0 auto;
+  animation: fade-out linear forwards;
+  animation-timeline: view();
+  animation-range: exit -100px;
 }
+
 .quote-section {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 2rem;
-    margin-top: 10rem;
-    animation: fade-out linear forwards;
-    animation-timeline: view();
-    animation-range: exit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-3xl);
+  animation: fade-out linear forwards;
+  animation-timeline: view();
+  animation-range: exit;
 }
+
 .quote-section img {
-    width: 90%;
-    max-width: 600px;
-    height: auto;
-    object-fit: cover;
-    animation: fade-in linear forwards;
-    animation-timeline: view();
-    animation-range: entry -250px, exit -650px;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: cover;
+  animation: fade-in linear forwards;
+  animation-timeline: view();
+  animation-range: entry -250px, exit -650px;
 }
 
 .quote-section blockquote {
-    font-family: "DM Serif Display", serif;
-    width: 30%;
-    color: white;
-    font-size: 1.7rem;
-    font-style: italic;
-    line-height: 2.0;
-    animation: fade-in linear forwards;
-    animation-timeline: view();
-    animation-range: entry -200px, exit -600px;
+  font-family: var(--font-serif);
+  width: 100%;
+  color: var(--accent-contrast);
+  font-size: 1.25rem;
+  font-style: italic;
+  line-height: 2;
+  animation: fade-in linear forwards;
+  animation-timeline: view();
+  animation-range: entry -200px, exit -600px;
 }
-.mission,.values {
-    max-width: 900px;
-    margin: 4rem auto;
-    padding: 0 2rem;
-    text-align: center;
-     animation: fade-in linear forwards;
-    animation-timeline: view();
-    animation-range: entry 50px, exit -600px;
+
+.mission,
+.values {
+  max-width: 900px;
+  margin: var(--space-xl) auto;
+  padding: 0 var(--space-lg);
+  text-align: center;
+  animation: fade-in linear forwards;
+  animation-timeline: view();
+  animation-range: entry 50px, exit -600px;
 }
 
 .values-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  margin-top: var(--space-xl);
 }
 
 .values-grid h3 {
-    color: #fff;
-    margin-bottom: 1rem;
+  color: var(--accent-contrast);
+  margin-bottom: var(--space-md);
 }
 
-.footer {
-    text-align: center;
-    background: #111;
-    color: #ccc;
-    padding: 2rem;
+.about-page .footer {
+  text-align: center;
+  background: #111;
+  color: #ccc;
+  padding: var(--space-xl);
 }
-/* Define the keyframes for the motion */
+
 @keyframes fade-in {
-    from {
-        opacity: 0;
-        scale: 0.8; /* Optional: Slight zoom effect like in the video */
-    }
-    to {
-        opacity: 1;
-        scale: 1;
-    }
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
 }
 
 @keyframes fade-out {
-    from {
-        opacity: 1;
-    }
-    to {
-        opacity: 0;
-    }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
+/* ----- Tablet ----- */
+@media (min-width: 768px) {
+  .hero {
+    padding: var(--space-2xl) var(--space-3xl);
+  }
 
+  .hero-content h1 {
+    font-size: 2.5rem;
+  }
 
+  .hero-content p {
+    font-size: 1.1rem;
+  }
 
+  .image-section img {
+    width: 90%;
+    max-height: 450px;
+  }
 
+  .quote-section {
+    flex-direction: row;
+    gap: var(--space-xl);
+    margin-top: 6rem;
+  }
+
+  .quote-section img {
+    width: 55%;
+    max-width: 500px;
+  }
+
+  .quote-section blockquote {
+    width: 40%;
+    font-size: 1.5rem;
+  }
+
+  .mission,
+  .values {
+    margin: var(--space-3xl) auto;
+    padding: 0 var(--space-xl);
+  }
+
+  .values-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-xl);
+  }
+}
+
+/* ----- Desktop: match original exactly ----- */
+@media (min-width: 1024px) {
+  .hero {
+    padding: 3rem 3rem;
+  }
+
+  .hero-content h1 {
+    font-size: 3rem;
+  }
+
+  .hero-content p {
+    font-size: 1.2rem;
+  }
+
+  .image-section img {
+    width: 80%;
+    max-height: 610px;
+  }
+
+  .quote-section {
+    gap: 2rem;
+    margin-top: 10rem;
+  }
+
+  .quote-section img {
+    width: 90%;
+    max-width: 600px;
+  }
+
+  .quote-section blockquote {
+    width: 30%;
+    font-size: 1.7rem;
+    line-height: 2;
+  }
+
+  .mission,
+  .values {
+    margin: 4rem auto;
+    padding: 0 2rem;
+  }
+
+  .values-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  .about-page .footer {
+    padding: 2rem;
+  }
+}

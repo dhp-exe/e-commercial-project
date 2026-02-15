@@ -1,0 +1,121 @@
+/* ============================================
+   Login page – full viewport, centered form
+   ============================================ */
+
+.login-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  background-color: var(--bg-page);
+  font-family: var(--font-serif);
+}
+
+.login-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: var(--bg);
+  padding: 40px 50px;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  width: 30%;
+}
+
+.login-container h2 {
+  margin-bottom: var(--space-xl);
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 36px;
+}
+
+.login-container label {
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.login-container input {
+  padding: 10px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  outline: none;
+}
+
+.login-container input:focus {
+  border-color: var(--accent);
+}
+
+.login-container button {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.3s;
+  font-family: var(--font-serif);
+}
+
+.login-container button:hover {
+  background-color: var(--muted);
+}
+
+.login-container .error {
+  color: var(--error-form);
+  margin-bottom: 15px;
+}
+
+.login-container p {
+  margin-top: var(--space-xl);
+  text-align: center;
+}
+
+.login-container a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.toggle-link:hover {
+  cursor: pointer;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ----- Mobile-first responsiveness ----- */
+@media (max-width: 767px) {
+  .login-container form {
+    width: 90%;
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .login-container h2 {
+    font-size: 28px;
+  }
+}
+
+@media (min-width: 768px) {
+  .login-container form {
+    width: 50%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .login-container form {
+    width: 30%;
+    padding: 40px 50px;
+  }
+
+  .login-container h2 {
+    font-size: 36px;
+  }
+}

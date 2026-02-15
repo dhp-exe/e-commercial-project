@@ -1,0 +1,141 @@
+/* ============================================
+   Feedback page – centered form, success state
+   ============================================ */
+
+.feedback-page {
+  min-height: 80vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--bg-page);
+  padding: var(--space-xl);
+}
+
+.feedback-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 700px;
+}
+
+.feedback-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: var(--bg);
+  padding: 40px 50px;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+.feedback-container h2 {
+  margin-bottom: 10px;
+  text-align: center;
+  font-size: 32px;
+  color: var(--text-secondary);
+  font-weight: bold;
+}
+
+.feedback-container .description {
+  text-align: center;
+  margin-bottom: var(--space-xl);
+  color: var(--text-muted);
+  font-size: 1.05rem;
+}
+
+.success {
+  background-color: var(--success-bg);
+  color: var(--success-text);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.feedback-container label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: var(--radius);
+  color: var(--accent);
+}
+
+.feedback-container input,
+.feedback-container textarea {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  background: var(--input-bg);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.feedback-container input:focus,
+.feedback-container textarea:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.feedback-container textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.feedback-container button {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 10px;
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.feedback-container button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.feedback-container button:disabled {
+  background-color: var(--border-input);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ----- Mobile-first responsiveness ----- */
+@media (max-width: 767px) {
+  .feedback-page {
+    padding: var(--space-md);
+  }
+
+  .feedback-container form {
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .feedback-container h2 {
+    font-size: 24px;
+  }
+
+  .feedback-container .description {
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .feedback-container form {
+    padding: 40px 50px;
+  }
+
+  .feedback-container h2 {
+    font-size: 32px;
+  }
+}

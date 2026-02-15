@@ -1,105 +1,111 @@
-/* Account Page Styles */
+/* ============================================
+   Account page – sidebar, profile, orders, forms, vouchers
+   Modal styles live in components.css (.modal-overlay, .modal-content)
+   ============================================ */
+
+/* Base: mobile (stacked, full width) */
 .account-page {
   min-height: 100vh;
-  background-color: #f8f8f8;
-  padding: 40px 20px;
+  background-color: var(--panel);
+  padding: var(--space-md);
 }
 
 .account-container {
-  max-width: 1200px;
+  max-width: var(--container-max);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 40px;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
 }
 
-/* Sidebar Styles */
 .account-sidebar {
-  position: sticky;
-  top: 120px;
+  position: static;
   height: fit-content;
 }
 
 .profile-card {
-  background: white;
-  border-radius: 12px;
-  padding: 30px 20px;
+  background: var(--bg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl) var(--space-lg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   text-align: center;
 }
 
 .profile-picture-container {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-xl);
+}
+
+.profile-picture,
+.profile-picture-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin: 0 auto;
 }
 
 .profile-picture {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #333;
-  margin: 0 auto;
+  border: 3px solid var(--profile-border);
 }
 
 .profile-picture-placeholder {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2b2b2e 0%, #300d62 100%);
+  background: linear-gradient(135deg, var(--placeholder-gradient-start) 0%, var(--placeholder-gradient-end) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto;
-  border: 3px solid #333;
+  border: 3px solid var(--profile-border);
 }
 
 .initials {
-  color: white;
-  font-size: 48px;
+  color: var(--accent-contrast);
+  font-size: 32px;
   font-weight: bold;
 }
 
 .profile-greeting {
-  font-size: 20px;
-  margin: 20px 0;
-  color: #333;
+  font-size: 16px;
+  margin: var(--space-lg) 0;
+  color: var(--text-secondary);
   word-break: break-word;
 }
 
 .upload-picture-section {
-  margin: 25px 0;
+  margin: var(--space-2xl) 0;
 }
 
 .upload-btn {
   display: inline-block;
-  background-color: #333;
-  color: white;
+  background-color: var(--text-secondary);
+  color: var(--accent-contrast);
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 700;
   transition: background-color 0.3s ease;
 }
 
 .upload-btn:hover {
-  background-color: #555;
+  background-color: var(--muted);
 }
 
 .account-nav {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 30px;
+  margin-top: var(--space-3xl);
 }
 
 .nav-item {
+  flex: 1;
+  min-width: 120px;
   padding: 12px 16px;
   border: none;
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: var(--nav-inactive-bg);
+  color: var(--text-secondary);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
   transition: all 0.3s ease;
@@ -107,78 +113,76 @@
 }
 
 .nav-item:hover {
-  background-color: #e0e0e0;
+  background-color: var(--nav-inactive-hover);
 }
 
 .nav-item.active {
-  background-color: #333;
-  color: white;
+  background-color: var(--text-secondary);
+  color: var(--accent-contrast);
 }
 
 .logout-btn {
-  margin-top: 20px;
-  background-color: #d32f2f;
-  color: white;
+  margin-top: var(--space-xl);
+  background-color: var(--logout-btn);
+  color: var(--accent-contrast);
 }
 
 .logout-btn:hover {
-  background-color: #b71c1c;
+  background-color: var(--logout-btn-hover);
 }
 
-/* Main Content Styles */
+/* Main content */
 .account-main {
-  background: white;
-  border-radius: 12px;
-  padding: 40px;
+  background: var(--bg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-lg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .message {
   padding: 15px 20px;
-  border-radius: 6px;
-  margin-bottom: 25px;
-  font-weight: 500;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2xl);
+  font-weight: 700;
 }
 
 .message.success {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background-color: var(--success-message-bg);
+  color: var(--success-message-text);
+  border: 1px solid var(--success-border);
 }
 
 .message.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: var(--error-light-bg);
+  color: var(--error-light-text);
+  border: 1px solid var(--error-light-border);
 }
 
-/* Account Section Styles */
 .account-section h1 {
-  font-size: 28px;
-  margin-bottom: 30px;
-  color: #333;
-  border-bottom: 2px solid #333;
+  font-size: 18px;
+  margin-bottom: var(--space-3xl);
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--text-secondary);
   padding-bottom: 15px;
 }
 
 .account-section h2 {
   font-size: 20px;
-  margin-top: 30px;
-  margin-bottom: 20px;
-  color: #333;
+  margin-top: var(--space-3xl);
+  margin-bottom: var(--space-xl);
+  color: var(--text-secondary);
 }
 
-/* Orders Grid */
 .orders-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
 }
 
 .order-card {
-  padding: 25px;
-  border-radius: 10px;
-  color: white;
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  color: var(--text);
   text-align: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
@@ -189,43 +193,31 @@
 }
 
 .order-card h3 {
-  font-size: 14px;
+  font-size: 12px;
   margin-bottom: 15px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .order-count {
-  font-size: 40px;
+  font-size: 24px;
   font-weight: bold;
-  color: #000000;
+  color: var(--accent);
   margin: 0;
 }
 
-.order-card.new {
-  background: #ffffff
-}
-
-.order-card.confirmed {
-  background: #ffffff
-}
-
-.order-card.shipping {
-  background: #ffffff
-}
-
-.order-card.received {
-  background: #ffffff
-}
-
+.order-card.new,
+.order-card.confirmed,
+.order-card.shipping,
+.order-card.received,
 .order-card.cancelled {
-  background: #ffffff
+  background: var(--bg);
 }
 
-/* Form Styles */
+/* Forms */
 .info-form,
 .password-form {
   display: grid;
-  gap: 20px;
+  gap: var(--space-lg);
 }
 
 .form-group {
@@ -235,15 +227,15 @@
 
 .form-group label {
   font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #333;
+  font-weight: 700;
+  margin-bottom: var(--radius);
+  color: var(--text-secondary);
 }
 
 .form-input {
   padding: 12px 15px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-family: inherit;
   transition: border-color 0.3s ease;
@@ -251,27 +243,27 @@
 
 .form-input:focus {
   outline: none;
-  border-color: #333;
+  border-color: var(--text-secondary);
   box-shadow: 0 0 0 3px rgba(51, 51, 51, 0.1);
 }
 
 .form-input.disabled {
-  background-color: #f5f5f5;
+  background-color: var(--panel);
   cursor: not-allowed;
-  color: #666;
+  color: var(--muted);
 }
 
 .form-input.disabled:focus {
-  border-color: #ddd;
+  border-color: var(--border-input);
   box-shadow: none;
 }
 
 .save-btn {
   padding: 12px 30px;
-  background-color: #333;
-  color: white;
+  background-color: var(--text-secondary);
+  color: var(--accent-contrast);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -280,220 +272,66 @@
 }
 
 .save-btn:hover {
-  background-color: #555;
+  background-color: var(--muted);
 }
 
-/* Vouchers Section */
+/* Vouchers */
 .vouchers-section {
-  margin-top: 40px;
-  padding-top: 30px;
-  border-top: 2px solid #eee;
+  margin-top: var(--space-xl);
+  padding-top: var(--space-3xl);
+  border-top: 2px solid var(--border-light);
 }
 
 .vouchers-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
 }
 
 .voucher-card {
-  border: 2px dashed #333;
-  border-radius: 10px;
-  padding: 20px;
+  border: 2px dashed var(--voucher-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 15px;
   align-items: center;
-  background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
+  text-align: center;
+  background: linear-gradient(135deg, var(--panel) 0%, var(--bg) 100%);
+}
+
+.voucher-details {
+  text-align: center;
 }
 
 .voucher-code {
   font-size: 18px;
   font-weight: bold;
-  color: #333;
+  color: var(--text-secondary);
   word-break: break-all;
-}
-
-.voucher-details {
-  text-align: right;
 }
 
 .voucher-discount {
   font-size: 16px;
   font-weight: 600;
-  color: #d32f2f;
-  margin: 0 0 8px 0;
+  color: var(--voucher-discount);
+  margin: 0 0 var(--radius) 0;
 }
 
 .voucher-expiry {
   font-size: 12px;
-  color: #666;
+  color: var(--muted);
   margin: 0;
 }
 
 .no-vouchers {
-  color: #999;
+  color: var(--muted-lighter);
   font-style: italic;
-  padding: 20px;
+  padding: var(--space-xl);
   text-align: center;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .account-container {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  .account-sidebar {
-    position: static;
-  }
-
-  .account-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .nav-item {
-    flex: 1;
-    min-width: 120px;
-  }
-
-  .account-main {
-    padding: 25px;
-  }
-
-  .account-section h1 {
-    font-size: 22px;
-  }
-
-  .orders-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  }
-
-  .order-card {
-    padding: 15px;
-  }
-
-  .order-count {
-    font-size: 28px;
-  }
-
-  .vouchers-list {
-    grid-template-columns: 1fr;
-  }
-
-  .voucher-card {
-    grid-template-columns: 1fr;
-    text-align: center;
-  }
-
-  .voucher-details {
-    text-align: center;
-  }
-}
-
-@media (max-width: 480px) {
-  .account-page {
-    padding: 20px 10px;
-  }
-
-  .account-container {
-    gap: 15px;
-  }
-
-  .profile-card {
-    padding: 20px 15px;
-  }
-
-  .profile-picture {
-    width: 80px;
-    height: 80px;
-  }
-
-  .profile-picture-placeholder {
-    width: 80px;
-    height: 80px;
-  }
-
-  .initials {
-    font-size: 32px;
-  }
-
-  .profile-greeting {
-    font-size: 16px;
-  }
-
-  .account-main {
-    padding: 15px;
-  }
-
-  .account-section h1 {
-    font-size: 18px;
-  }
-
-  .orders-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .order-card h3 {
-    font-size: 12px;
-  }
-
-  .order-count {
-    font-size: 24px;
-  }
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5); 
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000; 
-  animation: fadeIn 0.2s ease-out;
-}
-
-.modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 10px;
-}
-
-.modal-header h2 {
-  text-transform: capitalize;
-  margin: 0;
-  font-size: 24px;
-  font-family: "DM Serif Display", serif;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  cursor: pointer;
-  color: #666;
-}
-
+/* Account modal content (uses .modal-overlay, .modal-content from components.css) */
 .order-list {
   display: flex;
   flex-direction: column;
@@ -501,21 +339,21 @@
 }
 
 .order-item {
-  border: 1px solid #eee;
+  border: 1px solid var(--border-light);
   padding: 16px;
-  border-radius: 8px;
-  background: #fafafa;
+  border-radius: var(--radius);
+  background: var(--input-bg);
 }
 
 .order-item-header {
   display: flex;
   justify-content: space-between;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: var(--radius-md);
 }
 
-.muted {
-  color: #777;
+.account-page .modal-header .muted {
+  color: var(--muted-light);
   font-style: italic;
   text-align: center;
 }
@@ -525,9 +363,9 @@
   to { opacity: 1; }
 }
 
-order-items-container {
+.order-items-container {
   margin-top: 12px;
-  border-top: 1px dashed #eee;
+  border-top: 1px dashed var(--border-light);
   padding-top: 10px;
   display: flex;
   flex-direction: column;
@@ -544,8 +382,8 @@ order-items-container {
   width: 50px;
   height: 50px;
   object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid #eee;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
 }
 
 .mini-product-info {
@@ -555,14 +393,139 @@ order-items-container {
 
 .mini-product-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: bold;
   margin: 0;
-  color: #333;
+  color: var(--text-secondary);
 }
 
 .mini-product-meta {
   font-size: 13px;
-  color: #777;
-  margin: 2px 5 0 0;
-  font-family: 'DM Sans', sans-serif;
+  color: var(--muted-light);
+  margin: 2px 0 0 0;
+  font-family: var(--font-sans);
+}
+
+/* ----- Tablet: restore sidebar layout ----- */
+@media (min-width: 768px) {
+  .account-page {
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .account-container {
+    grid-template-columns: 300px 1fr;
+    gap: var(--space-xl);
+  }
+
+  .account-sidebar {
+    position: sticky;
+    top: 120px;
+  }
+
+  .account-nav {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .nav-item {
+    flex: none;
+    min-width: auto;
+  }
+
+  .account-main {
+    padding: var(--space-xl);
+  }
+
+  .account-section h1 {
+    font-size: 22px;
+  }
+
+  .orders-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .order-card {
+    padding: var(--space-2xl);
+  }
+
+  .order-count {
+    font-size: 28px;
+  }
+
+  .order-card h3 {
+    font-size: 14px;
+  }
+
+  .vouchers-list {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .voucher-card {
+    grid-template-columns: 1fr 1fr;
+    text-align: left;
+  }
+
+  .voucher-details {
+    text-align: right;
+  }
+
+  .profile-picture,
+  .profile-picture-placeholder {
+    width: 120px;
+    height: 120px;
+  }
+
+  .initials {
+    font-size: 48px;
+  }
+
+  .profile-greeting {
+    font-size: 20px;
+  }
+}
+
+/* ----- Desktop: match original exactly ----- */
+@media (min-width: 1024px) {
+  .account-page {
+    padding: 40px 20px;
+  }
+
+  .account-container {
+    gap: 40px;
+  }
+
+  .account-section h1 {
+    font-size: 28px;
+  }
+
+  .orders-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .order-count {
+    font-size: 40px;
+  }
+
+  .order-card h3 {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+  .account-page {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .profile-picture,
+  .profile-picture-placeholder {
+    width: 100px;
+    height: 100px;
+  }
+
+  .initials {
+    font-size: 40px;
+  }
+
+  .profile-greeting {
+    font-size: 18px;
+  }
 }
