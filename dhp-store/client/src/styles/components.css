@@ -108,6 +108,25 @@ button:hover {
   font-weight: 700;
 }
 
+/* Mobile: shorter product cards (home + products) */
+@media (max-width: 767px) {
+  .card {
+    min-height: 260px;
+  }
+
+  .card img {
+    height: 160px;
+  }
+
+  .card h3 {
+    min-height: 2.5em;
+  }
+
+  .card strong {
+    margin: 0 0 12px;
+  }
+}
+
 /* ----- Auth / form blocks ----- */
 .auth {
   max-width: 420px;

@@ -77,6 +77,17 @@
 
 /* ----- Mobile-first responsiveness ----- */
 @media (max-width: 767px) {
+  /* Home banner: prevent squeezed height on mobile */
+  .home-banner {
+    min-height: 220px;
+  }
+
+  .home-banner img {
+    min-height: 220px;
+    object-fit: cover;
+    object-position: center;
+  }
+
   .home-banner__overlay {
     left: 4%;
     top: 18%;
