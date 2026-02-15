@@ -1,17 +1,21 @@
+/* ============================================
+   Product details page – image + info, size, qty, actions
+   ============================================ */
+
+/* Base: mobile (stacked) */
 .pdp-container {
-  max-width: 1200px;
-  margin: 40px auto;
-  padding: 20px;
+  max-width: var(--container-max);
+  margin: var(--space-md) auto;
+  padding: var(--space-lg);
   display: grid;
-  grid-template-columns: 1fr 1fr; /* 2-column layout */
-  gap: 60px;
-  font-family: "DM Sans", sans-serif;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  font-family: var(--font-sans);
 }
 
-/* Left Column: Image */
 .pdp-image-container {
-  background-color: #f9f9f9;
-  border-radius: 12px;
+  background-color: var(--panel-hover);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -24,33 +28,33 @@
   object-fit: cover;
 }
 
-/* Right Column: Info */
 .pdp-info {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-xl);
 }
 
 .pdp-name {
-  font-size: 32px;
+  font-size: 24px;
   font-weight: 700;
   margin: 0;
 }
 
 .pdp-price {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-secondary);
 }
 
-/* Size Selector */
-.size-section h4, .qty-section h4 {
-    margin-bottom: 12px;
-    font-weight: 600;
+.size-section h4,
+.qty-section h4 {
+  margin-bottom: 12px;
+  font-weight: 600;
 }
 
 .size-grids {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -60,34 +64,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
 }
 
 .size-box:hover {
-  border-color: #000;
+  border-color: var(--accent);
 }
 
 .size-box.selected {
-  background-color: #000;
-  color: #fff;
-  border-color: #000;
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
 }
 
-/* Quantity Selector */
 .qty-wrapper {
   display: flex;
   align-items: center;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-input);
   width: fit-content;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .qty-btn {
-  color: #333;
+  color: var(--text-secondary);
   padding: 10px 16px;
   background: none;
   border: none;
@@ -98,21 +101,22 @@
 .qty-display {
   padding: 10px 16px;
   font-weight: 600;
-  border-left: 1px solid #ddd;
-  border-right: 1px solid #ddd;
+  border-left: 1px solid var(--border-input);
+  border-right: 1px solid var(--border-input);
 }
 
-/* Action Buttons */
 .pdp-actions {
   display: flex;
-  gap: 20px;
-  margin-top: 20px;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
 }
 
-.btn-add-cart, .btn-buy-now {
+.btn-add-cart,
+.btn-buy-now {
   flex: 1;
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-weight: 700;
   font-size: 16px;
   cursor: pointer;
@@ -120,30 +124,47 @@
 }
 
 .btn-add-cart {
-  background: #fff;
-  border: 2px solid #000;
-  color: #000;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  color: var(--accent);
 }
 
 .btn-buy-now {
-  background: #000;
-  border: 2px solid #000;
-  color: #fff;
+  background: var(--accent);
+  border: 2px solid var(--accent);
+  color: var(--accent-contrast);
 }
 
-.btn-add-cart:hover, .btn-buy-now:hover {
+.btn-add-cart:hover,
+.btn-buy-now:hover {
   opacity: 0.8;
 }
 
-@media (max-width: 768px) {
-    .pdp-container {
-        grid-template-columns: 1fr; /* Stack on mobile */
-        gap: 30px;
-    }
+.flying-item {
+  pointer-events: none;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  object-fit: cover;
 }
 
-.flying-item {
-    pointer-events: none; /* Let clicks pass through */
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3); /* Nice shadow while flying */
-    object-fit: cover;
+/* ----- Desktop: two columns, side by side ----- */
+@media (min-width: 768px) {
+  .pdp-container {
+    margin: 40px auto;
+    padding: var(--space-xl);
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+  }
+
+  .pdp-name {
+    font-size: 32px;
+  }
+
+  .pdp-price {
+    font-size: 24px;
+  }
+
+  .pdp-actions {
+    flex-direction: row;
+    gap: var(--space-xl);
+  }
 }

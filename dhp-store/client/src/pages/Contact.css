@@ -1,36 +1,36 @@
-/* Import both DM Serif Display (headers) and DM Sans (text) */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;700&family=DM+Serif+Display:ital@0;1&display=swap');
+/* ============================================
+   Contact page – city selector, showroom list, map
+   ============================================ */
 
-/* Simple styles for Contact page layout */
+/* Base: mobile (stacked, full width) */
 .contact-page {
-  padding: 24px;
-  /* Apply the readable font to the whole page by default */
-  font-family: "DM Sans", sans-serif;
-  color: #333;
+  padding: var(--space-md);
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
 }
 
 .contact-title {
-  font-size: 24px; /* Increased slightly for the fancy font */
-  margin-bottom: 20px;
-  /* Apply the fancy font to the main title */
-  font-family: "DM Serif Display", serif;
-  letter-spacing: 0.5px;
+  font-size: 20px;
+  margin-bottom: var(--space-lg);
+  font-family: var(--font-serif);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .contact-grid {
   display: flex;
-  gap: 24px;
+  flex-direction: column;
+  gap: var(--space-xl);
 }
 
 .contact-left {
-  width: 44%;
+  width: 100%;
 }
 
 .city-label {
   display: block;
-  margin-bottom: 8px;
-  color: #555;
-  font-weight: 700; /* Made slightly bolder for hierarchy */
+  margin-bottom: var(--radius);
+  color: var(--text-muted);
+  font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -39,10 +39,10 @@
 .city-select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
   margin-bottom: 16px;
-  font-family: "DM Sans", sans-serif; /* Ensure dropdown uses the font */
+  font-family: var(--font-sans);
   font-size: 15px;
 }
 
@@ -50,85 +50,83 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 720px;
+  max-height: 400px;
   overflow: auto;
 }
 
 .showroom-item {
-  border: 1px solid #e6e6e6;
-  padding: 18px; /* Increased padding for breathing room */
-  border-radius: 4px;
-  background: #fff;
+  border: 1px solid var(--border-input-light);
+  padding: var(--space-lg);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .showroom-item:hover {
-  border-color: #ccc;
+  border-color: var(--border-input);
 }
 
 .showroom-item.active {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  border-color: #333;
-  border-left: 4px solid #333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-color: var(--text-secondary);
+  border-left: 4px solid var(--text-secondary);
 }
 
 .showroom-name {
   font-size: 18px;
   margin: 0 0 10px 0;
-  /* Apply the fancy font to showroom names */
-  font-family: "DM Serif Display", serif;
+  font-family: var(--font-serif);
 }
 
-.showroom-address, 
-.showroom-hours, 
+.showroom-address,
+.showroom-hours,
 .showroom-phone {
-  margin: 6px 0;
-  color: #555;
+  margin: var(--radius-md) 0;
+  color: var(--text-muted);
   font-size: 14px;
-  /* Critical for readability */
   line-height: 1.6;
 }
 
 .contact-right {
-  width: 56%;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .map-frame {
-  height: 720px;
-  border-radius: 4px;
+  height: 360px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  background: #f0f0f0;
+  background: var(--border-solid);
 }
 
 .map-card {
-  padding: 20px;
-  background: #fff;
-  border: 1px solid #e6e6e6;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: var(--space-lg);
+  background: var(--bg);
+  border: 1px solid var(--border-input-light);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .map-card h3 {
   margin: 0 0 10px 0;
-  font-family: "DM Serif Display", serif;
-  font-size: 20px;
+  font-family: var(--font-serif);
+  font-size: 18px;
 }
 
 .map-card p {
-  margin: 8px 0;
+  margin: var(--radius) 0;
   line-height: 1.6;
-  color: #444;
+  color: var(--text-muted);
 }
 
 .directions-link {
   display: inline-flex;
   align-items: center;
   margin-top: 12px;
-  color: #000;
+  color: var(--accent);
   text-decoration: none;
   font-weight: 500;
   border-bottom: 1px solid transparent;
@@ -136,20 +134,56 @@
 }
 
 .directions-link:hover {
-  border-bottom: 1px solid #000;
+  border-bottom: 1px solid var(--accent);
 }
 
-@media (max-width: 900px) {
+/* ----- Tablet: side-by-side ----- */
+@media (min-width: 768px) {
+  .contact-page {
+    padding: var(--space-xl);
+  }
+
+  .contact-title {
+    font-size: 24px;
+  }
+
   .contact-grid {
-    flex-direction: column;
+    flex-direction: row;
+    gap: 24px;
   }
-  .contact-left, .contact-right {
-    width: 100%;
+
+  .contact-left {
+    width: 44%;
   }
-  .map-frame {
-    height: 360px;
+
+  .contact-right {
+    width: 56%;
   }
+
   .showroom-list {
-    max-height: 400px;
+    max-height: 520px;
+  }
+
+  .map-frame {
+    height: 520px;
+  }
+
+  .map-card h3 {
+    font-size: 20px;
+  }
+}
+
+/* ----- Desktop: match original ----- */
+@media (min-width: 900px) {
+  .contact-grid {
+    gap: 24px;
+  }
+
+  .showroom-list {
+    max-height: 720px;
+  }
+
+  .map-frame {
+    height: 720px;
   }
 }

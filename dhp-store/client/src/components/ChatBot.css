@@ -1,37 +1,43 @@
+/* ============================================
+   ChatBot – floating button, window, messages
+   ============================================ */
+
 .chatbot-wrapper {
   position: fixed;
   bottom: 20px;
-  right: 50px;
+  right: 20px;
   z-index: 1000;
 }
 
 .chat-toggle-btn {
-  width: 67px;
-  height: 67px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: black;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-contrast);
   border: none;
-  font-size: 36px;
+  font-size: 28px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   animation: chatbot-attention 7s ease-in-out infinite;
 }
 
 .chat-window {
-  width: 300px;
+  width: 100%;
+  max-width: 300px;
   height: 400px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+  max-height: 70vh;
+  background: var(--bg);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .chat-header {
-  background: black;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-contrast);
   padding: 10px 15px;
   display: flex;
   justify-content: space-between;
@@ -44,33 +50,33 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: #f9f9f9;
-  font-family:'DM Sans', sans-serif ;
+  gap: var(--radius);
+  background: var(--panel-hover);
+  font-family: var(--font-sans);
 }
 
-.message {
-  padding: 8px 12px;
-  border-radius: 8px;
+.chatbot-wrapper .message {
+  padding: var(--radius) 12px;
+  border-radius: var(--radius);
   max-width: 80%;
   font-size: 14px;
 }
 
-.message.user {
+.chatbot-wrapper .message.user {
   align-self: flex-end;
-  background: black;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
-.message.bot {
+.chatbot-wrapper .message.bot {
   align-self: flex-start;
-  background: #e0e0e0;
-  color: black;
+  background: var(--border-solid);
+  color: var(--text);
 }
 
 .chat-input-area {
   display: flex;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-light);
 }
 
 .chat-input-area input {
@@ -82,12 +88,13 @@
 
 .chat-input-area button {
   padding: 0 15px;
-  background: white;
+  background: var(--bg);
   border: none;
-  color: blue;
+  color: var(--link-color);
   font-weight: bold;
   cursor: pointer;
 }
+
 @keyframes chatbot-attention {
   0%   { transform: scale(1) translateX(0); }
   2%   { transform: scale(1.2) translateX(-1px); }
@@ -96,4 +103,21 @@
   8%   { transform: scale(1.12) translateX(1px) translateY(-10px); }
   10%  { transform: scale(1.05) translateX(0) translateY(-5px); }
   100% { transform: scale(1) translateX(0); }
+}
+
+@media (min-width: 768px) {
+  .chatbot-wrapper {
+    right: 50px;
+  }
+
+  .chat-toggle-btn {
+    width: 67px;
+    height: 67px;
+    font-size: 36px;
+  }
+
+  .chat-window {
+    width: 300px;
+    max-width: 300px;
+  }
 }

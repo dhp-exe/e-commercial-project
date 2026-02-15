@@ -1,65 +1,77 @@
-/* client/src/pages/Checkout.css */
+/* ============================================
+   Checkout page – form, order summary, payment modal
+   ============================================ */
 
+/* Base: mobile (single column, summary first) */
 .checkout-page {
-  max-width: 1400px;
+  max-width: var(--container-wide);
   margin: 0 auto;
-  padding: 40px 20px;
-  font-family: "DM Sans", sans-serif;
-  color: #333;
+  padding: var(--space-md);
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
 }
 
 .checkout-container {
   display: grid;
-  grid-template-columns: 1.6fr 1fr; /* Left wider */
-  gap: 80px;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
 }
 
-/* --- LEFT PANEL --- */
-.checkout-left {
+.checkout-right {
+  order: -1;
+}
+
+.checkout-left,
+.checkout-right {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: var(--space-lg);
 }
+
 .left-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
 }
+
 .section-title {
-  font-family: "DM Serif Display", serif;
-  font-size: 30px;
+  font-family: var(--font-serif);
+  font-size: 24px;
   margin-bottom: 12px;
   padding-bottom: 10px;
 }
+
 .login-link-btn {
   background: none;
   border: none;
-  color: #005baa;
+  color: var(--link-color);
   font-size: 16px;
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-sans);
   cursor: pointer;
   text-decoration: underline;
   padding: 0;
-  margin-top: 20;
+  margin-top: var(--space-xl);
 }
+
 .page-header {
   height: 25px;
 }
-.back-btn{
-  position: 'relative';
-  color: #000;
-  font-size: 14;
-  cursor: 'pointer';
-  border-radius: 8;
-  background: #fff;
-  top: 10;
-  left: 30;
-  padding: '10px 14px';
+
+.back-btn {
+  position: relative;
+  color: var(--accent);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  background: var(--bg);
+  top: 10px;
+  left: 30px;
+  padding: 10px 14px;
   font-size: 16px;
   transition: opacity 0.2s;
 }
-/* Form Styles */
+
 .form-grid {
   display: grid;
   gap: 16px;
@@ -67,29 +79,40 @@
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
 .checkout-input {
   width: 100%;
   padding: 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px; /* Sharper edges like screenshot */
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-sm);
   font-size: 15px;
   outline: none;
-  background: #fff;
+  background: var(--bg);
   transition: border-color 0.2s;
 }
 
 .checkout-input:focus {
-  border-color: #000;
+  border-color: var(--accent);
 }
 
-/* Payment Method Selection (Radio List) */
+.checkout-input.error {
+  border-color: var(--error-border) !important;
+  background-color: var(--warning-bg);
+}
+
+.error-msg {
+  color: var(--error-border);
+  font-size: 13px;
+  margin-top: var(--radius-md);
+  display: block;
+}
+
 .payment-methods {
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -99,8 +122,8 @@
   align-items: center;
   gap: 14px;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fff;
+  border-bottom: 1px solid var(--panel);
+  background: var(--bg);
   transition: background 0.2s;
 }
 
@@ -109,41 +132,34 @@
 }
 
 .payment-option:hover {
-  background: #f9f9f9;
+  background: var(--panel-hover);
 }
 
 .payment-option.selected {
-  background: #f4f8ff; /* Subtle highlight */
+  background: var(--payment-highlight);
 }
 
 .payment-option input[type="radio"] {
-  accent-color: #000;
+  accent-color: var(--accent);
   transform: scale(1.3);
 }
 
-/* --- RIGHT PANEL --- */
-.checkout-right {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
 .order-summary-box {
-  background: #fafafa;
-  padding: 30px;
-  border-radius: 8px;
+  background: var(--input-bg);
+  padding: var(--space-lg);
+  border-radius: var(--radius);
 }
 
 .summary-title {
-  font-family: "DM Serif Display", serif;
+  font-family: var(--font-serif);
   font-size: 20px;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-xl);
 }
 
 .order-items-scroll {
   max-height: 350px;
   overflow-y: auto;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-xl);
   padding-right: 10px;
 }
 
@@ -158,8 +174,8 @@
   width: 60px;
   height: 60px;
   object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid #eee;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
 }
 
 .summary-details {
@@ -169,7 +185,7 @@
 .summary-name {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: var(--radius-sm);
 }
 
 .summary-price {
@@ -179,23 +195,24 @@
 
 .voucher-input-group {
   display: flex;
-  gap: 10px;
-  margin: 20px 0;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: var(--space-xl) 0;
 }
 
 .voucher-input-group input {
   flex: 1;
   padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
 }
 
 .black-btn {
-  background: #000;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-contrast);
   border: none;
   padding: 12px 20px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   cursor: pointer;
   width: 100%;
@@ -212,23 +229,26 @@
   justify-content: space-between;
   margin-bottom: 12px;
   font-size: 14px;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .totals-row.final {
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-light);
   padding-top: 15px;
   margin-top: 15px;
   font-size: 20px;
   font-weight: 800;
-  color: #000;
+  color: var(--accent);
 }
 
-/* --- MODAL STYLES (The "Popup Panel") --- */
+/* Payment modal (Checkout-specific) */
 .payment-modal-overlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.6);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--modal-overlay-dark);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -237,32 +257,31 @@
 }
 
 .payment-modal {
-  background: #fff;
+  background: var(--bg);
   width: 90%;
   max-width: 550px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
-.modal-header {
-  background: #f8f8f8;
+.payment-modal .modal-header {
+  background: var(--panel);
   padding: 15px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-light);
 }
 
-.modal-header img {
+.payment-modal .modal-header img {
   height: 24px;
 }
 
 .modal-body {
-  padding: 30px;
+  padding: var(--space-3xl);
 }
 
-/* VNPay Fake Gateway Styles */
 .vnpay-gateway {
   display: flex;
   flex-direction: column;
@@ -270,8 +289,8 @@
 }
 
 .vnpay-option {
-  border: 1px solid #eee;
-  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
   padding: 15px;
   display: flex;
   align-items: center;
@@ -281,41 +300,58 @@
 }
 
 .vnpay-option:hover {
-  border-color: #005baa;
-  background: #f0f9ff;
+  border-color: var(--link-color);
+  background: var(--payment-option-hover);
 }
 
 .vnpay-text {
   font-weight: 600;
-  color: #333;
+  color: var(--text-secondary);
 }
 
 .vnpay-icon {
   height: 30px;
 }
 
-@media (max-width: 900px) {
+/* ----- Tablet: two columns, form first ----- */
+@media (min-width: 768px) {
+  .checkout-page {
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .voucher-input-group {
+    flex-direction: row;
+  }
+
+  .section-title {
+    font-size: 26px;
+  }
+}
+
+/* ----- Desktop: restore original layout (left wider, right order) ----- */
+@media (min-width: 900px) {
   .checkout-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 80px;
   }
+
   .checkout-right {
-    order: -1;
+    order: 0;
   }
-}
 
-.checkout-input.error {
-  border-color: #d32f2f !important; 
-  background-color: #fff8f8;      
-}
+  .checkout-left {
+    gap: 30px;
+  }
 
-.error-msg {
-  color: #d32f2f;
-  font-size: 13px;
-  margin-top: 6px;
-  display: block;
-}
+  .checkout-right {
+    gap: 24px;
+  }
 
-.input-group {
-  display: flex;
-  flex-direction: column;
+  .section-title {
+    font-size: 30px;
+  }
 }

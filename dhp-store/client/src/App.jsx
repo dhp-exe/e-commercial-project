@@ -21,7 +21,7 @@ import Account from './pages/Account.jsx';
 import Contact from './pages/Contact.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 
-import './styles.css';
+import './styles/main.css';
 const ProductDetails = lazy(() => import('./pages/ProductDetails'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 

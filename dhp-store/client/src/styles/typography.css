@@ -1,0 +1,32 @@
+/* ============================================
+   Typography – Single Google Font import, headings, links
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;600;700&family=DM+Serif+Display:ital,wght@0,400;1,400&family=Noto+Serif:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
+h1, h2, h3 {
+  color: var(--accent);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+/* Utility text */
+.muted {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.error {
+  background: var(--error-bg);
+  color: var(--error-text);
+  padding: var(--space-sm) var(--radius);
+  border-radius: var(--radius-md);
+}
