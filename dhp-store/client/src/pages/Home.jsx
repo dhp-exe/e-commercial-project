@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useSearch } from '../context/SearchContext';
 import searchIcon from "../assets/search_icon.png";
 import bagIcon from "../assets/shopping_bag.png";
 import accountIcon from "../assets/account_icon.png";
@@ -20,10 +21,8 @@ export default function Home() {
   const [addedId, setAddedId] = useState(null);
   const [isCartOpen, setCartOpen] = useState(false);
 
-  // search state & ref
-  const [q, setQ] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  // shared search state & ref (used also by mobile navbar)
+  const { showSearch, setShowSearch, searchTerm, setSearchTerm } = useSearch();
   const inputRef = useRef(null);
   //cart quantity
   const { items: cartItems } = useContext(CartContext);

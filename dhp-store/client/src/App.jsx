@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import CartProvider from './context/CartContext.jsx';
+import { SearchProvider } from './context/SearchContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ChatBot from './components/ChatBot.jsx';
@@ -29,10 +30,11 @@ export default function App(){
   return (
     <AuthProvider>
       <CartProvider>
-        <Navbar />
-        <ChatBot />
-        <main className="container">
-          <Routes>
+        <SearchProvider>
+          <Navbar />
+          <ChatBot />
+          <main className="container">
+            <Routes>
             {/* Public Storefront */}
             <Route path="" element={<Home />} />
             <Route path="/" element={<Home />} />
@@ -55,8 +57,9 @@ export default function App(){
                   <Route path="products" element={<ManageProducts />} />
               </Route>
           </Route>
-          </Routes>
-        </main>
+            </Routes>
+          </main>
+        </SearchProvider>
       </CartProvider>
     </AuthProvider>
   );

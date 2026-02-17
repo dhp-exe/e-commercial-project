@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useSearch } from '../context/SearchContext';
 import logo from "../assets/logo.png";
 import searchIcon from "../assets/search_icon.png";
 import bagIcon from "../assets/shopping_bag.png";
@@ -13,9 +14,21 @@ const Navbar = () => {
   const { totalQty } = useCart();
   const navigate = useNavigate();
   const [isCartOpen, setCartOpen] = useState(false);
+  const { showSearch, setShowSearch, searchTerm, setSearchTerm } = useSearch();
   const [menuOpen, setMenuOpen] = useState(false);
+  const inputRef = useRef(null);
 
   const closeMenu = () => setMenuOpen(false);
+
+  useEffect(() => {
+    if (showSearch && inputRef.current) inputRef.current.focus();
+  }, [showSearch]);
+
+  function submitSearch(e) {
+    e?.preventDefault();
+    // Match Home.jsx: prevent page reload, but filtering happens
+    // live via shared `searchTerm` in Home / Products components.
+  }
 
   return (
     <>
@@ -32,13 +45,25 @@ const Navbar = () => {
               <span /><span /><span />
             </span>
           </button>
-          <Link
-            to="/products"
-            className="navbar-icon-btn"
-            aria-label="Search products"
-          >
-            <img src={searchIcon} alt="" />
-          </Link>
+          <form onSubmit={submitSearch} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {showSearch && (
+              <input
+                ref={inputRef}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search products..."
+                style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)' }}
+              />
+            )}
+            <img
+              src={searchIcon}
+              alt="Search"
+              title="Search"
+              onClick={() => setShowSearch(s => !s)}
+              className="navbar-search-toggle-icon"
+              style={{ width: 32, height: 32, cursor: 'pointer' }}
+            />
+          </form>
         </div>
 
         {/* Desktop: left links */}
