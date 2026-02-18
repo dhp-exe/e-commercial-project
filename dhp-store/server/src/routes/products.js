@@ -8,9 +8,8 @@ const router = Router();
 // Helper to construct the image URL
 const formatImageUrl = (dbPath) => {
   if (!dbPath) return null;
-  if (dbPath.startsWith('http')) return dbPath;
+  if (dbPath.startsWith('http')) return dbPath; // Leave external URLs alone
   
-  // Use the env variable, fallback to localhost for local dev
   const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
   return `${BASE_URL}${dbPath.startsWith('/') ? '' : '/'}${dbPath}`;
 };
@@ -46,7 +45,7 @@ router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(sql, params);
 
-    // Format all URLs
+    // Apply formatter to all products
     const products = rows.map(p => ({
       ...p,
       image_url: formatImageUrl(p.image_url)
@@ -80,7 +79,6 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ message: 'Product not found' });
         }
 
-        // Apply the same URL formatting to the single product
         const product = rows[0];
         product.image_url = formatImageUrl(product.image_url);
 
@@ -96,33 +94,23 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, res) => {
     const { name, description, price, category_id, stock } = req.body;
 
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return res.status(400).json({ message: 'Product name is required' });
-    }
+    if (!name || typeof name !== 'string' || name.trim() === '') return res.status(400).json({ message: 'Product name is required' });
     
     const parsedPrice = Number(price);
-    if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
-      return res.status(400).json({ message: 'Invalid price' });
-    }
+    if (Number.isNaN(parsedPrice) || parsedPrice < 0) return res.status(400).json({ message: 'Invalid price' });
 
     const parsedStock = Number(stock);
-    if (!Number.isInteger(parsedStock) || parsedStock < 0) {
-      return res.status(400).json({ message: 'Invalid stock value' });
-    }
+    if (!Number.isInteger(parsedStock) || parsedStock < 0) return res.status(400).json({ message: 'Invalid stock value' });
 
-    if (!category_id) {
-      return res.status(400).json({ message: 'Category is required' });
-    }
+    if (!category_id) return res.status(400).json({ message: 'Category is required' });
 
   try {
     const [categoryRows] = await pool.execute('SELECT id FROM categories WHERE id = ?', [category_id]);
-    if (categoryRows.length === 0) {
-      return res.status(400).json({ message: 'Category does not exist' });
-    }
+    if (categoryRows.length === 0) return res.status(400).json({ message: 'Category does not exist' });
 
     let imageUrl = null;
     if (req.file) {
-        imageUrl = `/uploads/${req.file.filename}`; // Saves clean relative path
+        imageUrl = `/uploads/${req.file.filename}`; 
     }
 
     const [result] = await pool.execute(
@@ -137,7 +125,6 @@ router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, r
         stock: parsedStock, 
         image_url: formatImageUrl(imageUrl) 
     });
-
   } 
   catch (error) {
     console.error(error);
@@ -145,7 +132,7 @@ router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, r
   }
 });
 
-// PUT /api/products/:id/stock
+// PUT /api/products/:id/stock - Update product stock (staff and admin)
 router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
   const productId = Number(req.params.id);
   const { stock } = req.body;
@@ -166,6 +153,7 @@ router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
       }
 
       await pool.execute('UPDATE products SET stock = ? WHERE id = ?', [parsedStock, productId]);
+
       res.json({ message: 'Stock updated', productId, stock: parsedStock });
   } catch (error) {
       console.error(error);
@@ -173,7 +161,7 @@ router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
   }
 });
 
-// DELETE /api/products/:id
+// DELETE /api/products/:id - Delete a product (admin only)
 router.delete('/:id', requireAuth, verifyAdmin, async (req, res) => {
   const productId = Number(req.params.id); 
 
@@ -187,7 +175,9 @@ router.delete('/:id', requireAuth, verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Product not found'});
     }
 
+    // Soft Delete
     await pool.execute('UPDATE products SET is_active = false WHERE id = ?', [productId]);
+    
     res.status(200).json({ message: 'Product deleted successfully' }); 
   } 
   catch (error) {
