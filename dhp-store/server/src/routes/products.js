@@ -5,12 +5,23 @@ import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
 import upload from '../middleware/upload.js';
 const router = Router();
 
+// Helper to construct the image URL
+const formatImageUrl = (dbPath) => {
+  if (!dbPath) return null;
+  if (dbPath.startsWith('http')) return dbPath;
+  
+  // Use the env variable, fallback to localhost for local dev
+  const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
+  return `${BASE_URL}${dbPath.startsWith('/') ? '' : '/'}${dbPath}`;
+};
+
 // GET /api/products
 router.get('/', async (req, res) => {
   const { q, categoryId } = req.query;
   const where = [];
   const params = [];
-  where.push('p.is_active = true')
+  where.push('p.is_active = true');
+
   if (q) {
     where.push('p.name LIKE ?');
     params.push('%' + q + '%');
@@ -35,33 +46,11 @@ router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.query(sql, params);
 
-    // Build BASE_URL from the incoming request (works for localhost, DevTunnel, prod)
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.headers['x-forwarded-host'] || req.get('host');
-    const BASE_URL = `${protocol}://${host}`;
-
-    const products = rows.map(p => {
-      let imageUrl = p.image_url;
-
-      if (imageUrl) {
-        // If DB contains localhost URLs, normalize them
-        if (imageUrl.includes('localhost')) {
-          imageUrl = imageUrl.replace(
-            /^http:\/\/localhost:\d+/,
-            BASE_URL
-          );
-        }
-        // If DB contains relative paths, prepend base URL
-        else if (!imageUrl.startsWith('http')) {
-          imageUrl = `${BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-        }
-      }
-
-      return {
-        ...p,
-        image_url: imageUrl
-      };
-    });
+    // Format all URLs
+    const products = rows.map(p => ({
+      ...p,
+      image_url: formatImageUrl(p.image_url)
+    }));
 
     res.json(products);
   } catch (e) {
@@ -73,9 +62,7 @@ router.get('/', async (req, res) => {
 // GET /api/products/categories
 router.get('/categories', async (_req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM categories ORDER BY name'
-    );
+    const [rows] = await pool.query('SELECT * FROM categories ORDER BY name');
     res.json(rows);
   } catch (e) {
     console.error(e);
@@ -93,7 +80,11 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ message: 'Product not found' });
         }
 
-        res.json(rows[0]); 
+        // Apply the same URL formatting to the single product
+        const product = rows[0];
+        product.image_url = formatImageUrl(product.image_url);
+
+        res.json(product); 
     } 
     catch (error) {
         console.error(error);
@@ -105,7 +96,6 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, res) => {
     const { name, description, price, category_id, stock } = req.body;
 
-    // Validation
     if (!name || typeof name !== 'string' || name.trim() === '') {
       return res.status(400).json({ message: 'Product name is required' });
     }
@@ -125,16 +115,14 @@ router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, r
     }
 
   try {
-    // Check if Category Exists
     const [categoryRows] = await pool.execute('SELECT id FROM categories WHERE id = ?', [category_id]);
     if (categoryRows.length === 0) {
       return res.status(400).json({ message: 'Category does not exist' });
     }
 
-    // Handle Image
     let imageUrl = null;
     if (req.file) {
-        imageUrl = `/uploads/${req.file.filename}`; 
+        imageUrl = `/uploads/${req.file.filename}`; // Saves clean relative path
     }
 
     const [result] = await pool.execute(
@@ -147,7 +135,7 @@ router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, r
         name, 
         price: parsedPrice, 
         stock: parsedStock, 
-        image_url: imageUrl 
+        image_url: formatImageUrl(imageUrl) 
     });
 
   } 
@@ -157,7 +145,7 @@ router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, r
   }
 });
 
-// PUT /api/products/:id/stock - Update product stock (staff and admin)
+// PUT /api/products/:id/stock
 router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
   const productId = Number(req.params.id);
   const { stock } = req.body;
@@ -178,7 +166,6 @@ router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
       }
 
       await pool.execute('UPDATE products SET stock = ? WHERE id = ?', [parsedStock, productId]);
-
       res.json({ message: 'Stock updated', productId, stock: parsedStock });
   } catch (error) {
       console.error(error);
@@ -186,7 +173,7 @@ router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
   }
 });
 
-// DELETE /api/products/:id - Delete a product (admin only)
+// DELETE /api/products/:id
 router.delete('/:id', requireAuth, verifyAdmin, async (req, res) => {
   const productId = Number(req.params.id); 
 
@@ -200,9 +187,7 @@ router.delete('/:id', requireAuth, verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Product not found'});
     }
 
-    // Soft Delete
     await pool.execute('UPDATE products SET is_active = false WHERE id = ?', [productId]);
-    
     res.status(200).json({ message: 'Product deleted successfully' }); 
   } 
   catch (error) {
