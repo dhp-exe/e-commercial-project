@@ -72,6 +72,7 @@
 .navbar-center {
   flex: 0 0 auto;
   text-align: center;
+  margin-top: 10px;
 }
 
 .navbar-logo {
@@ -274,6 +275,11 @@
     height: 24px;
     display: block;
     object-fit: contain;
+    filter: brightness(0) invert(1);
+  }
+
+  /* Invert the mobile search toggle icon as well */
+  .navbar-search-toggle-icon {
     filter: brightness(0) invert(1);
   }
 

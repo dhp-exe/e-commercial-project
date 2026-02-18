@@ -10,6 +10,7 @@ class Recommender:
     def __init__(self, db_config):
         self.db_config = db_config
         self.df = None
+        self.products = []
         self.similarity_matrix = None
         self.vectorizer = None
         self.tfidf_matrix = None
@@ -36,6 +37,8 @@ class Recommender:
         """
         self.df = pd.read_sql(query, conn)
         conn.close()
+
+        self.products = self.df[["id", "name", "description", "price", "category"]].to_dict("records")
 
         # Combine all text features into one string
         self.df['soup'] = self.df['name'] + " " + self.df['description'] + " " + self.df['category']
@@ -97,7 +100,8 @@ class Recommender:
         # ---------- filtering ----------
         results = []
 
-        for product in self.products:
+        # If refresh() hasn't populated products yet, fail gracefully.
+        for product in (self.products or []):
             name = product["name"].lower()
             price = float(product["price"])
 
@@ -133,7 +137,7 @@ class Recommender:
         # ===== STORE INFO ONLY =====
         if intent == "STORE_INFO":
             prompt = f"""
-            You are a helpful store information assistant.
+            You are Naviah, a helpful store information assistant/manager.
 
             Rules:
             - Answer the user's question enthusiastically.
@@ -143,7 +147,7 @@ class Recommender:
             Store facts:
             - Store name: DHP Store
             - Store owner, ceo, creator: Do Huu Phuoc (DHP)
-            - Store manager, admin: Naviah
+            - Store manager, admin: you, Naviah
 
             Question: "{user_message}"
             """

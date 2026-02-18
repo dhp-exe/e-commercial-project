@@ -73,7 +73,7 @@
 
 .quote-section blockquote {
   font-family: var(--font-serif);
-  width: 100%;
+  width: 90%;
   color: var(--accent-contrast);
   font-size: 1.25rem;
   font-style: italic;

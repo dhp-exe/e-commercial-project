@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useSearch } from '../context/SearchContext';
 import searchIcon from "../assets/search_icon.png";
 import bagIcon from "../assets/shopping_bag.png";
 import accountIcon from "../assets/account_icon.png";
@@ -27,8 +28,7 @@ export default function Products(){
   const [isCartOpen, setCartOpen] = useState(false);
 
   // Search state
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(q.q || '');
+  const { showSearch, setShowSearch, searchTerm, setSearchTerm } = useSearch();
   const inputRef = useRef(null);
 
   // Filter & Sort States
