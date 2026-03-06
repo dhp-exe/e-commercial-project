@@ -28,7 +28,6 @@ const formatImageUrl = (dbPath) => {
   if (dbPath.startsWith('http')) return dbPath; // Leave external URLs alone
   
   const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
-  // Auth sometimes saves just the filename, sometimes the path. Ensure /uploads/ is there.
   const pathWithUploads = dbPath.startsWith('/uploads/') ? dbPath : `/uploads/${dbPath}`;
   return `${BASE_URL}${pathWithUploads}`;
 };
