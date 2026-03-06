@@ -1,11 +1,11 @@
-# DHP Store
+# **DHP Store**
 ***Website link:** https://dhp-store.onrender.com*
 
 *(Wait a few seconds for the site to load)*
-## Overview
+## *Overview*
 DHP Store is a full-stack e-commerce application implementing a modern React (Vite) frontend and a Node.js + Express backend with MySQL (TiDB). The project includes user authentication, a shopping flow, admin management tools, file uploads, role-based access control, server-side protections such as rate limiting, and an AI-powered product recommendation engine. Orders and inventory updates use transactional operations to maintain data integrity, while a Redis caching layer ensures lightning-fast product retrieval.
 
-## Key Features
+## ✨ Key Features
 ### Customer experience
 
 - **User Authentication:** Secure Login & Registration with JWT based sessions and Bcrypt hashing and password-reset flows.
@@ -26,16 +26,17 @@ DHP Store is a full-stack e-commerce application implementing a modern React (Vi
 - **Order History:** Users can track the status of their orders (New, Confirmed, Shipping, etc.) via their account dashboard.
 - **Feedback System**: Customers can leave feedback; backend stores and exposes feedback entries.
 
-### Admin & Staff Dashboard
+### 📈 Admin & Staff Dashboard
 - **Role-Based Access (RBAC)**: `requireRole` middleware for admin-only routes and protected admin UI.
 - **Product and Order management**: 
    - View all orders with customer details and item breakdowns, update order statuses.
    - Product listing, filtering, product details with images (uploads supported).
-### Security
+
+### 🔐 Security
 - **Rate limiting:** IP rate limiting middleware to protect endpoints
 - **Secure cookies:** HttpOnly cookies for session management.
 - **Protected Routes**: Frontend protected routes for authenticated areas (`ProtectedRoute` component).
-### Technical
+### ⚙️ Technical
 - **Unified Deployment:** The backend is configured to serve the React frontend static build, allowing for single-port deployment (ideal for Ngrok tunneling).
 - **Database:** Optimized MySQL queries with connection pooling.
 - **Caching:** edis implementation for high-speed data retrieval on product listings and details, with automatic cache invalidation on mutations.
@@ -54,7 +55,7 @@ Tools: Multer (File Uploads), Nodemailer (Emails), Ngrok (Tunneling)
 
 Deployment: Render (node) and TiDB Cloud (mysql)
 
-## Architecture
+## 🏛 Architecture
 
 **Architechure overview:**
 - Frontend (React/Vite): The user interacts with the UI, sending requests to the main backend.
@@ -108,7 +109,7 @@ graph TD
     style Payments fill:#6772e5,stroke:#333,color:#fff
     style Email fill:#fbbc04,stroke:#333,color:#000
 ```
-## API Documentation
+## 🌐 API Documentation
 
 Below is a summary of the core REST API endpoints available in the Node.js backend. 
 
@@ -162,7 +163,7 @@ Below is a summary of the core REST API endpoints available in the Node.js backe
 | :--- | :--- | :--- | :--- |
 | `GET`  | `/api/health` | Health check endpoint (used for keep-alive Cron Jobs). | Public |
 
-## Project Structure
+## 🗂 Project Structure
 ```text
 dhp-store/
 ├── docker-compose.yml
