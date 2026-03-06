@@ -166,7 +166,7 @@ router.get('/profile', requireAuth, async (req, res) => {
       role: user.role,
       phone: user.phone || '',
       address: user.address || '',
-      profilePicture: formatImageUrl(user.profile_picture), // FIX: Dynamic URL
+      profilePicture: formatImageUrl(user.profile_picture),
       orders: orderStats,
       vouchers: dummyVouchers
     });

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import redis from '../cache/redis.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
 import upload from '../middleware/upload.js';
@@ -14,45 +15,69 @@ const formatImageUrl = (dbPath) => {
   return `${BASE_URL}${dbPath.startsWith('/') ? '' : '/'}${dbPath}`;
 };
 
+const clearProductCaches = async (productId = null) => {
+  try {
+    if (productId) {
+      await redis.del(`product:${productId}`);
+    }
+    // Clear all product list caches (queries)
+    const keys = await redis.keys('products:*');
+    if (keys.length > 0) {
+      await redis.del(keys);
+    }
+  } catch (err) {
+    console.error('Redis cache invalidation error:', err);
+  }
+};
+
 // GET /api/products
 router.get('/', async (req, res) => {
-  const { q, categoryId } = req.query;
-  const where = [];
-  const params = [];
-  where.push('p.is_active = true');
+  try{
+    const { q, categoryId } = req.query;
+    
+    const cacheKey = `products:q=${q || ''}:cat=${categoryId || ''}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`CACHE HIT: ${cacheKey}`);
+      return res.json(JSON.parse(cached));
+    }
 
-  if (q) {
-    where.push('p.name LIKE ?');
-    params.push('%' + q + '%');
-  }
+    const where = [];
+    const params = [];
+    where.push('p.is_active = true');
 
-  if (categoryId) {
-    where.push('p.category_id = ?');
-    params.push(categoryId);
-  }
+    if (q) {
+      where.push('p.name LIKE ?');
+      params.push('%' + q + '%');
+    }
 
-  const sql = `
-    SELECT 
-      p.*, 
-      c.name AS category_name,
-      (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE product_id = p.id) AS sold_count
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY p.id DESC
-  `;
+    if (categoryId) {
+      where.push('p.category_id = ?');
+      params.push(categoryId);
+    }
 
-  try {
+    const sql = `
+      SELECT 
+        p.*, 
+        c.name AS category_name,
+        (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE product_id = p.id) AS sold_count
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      ORDER BY p.id DESC
+    `;
+
     const [rows] = await pool.query(sql, params);
 
-    // Apply formatter to all products
     const products = rows.map(p => ({
       ...p,
       image_url: formatImageUrl(p.image_url)
     }));
 
+    await redis.set(cacheKey, JSON.stringify(products), { EX: 3600 });
     res.json(products);
-  } catch (e) {
+  } 
+  catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
   }
@@ -61,9 +86,18 @@ router.get('/', async (req, res) => {
 // GET /api/products/categories
 router.get('/categories', async (_req, res) => {
   try {
+    const cacheKey = 'categories';
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`CACHE HIT: ${cacheKey}`);
+      return res.json(JSON.parse(cached));
+    }
     const [rows] = await pool.query('SELECT * FROM categories ORDER BY name');
+
+    await redis.set(cacheKey, JSON.stringify(rows), { EX: 86400});
     res.json(rows);
-  } catch (e) {
+  } 
+  catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
   }
@@ -71,23 +105,29 @@ router.get('/categories', async (_req, res) => {
 
 // GET /api/products/:id - Get a single product by ID
 router.get('/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const [rows] = await pool.execute('SELECT * FROM products WHERE id = ? AND is_active = true', [id]);
-        
-        if (rows.length === 0) {
-            return res.status(404).json({ message: 'Product not found' });
-        }
+  const { id } = req.params;
+  try {
+      const cacheKey = `product:${id}`;
+      const cached = await redis.get(cacheKey);
+      if(cached){
+        return res.json(JSON.parse(cached));
+      }
+      const [rows] = await pool.execute('SELECT * FROM products WHERE id = ? AND is_active = true', [id]);
+      
+      if (rows.length === 0) {
+          return res.status(404).json({ message: 'Product not found' });
+      }
 
-        const product = rows[0];
-        product.image_url = formatImageUrl(product.image_url);
-
-        res.json(product); 
-    } 
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
+      const product = rows[0];
+      product.image_url = formatImageUrl(product.image_url);
+      
+      await redis.set(cacheKey, JSON.stringify(product), { EX: 3600});
+      res.json(product); 
+  } 
+  catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // POST /api/products - Create a new product (admin only)
@@ -117,6 +157,8 @@ router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, r
       'INSERT INTO products (name, description, price, category_id, stock, image_url, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [name, description, parsedPrice, category_id, parsedStock, imageUrl, true]
     );
+
+    await clearProductCaches();
 
     res.status(201).json({ 
         id: result.insertId, 
@@ -153,9 +195,10 @@ router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
       }
 
       await pool.execute('UPDATE products SET stock = ? WHERE id = ?', [parsedStock, productId]);
-
+      await clearProductCaches();
       res.json({ message: 'Stock updated', productId, stock: parsedStock });
-  } catch (error) {
+  } 
+  catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Server error' });
   }
@@ -177,7 +220,8 @@ router.delete('/:id', requireAuth, verifyAdmin, async (req, res) => {
 
     // Soft Delete
     await pool.execute('UPDATE products SET is_active = false WHERE id = ?', [productId]);
-    
+    await clearProductCaches();
+
     res.status(200).json({ message: 'Product deleted successfully' }); 
   } 
   catch (error) {

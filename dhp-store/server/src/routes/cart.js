@@ -53,19 +53,16 @@ router.post('/add', requireAuth, async (req, res) => {
           cartId = result.insertId;
       }
 
-      // Check if product with SAME SIZE exists in cart
       const [existing] = await connection.execute(
           'SELECT id, qty FROM cart_items WHERE cart_id = ? AND product_id = ? AND size = ?',
           [cartId, productId, size]
       );
 
       if (existing.length > 0) {
-          // Update quantity if same size exists
           const newQty = existing[0].qty + qty;
           await connection.execute('UPDATE cart_items SET qty = ? WHERE id = ?', [newQty, existing[0].id]);
       } 
       else {
-          // Insert new item WITH SIZE
           await connection.execute(
               'INSERT INTO cart_items (cart_id, product_id, qty, size) VALUES (?, ?, ?, ?)',
               [cartId, productId, qty, size]
@@ -90,19 +87,16 @@ router.post('/add', requireAuth, async (req, res) => {
 
 // POST /cart/update - Update quantity
 router.post('/update', requireAuth, async (req, res) => {
-  const { productId, qty, size } = req.body; // 1. Get size from request
-  
+  const { productId, qty, size } = req.body; 
   try {
     const cart = await getOrCreateCart(req.user.id);
     
     if (qty <= 0) {
-      // Delete specific size
       await pool.execute(
           'DELETE FROM cart_items WHERE cart_id=? AND product_id=? AND size=?', 
           [cart.id, productId, size]
       );
     } else {
-      // Update specific size
       await pool.execute(
           'UPDATE cart_items SET qty=? WHERE cart_id=? AND product_id=? AND size=?', 
           [qty, cart.id, productId, size]

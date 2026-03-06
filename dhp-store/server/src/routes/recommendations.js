@@ -23,7 +23,6 @@ router.get('/product/:id', async (req, res) => {
 
     if (similarIds.length === 0) return res.json([]);
 
-    // Get full DB details for these IDs
     const products = await fetchProductsByIds(similarIds);
     res.json(products);
 
