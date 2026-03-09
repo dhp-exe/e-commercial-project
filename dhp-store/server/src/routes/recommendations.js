@@ -6,10 +6,22 @@ import { requireAuth } from '../middleware/requireAuth.js';
 const router = Router();
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';
 
+const formatImageUrl = (dbPath) => {
+  if (!dbPath) return null;
+  if (dbPath.startsWith('http')) return dbPath; 
+  
+  const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
+  return `${BASE_URL}${dbPath.startsWith('/') ? '' : '/'}${dbPath}`;
+};
+
 async function fetchProductsByIds(ids) {
   if (!ids || ids.length === 0) return [];
   const [rows] = await pool.query('SELECT * FROM products WHERE id IN (?)', [ids]);
-  return rows;
+
+  return rows.map(p => ({
+    ...p,
+    image_url: formatImageUrl(p.image_url)
+  }));
 }
 
 // GET /api/recommend/product/:id (For "Similar Products" section)
@@ -58,7 +70,10 @@ router.get('/user', requireAuth, async (req, res) => {
     
     if (recommendedProducts.length === 0) {
       const [trending] = await pool.query('SELECT * FROM products ORDER BY RAND() LIMIT 4');
-      recommendedProducts = trending;
+      recommendedProducts = trending.map(p => ({
+        ...p,
+        image_url: formatImageUrl(p.image_url)
+      }));
     }
 
     res.json(recommendedProducts);

@@ -27,9 +27,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const clientBuildPath = join(__dirname, '../../client/dist');
 
-app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
-app.use(express.static(clientBuildPath));
-
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -48,17 +45,18 @@ app.use(
   })
 );
 app.use(morgan('common'));
-
 //app.use(globalLimiter); 
 app.use(cookieParser());
 app.use(cors({ 
   origin: ['http://localhost:5173', 'https://handed-administrative-soo.ngrok-free.dev'], 
   credentials: true 
 }));
-
 app.use(express.json());
 
-// API ROUTES
+// STATIC FILES (UPLOADS)
+app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
+
+// --- API ROUTES ---
 app.use('/api/auth', auth);
 app.use('/api/products', products);
 app.use('/api/cart', cart);
@@ -68,9 +66,19 @@ app.use('/api/recommend', recommendations);
 app.use('/api/chat', chat);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-app.get('*', (req, res) => {
-  res.sendFile(join(clientBuildPath, 'index.html'));
-});
+// FRONTEND SERVING (CONDITIONAL)
+if (fs.existsSync(clientBuildPath)) {
+  app.use(express.static(clientBuildPath));
+  
+  app.get('*', (req, res) => {
+    res.sendFile(join(clientBuildPath, 'index.html'));
+  });
+} else {
+  // Fallback route for Docker environments where the backend is isolated
+  app.get('/', (req, res) => {
+    res.send('Backend API is running securely in Docker! (Frontend is hosted on port 5173)');
+  });
+}
 
 app.listen(process.env.PORT, () => {
   console.log(`Server running on http://localhost:${process.env.PORT}`);

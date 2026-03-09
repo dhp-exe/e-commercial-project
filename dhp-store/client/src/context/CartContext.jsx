@@ -17,7 +17,7 @@ export function CartProvider({ children }) {
   async function refreshServer() {
     try {
       const { data } = await api.get('/cart');
-      setItems(data.items);
+      setItems(Array.isArray(data.items) ? data.items : []);
     } catch (e) {
       console.error('refreshServer error', e);
       setItems([]);
@@ -114,8 +114,8 @@ export function CartProvider({ children }) {
     }
   }
 
-  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const totalQty = items.reduce((sum, item) => sum + Number(item.qty), 0);
+  const total = (items || []).reduce((s, i) => s + i.price * i.qty, 0);
+  const totalQty = (items || []).reduce((sum, item) => sum + Number(item.qty), 0);
   return (
     <CartCtx.Provider value={{ items, total, totalQty, add, update, refresh }}>
       {children}

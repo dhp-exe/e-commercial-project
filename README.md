@@ -318,7 +318,34 @@ From the `dhp-store` root (requires Docker & Docker Compose):
 ```bash
 docker-compose up --build
 ```
-
+Docker flow:
+```
+               Browser
+                  │
+                  ▼
+         localhost:5173
+                  │
+          ┌─────────────┐
+          │  Frontend   │  (container)
+          └─────────────┘
+                  │
+                  ▼
+          ┌─────────────┐
+          │   Backend   │  (container)
+          └─────────────┘
+           │           │
+           ▼           ▼
+    ┌───────────┐  ┌────────────┐
+    │   Redis   │  │ AI Service │
+    │ container │  │ container  │
+    └─────┬─────┘  └────────────┘
+          │
+          ▼
+    ┌───────────┐
+    │  Volume   │
+    │ redis_data│
+    └───────────┘
+```
 ## Notes
 - Database migrations and seed scripts can be added to `server/src` to initialize sample data.
 - Add automated tests for critical routes and payment/checkout flows.

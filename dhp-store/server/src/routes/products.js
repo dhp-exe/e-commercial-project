@@ -9,7 +9,7 @@ const router = Router();
 // Helper to construct the image URL
 const formatImageUrl = (dbPath) => {
   if (!dbPath) return null;
-  if (dbPath.startsWith('http')) return dbPath; // Leave external URLs alone
+  if (dbPath.startsWith('http')) return dbPath;
   
   const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
   return `${BASE_URL}${dbPath.startsWith('/') ? '' : '/'}${dbPath}`;

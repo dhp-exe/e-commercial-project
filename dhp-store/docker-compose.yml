@@ -1,37 +1,50 @@
 version: "3.9"
 
 services:
-  db:
-    image: mysql:8.0
-    container_name: mysql
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: streetwear
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-  backend:
-    build: ./server
-    container_name: backend
-    restart: always
-    env_file:
-      - .env
-    ports:
-      - "5001:5001"
-    depends_on:
-      - db
-
+  # 1. Frontend React App
   frontend:
-    build: ./client
-    container_name: frontend
-    restart: always
+    build: 
+      context: ./client
+      args:
+        - VITE_STRIPE_PUBLIC_KEY=${VITE_STRIPE_PUBLIC_KEY}
+        - VITE_BACKEND_URL=${BACKEND_URL}
     ports:
-      - "5173:80"
+      - "5173:80" 
     depends_on:
       - backend
 
+  # 2. Node.js Backend
+  backend:
+    build: ./server
+    ports:
+      - "5001:5001"
+    depends_on:
+      - redis
+      - ai-service
+    volumes:
+      - ./server/src/uploads:/app/src/uploads 
+    env_file:
+      - .env
+    environment:
+      # Internal Docker network routing
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai-service:10000
+
+  # 3. Python AI Service
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "10000:10000"
+    env_file:
+      - .env 
+
+  # 4. Redis Cache
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
-  mysql_data:
+  redis_data:
