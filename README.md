@@ -1,4 +1,6 @@
-# **DHP Store**
+<h align="center">
+  <img src="dhp-store/client/public/logo2.png" height = "400" width="500">
+</h>
 ***Website link:** https://dhp-store.onrender.com*
 
 *(Wait a few seconds for the site to load)*
