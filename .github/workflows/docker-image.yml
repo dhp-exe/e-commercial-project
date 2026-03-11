@@ -1,0 +1,27 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Create mock .env file for build
+      run: |
+        cd dhp-store
+        touch .env
+        echo "VITE_STRIPE_PUBLIC_KEY=pk_test_mock_key" >> .env
+        echo "BACKEND_URL=http://localhost:5001" >> .env
+
+    - name: Build the Docker Compose stack
+      run: |
+        cd dhp-store
+        docker compose build
