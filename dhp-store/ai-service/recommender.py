@@ -16,7 +16,6 @@ class Recommender:
         self.tfidf_matrix = None
         self.id_to_index = None
         
-        # Load data immediately
         self.refresh()
 
         if os.getenv("GOOGLE_API_KEY"):
@@ -40,14 +39,13 @@ class Recommender:
 
         self.products = self.df[["id", "name", "description", "price", "category"]].to_dict("records")
 
-        # Combine all text features into one string
         self.df['soup'] = self.df['name'] + " " + self.df['description'] + " " + self.df['category']
         
         # Vectorize (Text -> numbers)
         self.vectorizer = TfidfVectorizer(stop_words='english')
         self.tfidf_matrix = self.vectorizer.fit_transform(self.df['soup'])
         
-        # Calculate Cosine Similarity
+        # Cosine Similarity
         self.similarity_matrix = cosine_similarity(self.tfidf_matrix, self.tfidf_matrix)
         
         # Create a lookup map (Product ID -> Matrix Index)
@@ -100,7 +98,6 @@ class Recommender:
         # ---------- filtering ----------
         results = []
 
-        # If refresh() hasn't populated products yet, fail gracefully.
         for product in (self.products or []):
             name = product["name"].lower()
             price = float(product["price"])
@@ -120,7 +117,8 @@ class Recommender:
     def detect_intent(self, text: str) -> str:
         t = text.lower()
 
-        if any(k in t for k in ["owner", "store owner", "who", "manager", "ceo", "creator", "admin", "founder", "DHP", "Phuoc", "Naviah"]):
+        if any(k in t for k in ["owner", "store owner", "who", "manager", "ceo", "creator", "admin", "founder", "DHP", "Phuoc", "Naviah", 
+                                "location", "where", "address", "open", "close", "hours", "time"]):
             return "STORE_INFO"
 
         if any(k in t for k in ["buy", "price", "product", "products", "recommend", "search", "best seller", "trending", "tee", "tees", "jeans", "shirt", "t-shirt"]):
@@ -134,7 +132,7 @@ class Recommender:
 
         intent = self.detect_intent(user_message)
 
-        # ===== STORE INFO ONLY =====
+        # ===== STORE INFO =====
         if intent == "STORE_INFO":
             prompt = f"""
             You are Naviah, a helpful store information assistant/manager.
@@ -145,6 +143,7 @@ class Recommender:
             - Answer with less than 30 words.
 
             Store facts:
+            - Store location: HCM City and Hanoi, Vietnam
             - Store name: DHP Store
             - Store owner, ceo, creator: Do Huu Phuoc (DHP)
             - Store manager, admin: you, Naviah
@@ -197,5 +196,4 @@ class Recommender:
 
             response = self.model.generate_content(prompt)
             return response.text.strip()
-        # ===== FALLBACK =====
         return "Can you please clarify what you're looking for?"
