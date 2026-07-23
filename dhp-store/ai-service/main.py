@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from recommender import Recommender
 import uvicorn
 from dotenv import load_dotenv
@@ -35,10 +35,10 @@ def recommend(product_id: int):
     return {"product_id": product_id, "recommendations": similar_ids}
 
 @app.post("/refresh")
-def refresh_model():
-    """Call this when you add new products to update the AI"""
-    rec_engine.refresh()
-    return {"status": "Refreshed"}
+def refresh_model(background_tasks: BackgroundTasks):
+    """Call this when you add new products to update the AI (runs in background)"""
+    background_tasks.add_task(rec_engine.refresh)
+    return {"status": "Refresh started"}
 
 class ChatRequest(BaseModel):
     message: str

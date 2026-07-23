@@ -22,9 +22,11 @@
     "mysql2": "^3.14.3",
     "nodemailer": "^7.0.13",
     "redis": "^5.11.0",
-    "stripe": "^20.2.0"
+    "stripe": "^20.2.0",
+    "validator": "^13.15.35"
   },
   "devDependencies": {
+    "eslint": "^10.7.0",
     "nodemon": "^3.1.0"
   }
 }

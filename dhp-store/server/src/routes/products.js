@@ -4,27 +4,26 @@ import redis from '../cache/redis.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
 import upload from '../middleware/upload.js';
+import { formatImageUrl } from '../utils/formatImageUrl.js';
 const router = Router();
-
-// Helper to construct the image URL
-const formatImageUrl = (dbPath) => {
-  if (!dbPath) return null;
-  if (dbPath.startsWith('http')) return dbPath;
-  
-  const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
-  return `${BASE_URL}${dbPath.startsWith('/') ? '' : '/'}${dbPath}`;
-};
 
 const clearProductCaches = async (productId = null) => {
   try {
     if (productId) {
       await redis.del(`product:${productId}`);
     }
-    // Clear all product list caches (queries)
-    const keys = await redis.keys('products:*');
-    if (keys.length > 0) {
-      await redis.del(keys);
-    }
+    // Use SCAN instead of KEYS to avoid blocking Redis
+    let cursor = 0;
+    do {
+      const result = await redis.scan(cursor, {
+        MATCH: 'products:*',
+        COUNT: 100,
+      });
+      cursor = result.cursor;
+      if (result.keys.length > 0) {
+        await redis.del(result.keys);
+      }
+    } while (cursor !== 0);
   } catch (err) {
     console.error('Redis cache invalidation error:', err);
   }
@@ -60,9 +59,14 @@ router.get('/', async (req, res) => {
       SELECT 
         p.*, 
         c.name AS category_name,
-        (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE product_id = p.id) AS sold_count
+        COALESCE(oi_agg.sold_count, 0) AS sold_count
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN (
+        SELECT product_id, SUM(quantity) AS sold_count
+        FROM order_items
+        GROUP BY product_id
+      ) oi_agg ON oi_agg.product_id = p.id
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY p.id DESC
     `;

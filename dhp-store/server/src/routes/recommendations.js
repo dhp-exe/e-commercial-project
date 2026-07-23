@@ -2,17 +2,16 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import axios from 'axios';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { formatImageUrl } from '../utils/formatImageUrl.js';
 
 const router = Router();
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';
 
-const formatImageUrl = (dbPath) => {
-  if (!dbPath) return null;
-  if (dbPath.startsWith('http')) return dbPath; 
-  
-  const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
-  return `${BASE_URL}${dbPath.startsWith('/') ? '' : '/'}${dbPath}`;
-};
+// Shared AI HTTP client with a 10-second timeout
+const aiClient = axios.create({
+  baseURL: AI_SERVICE_URL,
+  timeout: 10000,
+});
 
 async function fetchProductsByIds(ids) {
   if (!ids || ids.length === 0) return [];
@@ -30,7 +29,7 @@ router.get('/product/:id', async (req, res) => {
     const { id } = req.params;
     
     // Ask Python: "What is similar to product X?"
-    const aiResponse = await axios.get(`${AI_SERVICE_URL}/recommend/${id}`);
+    const aiResponse = await aiClient.get(`/recommend/${id}`);
     const similarIds = aiResponse.data.recommendations; // e.g., [12, 4, 9]
 
     if (similarIds.length === 0) return res.json([]);
@@ -63,17 +62,34 @@ router.get('/user', requireAuth, async (req, res) => {
 
     if (history.length > 0) {
       const lastProductId = history[0].product_id;
-      const aiResponse = await axios.get(`${AI_SERVICE_URL}/recommend/${lastProductId}`);
+      const aiResponse = await aiClient.get(`/recommend/${lastProductId}`);
       const similarIds = aiResponse.data.recommendations;
       recommendedProducts = await fetchProductsByIds(similarIds);
     } 
     
+    // Fallback: random products without ORDER BY RAND()
     if (recommendedProducts.length === 0) {
-      const [trending] = await pool.query('SELECT * FROM products ORDER BY RAND() LIMIT 4');
-      recommendedProducts = trending.map(p => ({
-        ...p,
-        image_url: formatImageUrl(p.image_url)
-      }));
+      const [maxRow] = await pool.query('SELECT MAX(id) AS maxId FROM products WHERE is_active = true');
+      const maxId = maxRow[0]?.maxId || 0;
+
+      if (maxId > 0) {
+        const randomIds = new Set();
+        const attempts = Math.min(maxId, 20); // avoid infinite loop on small tables
+        for (let i = 0; i < attempts && randomIds.size < 4; i++) {
+          randomIds.add(Math.floor(Math.random() * maxId) + 1);
+        }
+
+        if (randomIds.size > 0) {
+          const [trending] = await pool.query(
+            'SELECT * FROM products WHERE id IN (?) AND is_active = true LIMIT 4',
+            [[...randomIds]]
+          );
+          recommendedProducts = trending.map(p => ({
+            ...p,
+            image_url: formatImageUrl(p.image_url)
+          }));
+        }
+      }
     }
 
     res.json(recommendedProducts);

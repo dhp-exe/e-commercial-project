@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import upload from '../middleware/upload.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import nodemailer from 'nodemailer';
+import { formatImageUrl } from '../utils/formatImageUrl.js';
 
 dotenv.config();
 
@@ -22,62 +23,31 @@ const cookieOptions = {
   maxAge: 60 * 60 * 1000
 };
 
-// Helper to reliably construct the image URL
-const formatImageUrl = (dbPath) => {
-  if (!dbPath) return null;
-  if (dbPath.startsWith('http')) return dbPath; // Leave external URLs alone
-  
-  const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
-  const pathWithUploads = dbPath.startsWith('/uploads/') ? dbPath : `/uploads/${dbPath}`;
-  return `${BASE_URL}${pathWithUploads}`;
-};
+// SMTP transporter — created once at module level, not per-request
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 async function sendEmail(to, link) {
-  try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      },
-      logger: true, 
-      debug: true   
-    });
+  const mailOptions = {
+    from: `"Streetwear Support" <${process.env.EMAIL_USER}>`,
+    to: to,
+    subject: 'Password Reset Request',
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Password Reset</h2>
+        <p>Click below to reset:</p>
+        <a href="${link}">Reset Password</a>
+      </div>
+    `
+  };
 
-    const mailOptions = {
-      from: `"Streetwear Support" <${process.env.EMAIL_USER}>`,
-      to: to,
-      subject: 'Password Reset Request',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-          <h2>Password Reset</h2>
-          <p>Click below to reset:</p>
-          <a href="${link}">Reset Password</a>
-        </div>
-      `
-    };
-
-    await transporter.verify();
-    console.log("Server is ready to take our messages");
-
-    const info = await transporter.sendMail(mailOptions);
-    
-    console.log("---------------------------------------");
-    console.log("📧 EMAIL SENT SUCCESSFULLY");
-    console.log("Message ID:", info.messageId);
-    console.log("---------------------------------------");
-
-  } catch (error) {
-    console.error("---------------------------------------");
-    console.error("❌ EMAIL FAILED TO SEND");
-    console.error("Error Message:", error.message);
-    if (error.code === 'EAUTH') {
-        console.error("👉 CAUSE: Invalid Login. Check EMAIL_USER and EMAIL_PASS in .env");
-        console.error("👉 TIP: You must use an 'App Password', not your login password.");
-    }
-    console.error("---------------------------------------");
-    throw error; 
-  }
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`📧 Email sent to ${to} (ID: ${info.messageId})`);
 }
 
 // POST /register
@@ -229,7 +199,10 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
       const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
       const resetLink = `${FRONTEND_URL}/reset-password?token=${rawToken}&email=${email}`;
       
-      await sendEmail(email, resetLink);
+      // Fire-and-forget: respond immediately, email sends in background
+      sendEmail(email, resetLink).catch(err => {
+        console.error('Background email failed:', err.message);
+      });
     }
 
     return res.json({ message: 'If the email exists, a reset link has been sent.' });
