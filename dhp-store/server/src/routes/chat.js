@@ -4,13 +4,19 @@ import axios from 'axios';
 const router = Router();
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';
 
+// Shared AI HTTP client with timeout
+const aiClient = axios.create({
+  baseURL: AI_SERVICE_URL,
+  timeout: 10000, // 10 second timeout
+});
+
 // POST /chat
 router.post('/', async (req, res) => {
   try {
     const { message } = req.body;
     
     // Forward to Python
-    const aiResponse = await axios.post(`${AI_SERVICE_URL}/chat`, { message });
+    const aiResponse = await aiClient.post('/chat', { message });
     
     res.json({ reply: aiResponse.data.reply });
 

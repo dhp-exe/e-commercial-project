@@ -9,8 +9,40 @@ import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+/**
+ * Helper: Fetch order items for a batch of order IDs in a single query.
+ * Eliminates N+1 query pattern.
+ */
+async function fetchItemsForOrders(orderIds, conn = pool) {
+  if (orderIds.length === 0) return new Map();
+
+  const [items] = await conn.query(
+    `SELECT oi.order_id, oi.id, oi.quantity, oi.size, oi.price, p.name, p.image_url
+     FROM order_items oi
+     JOIN products p ON oi.product_id = p.id
+     WHERE oi.order_id IN (?)`,
+    [orderIds]
+  );
+
+  const itemMap = new Map();
+  for (const item of items) {
+    if (!itemMap.has(item.order_id)) {
+      itemMap.set(item.order_id, []);
+    }
+    itemMap.get(item.order_id).push({
+      id: item.id,
+      quantity: item.quantity,
+      size: item.size,
+      price: item.price,
+      name: item.name,
+      image_url: item.image_url,
+    });
+  }
+  return itemMap;
+}
+
 // POST /api/orders - Create a new order (Guest & User)
-router.post('/',apiLimiter, async (req, res) => {
+router.post('/', apiLimiter, async (req, res) => {
     let connection;
     try {
         // Auth Check (from cookie `access_token`)
@@ -104,11 +136,16 @@ router.post('/',apiLimiter, async (req, res) => {
         
         const orderId = orderResult.insertId;
 
-        for (const item of finalItemsToOrder) {
-            await connection.execute(
-                'INSERT INTO order_items (order_id, product_id, quantity, size, price) VALUES (?, ?, ?, ?, ?)',
-                [orderId, item.product_id, item.qty, item.size, item.price]
-            );
+        // Batch INSERT order items instead of sequential inserts
+        if (finalItemsToOrder.length > 0) {
+          const placeholders = finalItemsToOrder.map(() => '(?, ?, ?, ?, ?)').join(', ');
+          const values = finalItemsToOrder.flatMap(item => [
+            orderId, item.product_id, item.qty, item.size, item.price
+          ]);
+          await connection.execute(
+            `INSERT INTO order_items (order_id, product_id, quantity, size, price) VALUES ${placeholders}`,
+            values
+          );
         }
 
         await connection.commit();
@@ -123,10 +160,13 @@ router.post('/',apiLimiter, async (req, res) => {
     }
 });
 
-// GET /api/orders?status=new - Get user's orders
+// GET /api/orders?status=new&page=1&limit=20 - Get user's orders (paginated)
 router.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id;
   const { status } = req.query; 
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const offset = (page - 1) * limit;
 
   try {
     let query = 'SELECT * FROM orders WHERE user_id = ?';
@@ -137,18 +177,18 @@ router.get('/', requireAuth, async (req, res) => {
       params.push(status);
     }
     
-    query += ' ORDER BY created_at DESC'; 
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'; 
+    params.push(limit, offset);
 
     const [orders] = await pool.execute(query, params);
-    const ordersWithItems = await Promise.all(orders.map(async (order) => {
-      const [items] = await pool.execute(
-        `SELECT oi.id, oi.quantity, oi.size, oi.price, p.name, p.image_url 
-         FROM order_items oi 
-         JOIN products p ON oi.product_id = p.id 
-         WHERE oi.order_id = ?`,
-        [order.id]
-      );
-      return { ...order, items };
+
+    // Batch fetch items for all orders (2 queries total instead of N+1)
+    const orderIds = orders.map(o => o.id);
+    const itemMap = await fetchItemsForOrders(orderIds);
+
+    const ordersWithItems = orders.map(order => ({
+      ...order,
+      items: itemMap.get(order.id) || [],
     }));
 
     res.json(ordersWithItems);
@@ -246,21 +286,29 @@ router.put('/:id/cancel', apiLimiter, requireAuth, async (req,res) =>{
         console.error('Cancel order error:', error);
         res.status(500).json({ message: 'Server error cancelling order' });
     } 
-})
-// GET /api/admin/all (Admin/Staff)
+});
+
+// GET /api/orders/admin/all (Admin/Staff) — paginated
 router.get('/admin/all', requireAuth, verifyStaff, async (req, res) => {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
     try{
-        const [orders] = await pool.execute('SELECT * FROM orders ORDER BY created_at DESC');
-        const ordersWithItems = await Promise.all(orders.map(async (order) => {
-            const [items] = await pool.execute(
-                `SELECT oi.id, oi.quantity, oi.size, oi.price, p.name, p.image_url
-                FROM order_items oi
-                JOIN products p ON oi.product_id = p.id
-                WHERE oi.order_id = ?`,
-                [order.id ]
-            );
-            return {...order, items};
+        const [orders] = await pool.execute(
+          'SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?',
+          [limit, offset]
+        );
+
+        // Batch fetch items for all orders (2 queries total instead of N+1)
+        const orderIds = orders.map(o => o.id);
+        const itemMap = await fetchItemsForOrders(orderIds);
+
+        const ordersWithItems = orders.map(order => ({
+          ...order,
+          items: itemMap.get(order.id) || [],
         }));
+
         res.json(ordersWithItems);
     }
     catch (err){
@@ -369,4 +417,5 @@ router.put('/:id/status', requireAuth, verifyStaff, async (req, res) => {
         if (connection) connection.release();
     }
 });
+
 export default router;
