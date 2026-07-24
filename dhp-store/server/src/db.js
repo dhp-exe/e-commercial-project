@@ -12,5 +12,7 @@ export const pool = mysql.createPool({
   connectionLimit: 20, // Increased for production concurrency
   queueLimit: 0,       // Unlimited queuing
   idleTimeout: 60000,  // Clean up idle connections after 60s
-  ssl: process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : undefined
+  ssl: process.env.DB_SSL_CA 
+    ? { ca: process.env.DB_SSL_CA } 
+    : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true, minVersion: 'TLSv1.2' } : undefined)
 });
