@@ -25,6 +25,7 @@ const AdminLayout = lazy(() => import('./pages/admin/AdminLayout.jsx'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx'));
 const ManageOrders = lazy(() => import('./pages/admin/ManageOrders.jsx'));
 const ManageProducts = lazy(() => import('./pages/admin/ManageProducts.jsx'));
+const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 export default function App(){
   return (
@@ -57,7 +58,10 @@ export default function App(){
                     <Route path="orders" element={<ManageOrders />} />
                     <Route path="products" element={<ManageProducts />} />
                 </Route>
-            </Route>
+              </Route>
+
+              {/* 404 Fallback */}
+              <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </main>
