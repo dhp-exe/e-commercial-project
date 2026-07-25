@@ -151,11 +151,12 @@ router.post('/upload-profile-picture', requireAuth, upload.single('profilePictur
   
   try {
     const fileName = req.file.filename;
-    await pool.execute('UPDATE users SET profile_picture = ? WHERE id = ?', [fileName, req.user.id]);
+    const filePath = `/uploads/${fileName}`;
+    await pool.execute('UPDATE users SET profile_picture = ? WHERE id = ?', [filePath, req.user.id]);
 
     res.json({ 
       message: 'Upload successful', 
-      profilePicture: formatImageUrl(fileName) // FIX: Dynamic URL
+      profilePicture: formatImageUrl(filePath)
     });
   } catch (e) {
     console.error(e);

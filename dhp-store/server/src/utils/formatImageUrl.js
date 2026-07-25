@@ -7,6 +7,7 @@ const BASE_URL = process.env.BACKEND_URL || 'http://localhost:5001';
 export function formatImageUrl(dbPath) {
   if (!dbPath) return null;
   if (dbPath.startsWith('http')) return dbPath;
-  const normalizedPath = dbPath.startsWith('/') ? dbPath : `/${dbPath}`;
+  // Handle legacy bare filenames (e.g., "1770105462047.webp") stored before the /uploads/ prefix fix
+  const normalizedPath = dbPath.startsWith('/') ? dbPath : `/uploads/${dbPath}`;
   return `${BASE_URL}${normalizedPath}`;
 }
