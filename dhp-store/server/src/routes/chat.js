@@ -28,7 +28,7 @@ router.post('/', async (req, res) => {
     else {
         console.error("Chat Error:", error.message);
     }
-    res.json({ reply: "I'm sorry, I can't connect to the server right now." });
+    res.json({ reply: "I'm sorry, I can't connect to the server right now.", status: 'error' });
   }
 });
 
