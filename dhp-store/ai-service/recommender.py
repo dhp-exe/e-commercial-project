@@ -24,7 +24,8 @@ class Recommender:
 
         if os.getenv("GOOGLE_API_KEY"):
             genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
+            model_name = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+            self.model = genai.GenerativeModel(model_name)
         else:
             self.model = None
 
