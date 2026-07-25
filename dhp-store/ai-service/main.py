@@ -18,6 +18,11 @@ db_config = {
     "database": os.getenv("DB_NAME"),
 }
 
+# Enable SSL for TiDB Serverless (production)
+if os.getenv("DB_SSL", "").lower() == "true":
+    db_config["ssl_verify_cert"] = True
+    db_config["ssl_disabled"] = False
+
 # Initialize AI Engine
 rec_engine = Recommender(db_config)
 

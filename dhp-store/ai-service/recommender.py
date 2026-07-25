@@ -16,11 +16,16 @@ class Recommender:
         self.tfidf_matrix = None
         self.id_to_index = None
         
-        self.refresh()
+        try:
+            self.refresh()
+        except Exception as e:
+            print(f"WARNING: Failed to load product data on startup: {e}")
+            print("AI recommendations will be unavailable until data is loaded.")
 
         if os.getenv("GOOGLE_API_KEY"):
             genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
+            model_name = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+            self.model = genai.GenerativeModel(model_name)
         else:
             self.model = None
 

@@ -30,9 +30,9 @@ router.get('/product/:id', async (req, res) => {
     
     // Ask Python: "What is similar to product X?"
     const aiResponse = await aiClient.get(`/recommend/${id}`);
-    const similarIds = aiResponse.data.recommendations; // e.g., [12, 4, 9]
+    const similarIds = aiResponse.data?.recommendations;
 
-    if (similarIds.length === 0) return res.json([]);
+    if (!Array.isArray(similarIds) || similarIds.length === 0) return res.json([]);
 
     const products = await fetchProductsByIds(similarIds);
     res.json(products);
@@ -63,8 +63,10 @@ router.get('/user', requireAuth, async (req, res) => {
     if (history.length > 0) {
       const lastProductId = history[0].product_id;
       const aiResponse = await aiClient.get(`/recommend/${lastProductId}`);
-      const similarIds = aiResponse.data.recommendations;
-      recommendedProducts = await fetchProductsByIds(similarIds);
+      const similarIds = aiResponse.data?.recommendations;
+      if (Array.isArray(similarIds) && similarIds.length > 0) {
+        recommendedProducts = await fetchProductsByIds(similarIds);
+      }
     } 
     
     // Fallback: random products without ORDER BY RAND()
@@ -95,8 +97,9 @@ router.get('/user', requireAuth, async (req, res) => {
     res.json(recommendedProducts);
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('Recommendation error:', error.message);
+    // Graceful degradation: return empty array instead of 500
+    res.json([]);
   }
 });
 

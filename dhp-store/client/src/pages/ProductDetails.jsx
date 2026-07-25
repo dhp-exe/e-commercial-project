@@ -272,8 +272,6 @@ export default function ProductDetails() {
         <RecommendRow title="Similar Products" products={similarProducts} />
 
         <CartDrawer isOpen={isCartOpen} onClose={() => setCartOpen(false)} />
-
-        <CartDrawer isOpen={isCartOpen} onClose={() => setCartOpen(false)} />
     </>
     );
 }
