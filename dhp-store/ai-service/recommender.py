@@ -58,6 +58,8 @@ class Recommender:
         print("AI Model Ready!")
 
     def get_similar(self, product_id, top_n=4):
+        if self.id_to_index is None or self.similarity_matrix is None:
+            return []
         if product_id not in self.id_to_index:
             return []
 
