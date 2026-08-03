@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { api } from '../api';
 import { useAuth } from './AuthContext';
 
@@ -28,9 +28,12 @@ export function CartProvider({ children }) {
     try {
       const local = JSON.parse(localStorage.getItem('local_cart') || '[]');
       if (!local || local.length === 0) { setItems([]); return; }
-      const { data: all } = await api.get('/products');
+      
+      const ids = [...new Set(local.map(item => item.product_id))];
+      const { data: products } = await api.post('/products/batch', { ids });
+      
       const mapped = local.map(l => {
-        const p = all.find(a => a.id === l.product_id);
+        const p = products.find(a => a.id === l.product_id);
         if (!p) return null;
     
         return { 
@@ -114,8 +117,14 @@ export function CartProvider({ children }) {
     }
   }
 
-  const total = (items || []).reduce((s, i) => s + i.price * i.qty, 0);
-  const totalQty = (items || []).reduce((sum, item) => sum + Number(item.qty), 0);
+  const total = useMemo(
+    () => (items || []).reduce((s, i) => s + i.price * i.qty, 0),
+    [items]
+  );
+  const totalQty = useMemo(
+    () => (items || []).reduce((sum, item) => sum + Number(item.qty), 0),
+    [items]
+  );
   return (
     <CartCtx.Provider value={{ items, total, totalQty, add, update, refresh }}>
       {children}

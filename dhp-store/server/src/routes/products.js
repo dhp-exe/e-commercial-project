@@ -58,15 +58,9 @@ router.get('/', async (req, res) => {
     const sql = `
       SELECT 
         p.*, 
-        c.name AS category_name,
-        COALESCE(oi_agg.sold_count, 0) AS sold_count
+        c.name AS category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN (
-        SELECT product_id, SUM(quantity) AS sold_count
-        FROM order_items
-        GROUP BY product_id
-      ) oi_agg ON oi_agg.product_id = p.id
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY p.id DESC
     `;
@@ -83,6 +77,34 @@ router.get('/', async (req, res) => {
   } 
   catch (e) {
     console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/products/batch - Fetch multiple products by ID
+router.post('/batch', async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.json([]);
+  }
+  if (ids.length > 50) {
+    return res.status(400).json({ message: 'Exceeded maximum batch size of 50' });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM products WHERE id IN (?) AND is_active = true',
+      [ids]
+    );
+
+    const products = rows.map(p => ({
+      ...p,
+      image_url: formatImageUrl(p.image_url)
+    }));
+
+    res.json(products);
+  } catch (error) {
+    console.error('Batch fetch error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

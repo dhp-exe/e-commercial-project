@@ -1,39 +1,27 @@
-import React, { useEffect, useState, useRef, useContext } from 'react';
+import React, { useEffect, useRef } from 'react';
 import './Home.css';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSearch } from '../context/SearchContext';
+import { useProducts } from '../hooks/useProducts';
 import searchIcon from "../assets/search_icon.png";
 import bagIcon from "../assets/shopping_bag.png";
 import accountIcon from "../assets/account_icon.png";
 import homeBanner from "../assets/home-banner3.jpg";
 import CartDrawer from "../components/CartDrawer";
-import { CartContext } from "../context/CartContext";
+import { useState } from 'react';
 
 export default function Home() {
-  const [items, setItems] = useState([]);
-  const { add, totalQty } = useCart();
+  const { data: items = [] } = useProducts();
+  const { totalQty } = useCart();
   const { token, name } = useAuth();
   const navigate = useNavigate();
-  const [message, setMessage] = useState(null);
-  const [addedId, setAddedId] = useState(null);
   const [isCartOpen, setCartOpen] = useState(false);
 
   // shared search state & ref (used also by mobile navbar)
   const { showSearch, setShowSearch, searchTerm, setSearchTerm } = useSearch();
   const inputRef = useRef(null);
-  //cart quantity
-  const { items: cartItems } = useContext(CartContext);
-
-  useEffect(() => {
-    let mounted = true;
-    api.get('/products')
-      .then(res => { if (mounted) setItems(res.data); })
-      .catch(() => { if (mounted) setItems([]); });
-    return () => { mounted = false; };
-  }, []);
 
   useEffect(() => {
     if (!items.length) return;

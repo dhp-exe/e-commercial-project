@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import redis from '../cache/redis.js';
 import axios from 'axios';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { formatImageUrl } from '../utils/formatImageUrl.js';
@@ -27,7 +28,15 @@ async function fetchProductsByIds(ids) {
 router.get('/product/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const cacheKey = `recs:product:${id}`;
     
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) return res.json(JSON.parse(cached));
+    } catch (redisErr) {
+      console.warn("Redis cache error, falling back to AI service", redisErr.message);
+    }
+
     // Ask Python: "What is similar to product X?"
     const aiResponse = await aiClient.get(`/recommend/${id}`);
     const similarIds = aiResponse.data?.recommendations;
@@ -35,6 +44,13 @@ router.get('/product/:id', async (req, res) => {
     if (!Array.isArray(similarIds) || similarIds.length === 0) return res.json([]);
 
     const products = await fetchProductsByIds(similarIds);
+    
+    try {
+      await redis.set(cacheKey, JSON.stringify(products), { EX: 300 });
+    } catch (redisErr) {
+      console.warn("Redis set error", redisErr.message);
+    }
+
     res.json(products);
 
   } catch (error) {
@@ -47,6 +63,14 @@ router.get('/product/:id', async (req, res) => {
 router.get('/user', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
+    const cacheKey = `recs:user:${userId}`;
+
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) return res.json(JSON.parse(cached));
+    } catch (redisErr) {
+      console.warn("Redis cache error, falling back to DB/AI", redisErr.message);
+    }
 
     // Step A: Find the LAST item this user bought
     const [history] = await pool.query(`
@@ -92,6 +116,12 @@ router.get('/user', requireAuth, async (req, res) => {
           }));
         }
       }
+    }
+
+    try {
+      await redis.set(cacheKey, JSON.stringify(recommendedProducts), { EX: 300 });
+    } catch (redisErr) {
+      console.warn("Redis set error", redisErr.message);
     }
 
     res.json(recommendedProducts);

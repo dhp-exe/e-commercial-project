@@ -146,6 +146,14 @@ router.post('/', apiLimiter, async (req, res) => {
             `INSERT INTO order_items (order_id, product_id, quantity, size, price) VALUES ${placeholders}`,
             values
           );
+
+          // Increment sold_count atomically inside the transaction
+          for (const item of finalItemsToOrder) {
+            await connection.execute(
+              'UPDATE products SET sold_count = sold_count + ? WHERE id = ?',
+              [item.qty, item.product_id]
+            );
+          }
         }
 
         await connection.commit();
