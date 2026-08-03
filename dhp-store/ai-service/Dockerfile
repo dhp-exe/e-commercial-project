@@ -10,7 +10,7 @@ FROM python:3.11-slim AS runtime
 WORKDIR /app
 
 # We need the mysql client library at runtime, but not the dev headers
-RUN apt-get update && apt-get install -y default-libmysqlclient21 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libmariadb3 && rm -rf /var/lib/apt/lists/*
 
 # Copy installed pip packages from builder
 COPY --from=builder /root/.local /root/.local
