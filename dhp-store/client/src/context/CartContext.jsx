@@ -28,9 +28,12 @@ export function CartProvider({ children }) {
     try {
       const local = JSON.parse(localStorage.getItem('local_cart') || '[]');
       if (!local || local.length === 0) { setItems([]); return; }
-      const { data: all } = await api.get('/products');
+      
+      const ids = [...new Set(local.map(item => item.product_id))];
+      const { data: products } = await api.post('/products/batch', { ids });
+      
       const mapped = local.map(l => {
-        const p = all.find(a => a.id === l.product_id);
+        const p = products.find(a => a.id === l.product_id);
         if (!p) return null;
     
         return { 
