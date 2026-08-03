@@ -1,4 +1,12 @@
 import './config.js'; // env validation — must be first
+import * as Sentry from '@sentry/node';
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+  });
+}
+
 import express from 'express';
 import cors from 'cors';
 import auth from './routes/auth.js';
@@ -97,6 +105,8 @@ app.get('/', (_req, res) => {
 });
 
 // ── Centralized Error Handler ───────────────────────────────────────
+Sentry.setupExpressErrorHandler(app);
+
 app.use((err, req, res, _next) => {
   console.error(`[${new Date().toISOString()}] ${req.method} ${req.path}`, err);
 
