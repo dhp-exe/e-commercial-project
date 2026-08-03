@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext'; 
+import { useProduct, useProductRecommendations } from '../hooks/useProducts';
 import CartDrawer from '../components/CartDrawer';
 import RecommendRow from '../components/RecommendRow';
 import './ProductDetails.css';
@@ -17,8 +17,9 @@ export default function ProductDetails() {
     const { add, totalQty } = useCart(); 
     const { token, name } = useAuth();
 
-    const [product, setProduct] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { data: product, isLoading: loading } = useProduct(id);
+    const { data: similarProducts = [] } = useProductRecommendations(id);
+
     const [selectedSize, setSelectedSize] = useState(null);
     const [quantity, setQuantity] = useState(1);
     
@@ -27,37 +28,6 @@ export default function ProductDetails() {
     const productImgRef = useRef(null);
     const cartIconRef = useRef(null);
     const [flyingItem, setFlyingItem] = useState(null);
-    const [similarProducts, setSimilarProducts] = useState([]);
-
-    useEffect(() => {
-        api.get(`/products/${id}`)
-           .then(res => {
-               setProduct(res.data);
-               setLoading(false);
-           })
-           .catch(err => {
-               console.error("Failed to fetch product", err);
-               setLoading(false);
-           });
-    }, [id]);
-
-    useEffect(() => {
-    if (!id) return;
-    
-    api.get(`/recommend/product/${id}`)
-    .then(res => {
-        if (Array.isArray(res.data)) {
-            setSimilarProducts(res.data);
-        } else {
-            console.warn("Unexpected AI response:", res.data);
-            setSimilarProducts([]); // Default to empty if API fails
-        }
-    })
-    .catch(err => {
-        console.error("Recs error:", err);
-        setSimilarProducts([]); // Default to empty on error
-    });
-}, [id]);
 
     if (loading) return <div style={{padding: 40, textAlign:'center'}}>Loading product...</div>;
     if (!product) return <div style={{padding: 40, textAlign:'center'}}>Product not found.</div>;

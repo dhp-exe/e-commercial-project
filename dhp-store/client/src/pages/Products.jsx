@@ -1,16 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api } from '../api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSearch } from '../context/SearchContext';
+import { useProducts, useUserRecommendations } from '../hooks/useProducts';
 import searchIcon from "../assets/search_icon.png";
 import bagIcon from "../assets/shopping_bag.png";
 import accountIcon from "../assets/account_icon.png";
 import CartDrawer from "../components/CartDrawer";
 import RecommendRow from "../components/RecommendRow";
 
-function useQuery(){ const { search } = useLocation(); return Object.fromEntries(new URLSearchParams(search)); }
+function useQueryParams(){ const { search } = useLocation(); return Object.fromEntries(new URLSearchParams(search)); }
 
 const CATEGORY_MAP = {
   1: 'Tees',
@@ -19,11 +19,12 @@ const CATEGORY_MAP = {
 };
 
 export default function Products(){
-  const [items, setItems] = useState([]);
-  const q = useQuery();
+  const q = useQueryParams();
+  const { data: items = [] } = useProducts({ q: q.q, categoryId: q.categoryId });
+  const { token, name } = useAuth();
+  const { data: recommendations = [] } = useUserRecommendations(token);
   
   const { totalQty } = useCart(); 
-  const { token, name } = useAuth();
   const navigate = useNavigate();
   const [isCartOpen, setCartOpen] = useState(false);
 
@@ -36,18 +37,6 @@ export default function Products(){
   const [priceFilter, setPriceFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState(q.size || 'all');
-  const [recommendations, setRecommendations] = useState([]);
-
-  // Fetch Products
-  useEffect(()=>{
-    let mounted = true;
-    api.get('/products', { params: q }).then(r=>{
-      if(mounted) {
-        setItems(r.data);
-      }
-    }).catch(()=>{ if(mounted) setItems([]); });
-    return ()=> mounted=false;
-  }, [q.q, q.categoryId]);
 
   // Fade-in animation
   useEffect(() => {
@@ -69,30 +58,9 @@ export default function Products(){
 
   function submitSearch(e){ e?.preventDefault?.(); }
 
-  // Fetch recommendations
-  useEffect(() => {
-    if (token) {
-      api.get('/recommend/user')
-      .then(res => {
-        if (Array.isArray(res.data)) {
-          setRecommendations(res.data);
-        } 
-        else {
-          setRecommendations([]);
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        setRecommendations([]); 
-      });
-    }
-    else {
-        setRecommendations([]);
-    }
-  }, [token]);
-
-  // Helper: Filter & Sort Logic
-  const processedItems = items.filter(p => {
+  // Memoized filter & sort — only recomputes when dependencies change
+  const processedItems = useMemo(() => {
+    return items.filter(p => {
       // Search Filter
       if (searchTerm && !p.name.toLowerCase().includes(searchTerm.trim().toLowerCase())) return false;
       
@@ -109,9 +77,9 @@ export default function Products(){
       if (priceFilter === '20-plus') return price > 20;
       
       // Size Filter
-      if(sizeFilter !== 'all'){
+      if (sizeFilter !== 'all') {
         const availableSizes = p.sizes ? p.sizes.split(',') : [];
-        if(!availableSizes.includes(sizeFilter)) return false;
+        if (!availableSizes.includes(sizeFilter)) return false;
       }
 
       return true;
@@ -119,18 +87,17 @@ export default function Products(){
     .sort((a, b) => {
       const priceA = Number(a.price);
       const priceB = Number(b.price);
-      
-      // 👇 UPDATED SORT LOGIC
       const soldA = Number(a.sold_count) || 0;
       const soldB = Number(b.sold_count) || 0;
 
       switch (sortOption) {
         case 'asc': return priceA - priceB;
         case 'desc': return priceB - priceA;
-        case 'best-seller': return soldB - soldA; // Sort by sold_count (Highest first)
+        case 'best-seller': return soldB - soldA;
         default: return 0; 
       }
     });
+  }, [items, searchTerm, categoryFilter, priceFilter, sizeFilter, sortOption]);
 
   const filterSelectStyle = {
     padding: '8px 12px',

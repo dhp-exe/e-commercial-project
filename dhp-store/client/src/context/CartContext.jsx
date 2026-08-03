@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { api } from '../api';
 import { useAuth } from './AuthContext';
 
@@ -114,8 +114,14 @@ export function CartProvider({ children }) {
     }
   }
 
-  const total = (items || []).reduce((s, i) => s + i.price * i.qty, 0);
-  const totalQty = (items || []).reduce((sum, item) => sum + Number(item.qty), 0);
+  const total = useMemo(
+    () => (items || []).reduce((s, i) => s + i.price * i.qty, 0),
+    [items]
+  );
+  const totalQty = useMemo(
+    () => (items || []).reduce((sum, item) => sum + Number(item.qty), 0),
+    [items]
+  );
   return (
     <CartCtx.Provider value={{ items, total, totalQty, add, update, refresh }}>
       {children}
