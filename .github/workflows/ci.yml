@@ -1,0 +1,105 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint-client:
+    name: Lint Client (React)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'dhp-store/client/package-lock.json'
+      - name: Install dependencies
+        run: |
+          cd dhp-store/client
+          npm ci
+      - name: Run ESLint
+        run: |
+          cd dhp-store/client
+          npm run lint
+
+  lint-server:
+    name: Lint Server (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'dhp-store/server/package-lock.json'
+      - name: Install dependencies
+        run: |
+          cd dhp-store/server
+          npm ci
+      - name: Run ESLint
+        run: |
+          cd dhp-store/server
+          npm run lint
+
+  build-client:
+    name: Build Client (Vite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'dhp-store/client/package-lock.json'
+      - name: Install dependencies
+        run: |
+          cd dhp-store/client
+          npm ci
+      - name: Build Vite App
+        run: |
+          cd dhp-store/client
+          npm run build
+
+  build-server:
+    name: Build Server Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'dhp-store/server/package-lock.json'
+      - name: Install dependencies
+        run: |
+          cd dhp-store/server
+          npm ci
+      - name: Syntax Check
+        run: |
+          cd dhp-store/server
+          node --check src/index.js
+
+  docker-build:
+    name: Build Docker Stack
+    needs: [lint-client, lint-server, build-client, build-server]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create mock .env file for build
+        run: |
+          cd dhp-store
+          touch .env
+          echo "VITE_STRIPE_PUBLIC_KEY=pk_test_mock_key" >> .env
+          echo "BACKEND_URL=http://localhost:5001" >> .env
+      - name: Build the Docker Compose stack
+        run: |
+          cd dhp-store
+          docker compose build
