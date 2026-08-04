@@ -94,8 +94,8 @@ app.use('/api/recommend', recommendations);
 app.use('/api/chat', chat);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-app.get("/debug-sentry", function mainHandler(req, res) {
-  throw new Error("My first Sentry error!");
+app.get("/debug-sentry", function triggerError(req, res) {
+  throw new Error("Sentry verification test error!");
 });
 
 // ── API 404 Fallback ────────────────────────────────────────────────
