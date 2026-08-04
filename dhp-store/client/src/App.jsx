@@ -35,6 +35,11 @@ export default function App(){
           <Navbar />
           <ChatBot />
           <main className="container">
+            <div style={{ textAlign: 'center', margin: '20px' }}>
+              <button onClick={() => { throw new Error('This is your first error!'); }} style={{ padding: '10px 20px', background: 'red', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
+                Break the world
+              </button>
+            </div>
             <Suspense fallback={<div style={{padding:'50px', textAlign:'center'}}>Loading...</div>}>
               <Routes>
               {/* Public Storefront */}
