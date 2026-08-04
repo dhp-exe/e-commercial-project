@@ -6,6 +6,7 @@ import { SearchProvider } from './context/SearchContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ChatBot from './components/ChatBot.jsx';
+import LoadingScreen from './components/LoadingScreen.jsx';
 
 import './styles/main.css';
 
@@ -27,7 +28,7 @@ const ManageOrders = lazy(() => import('./pages/admin/ManageOrders.jsx'));
 const ManageProducts = lazy(() => import('./pages/admin/ManageProducts.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
-export default function App(){
+export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
@@ -35,38 +36,33 @@ export default function App(){
           <Navbar />
           <ChatBot />
           <main className="container">
-            <div style={{ textAlign: 'center', margin: '20px' }}>
-              <button onClick={() => { throw new Error('This is your first error!'); }} style={{ padding: '10px 20px', background: 'red', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-                Break the world
-              </button>
-            </div>
-            <Suspense fallback={<div style={{padding:'50px', textAlign:'center'}}>Loading...</div>}>
+            <Suspense fallback={<LoadingScreen />}>
               <Routes>
-              {/* Public Storefront */}
-              <Route path="" element={<Home />} />
-              <Route path="/" element={<Home />} />
-              <Route path='/about' element={<About />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/product/:id" element={<ProductDetails />} />
-              <Route path="/contacts" element={<Contact />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/feedback" element={<Feedback />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/account" element={<Account />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+                {/* Public Storefront */}
+                <Route path="" element={<Home />} />
+                <Route path="/" element={<Home />} />
+                <Route path='/about' element={<About />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/product/:id" element={<ProductDetails />} />
+                <Route path="/contacts" element={<Contact />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/feedback" element={<Feedback />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
 
-              {/* Admin / Staff Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'staff']} />}>
-                <Route path="/admin" element={<AdminLayout />}>
+                {/* Admin / Staff Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['admin', 'staff']} />}>
+                  <Route path="/admin" element={<AdminLayout />}>
                     <Route index element={<AdminDashboard />} /> {/* Overview */}
                     <Route path="orders" element={<ManageOrders />} />
                     <Route path="products" element={<ManageProducts />} />
+                  </Route>
                 </Route>
-              </Route>
 
-              {/* 404 Fallback */}
-              <Route path="*" element={<NotFound />} />
+                {/* 404 Fallback */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </main>

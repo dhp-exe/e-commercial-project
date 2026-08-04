@@ -1,0 +1,50 @@
+/* ============================================
+   LoadingScreen – Full-screen video loader
+   ============================================ */
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaeaea;
+  /* slightly gray to match the video's checkerboard tones */
+}
+
+.loading-screen__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.loading-screen__video {
+  width: 45vmin;
+  height: 45vmin;
+  object-fit: contain;
+}
+
+.loading-screen__text {
+  color: #2e2e2e;
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: var(--letter-spacing, 1.2px);
+  overflow: hidden;
+  animation: reveal-lr 0.8s ease-out forwards;
+}
+
+/* Left-to-right text reveal via clip-path */
+@keyframes reveal-lr {
+  from {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
