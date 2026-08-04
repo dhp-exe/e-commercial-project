@@ -94,6 +94,10 @@ app.use('/api/recommend', recommendations);
 app.use('/api/chat', chat);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
+app.get("/debug-sentry", function mainHandler(req, res) {
+  throw new Error("My first Sentry error!");
+});
+
 // ── API 404 Fallback ────────────────────────────────────────────────
 app.use('/api', (_req, res) => {
   res.status(404).json({ message: 'API route not found' });
@@ -110,7 +114,6 @@ Sentry.setupExpressErrorHandler(app);
 app.use((err, req, res, _next) => {
   console.error(`[${new Date().toISOString()}] ${req.method} ${req.path}`, err);
 
-  // Don't leak internal details in production
   const message =
     process.env.NODE_ENV === 'production'
       ? 'Internal server error'
