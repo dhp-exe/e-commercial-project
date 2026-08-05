@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Feedback.css';
 import { api } from '../api';
+import Form from '../components/Form';
 
 export default function Feedback() {
   const [name, setName] = useState('');
@@ -60,7 +61,7 @@ export default function Feedback() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <Form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Your Name </label>
             <input
@@ -96,7 +97,7 @@ export default function Feedback() {
           <button type="submit" disabled={loading}>
             {loading ? 'Sending...' : 'Send Feedback'}
           </button>
-        </form>
+        </Form>
       </div>
     </div>
   );

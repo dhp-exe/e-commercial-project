@@ -88,6 +88,45 @@
   display: none;
 }
 
+/* Intermediate desktop sizing (768px to 1200px) to prevent overflow */
+@media (max-width: 1200px) and (min-width: 768px) {
+  .navbar-desktop-left,
+  .navbar-desktop-right {
+    gap: 3rem;
+  }
+  .navbar-desktop-left {
+    margin-left: 2rem;
+  }
+  .navbar-desktop-right {
+    margin-right: 2rem;
+  }
+  .navbar-logo {
+    height: 180px;
+    margin-top: 25px;
+  }
+}
+
+@media (max-width: 992px) and (min-width: 768px) {
+  .navbar-desktop-left,
+  .navbar-desktop-right {
+    gap: 1.5rem;
+  }
+  .navbar-desktop-left {
+    margin-left: 1rem;
+  }
+  .navbar-desktop-right {
+    margin-right: 1rem;
+  }
+  .navbar a {
+    padding: var(--radius) 8px;
+    font-size: 0.9rem;
+  }
+  .navbar-logo {
+    height: 140px;
+    margin-top: 20px;
+  }
+}
+
 /* Mobile menu overlay (hidden by default) */
 .navbar-menu-overlay {
   position: fixed;
@@ -236,6 +275,28 @@
     background: rgba(255, 255, 255, 0.06);
   }
 
+  /* Products Filter Bar (mobile, keep on one line) */
+  .filter-bar {
+    padding: 8px 10px !important;
+    gap: 4px !important;
+  }
+  
+  .filter-bar .filter-selects {
+    gap: 4px !important;
+    flex: 1;
+  }
+  
+  .filter-bar select {
+    padding: 4px !important;
+    font-size: clamp(10px, 2.5vw, 12px) !important;
+    max-width: 23vw;
+    text-overflow: ellipsis;
+  }
+
+  .filter-bar .sort-container label {
+    display: none; /* Hide 'Sort by:' text to save space on mobile */
+  }
+
   /* Hamburger icon (three lines) */
   .navbar-menu-icon {
     display: flex;
@@ -309,7 +370,6 @@
   padding: var(--footer-padding);
   background: var(--accent);
   color: var(--accent-contrast);
-  margin-top: var(--space-xl);
   border-top: 1px solid rgba(255, 255, 255, 0.04);
 }
 
@@ -326,8 +386,8 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--section-gap);
   margin-top: var(--section-gap);
-  margin-left: 10rem;
-  margin-right: 10rem;
+  margin-left: 2rem;
+  margin-right: 2rem;
 }
 
 /* Home page grid overrides (smaller min, tighter gap) */
@@ -335,8 +395,8 @@
 .home-grid {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--section-gap-lg);
-  margin-left: 10rem;
-  margin-right: 10rem;
+  margin-left: 2rem;
+  margin-right: 2rem;
 }
 
 .grid .card.fade-in {

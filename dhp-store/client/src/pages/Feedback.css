@@ -90,6 +90,7 @@
   width: 100%;
   padding: 16px;
   font-size: 16px;
+  font-family: var(--font-serif);
   font-weight: bold;
   margin-top: 10px;
   background-color: var(--accent);

@@ -122,7 +122,7 @@ export default function Home() {
       </div>
 
       <section className="container">
-        <h2 role = "button" onClick={() => navigate('/products')} style={{ cursor: 'pointer', textAlign: "center", fontSize: "40px" }}> All Products</h2>
+        <h2 role="button" onClick={() => navigate('/products')} className="home-section-title">All Products</h2>
         <div className="grid home-grid">
           {items
             .filter((p) => {

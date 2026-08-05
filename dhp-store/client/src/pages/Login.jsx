@@ -3,6 +3,7 @@ import './Login.css';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api'; 
+import Form from '../components/Form'; 
 
 const Login = () => {
     const [isRegister, setIsRegister] = useState(false);
@@ -67,7 +68,7 @@ const Login = () => {
                 <h2>{isRegister ? 'Register' : 'Login'}</h2>
                 {error && <p className="error" style={{color: 'red'}}>{error}</p>}
 
-                <form onSubmit={handleSubmit}>
+                <Form onSubmit={handleSubmit}>
                     {isRegister && (
                         <div className="input-group">
                             <label>Username</label>
@@ -117,7 +118,7 @@ const Login = () => {
                     <button type="submit" >
                         {isRegister ? 'Register' : 'Login'}
                     </button>
-                </form>
+                </Form>
                 
                 <p style={{marginTop: '15px'}}>
                     {isRegister ? (
@@ -165,7 +166,7 @@ const Login = () => {
                                 <button onClick={() => setShowRecovery(false)} style={{padding: '8px 16px'}}>Close</button>
                             </div>
                         ) : (
-                            <form onSubmit={handleRecoverySubmit}>
+                            <Form onSubmit={handleRecoverySubmit}>
                                 <div style={{marginBottom: '10px'}}>
                                     <label style={{display: 'block', fontSize: '0.9em', marginBottom: '6px'}}>Email</label>
                                     <input
@@ -182,7 +183,7 @@ const Login = () => {
                                         {recoveryLoading ? 'Sending...' : 'Send'}
                                     </button>
                                 </div>
-                            </form>
+                            </Form>
                         )}
                     </div>
                 </div>

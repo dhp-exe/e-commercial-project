@@ -175,10 +175,9 @@ export default function Products(){
         margin: '0 auto 20px',
         maxWidth: '1200px',
         borderBottom: '1px solid #f0f0f0',
-        flexWrap: 'wrap',
         gap: '10px'
       }}>
-        <div style={{ display: 'flex', gap: '15px' }}>
+        <div className="filter-selects" style={{ display: 'flex', gap: '15px' }}>
           <select 
             value={priceFilter} 
             onChange={(e) => setPriceFilter(e.target.value)}

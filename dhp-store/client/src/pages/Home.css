@@ -57,6 +57,13 @@
   font-family: var(--font-noto);
 }
 
+.home-section-title {
+  cursor: pointer;
+  text-align: center;
+  font-size: clamp(24px, 5vw, 40px);
+  margin-bottom: var(--space-md);
+}
+
 /* Home page icons */
 .home-icons {
   display: flex;
@@ -96,6 +103,20 @@
 
   .home-banner__overlay .home {
     padding: 14px;
+  }
+
+  .home-banner__overlay .home h1 {
+    font-size: clamp(1.8rem, 8vw, 2.5rem);
+    margin-bottom: var(--space-sm);
+  }
+
+  .home-banner__overlay .home p {
+    font-size: clamp(0.9rem, 4vw, 1.2rem);
+  }
+
+  .home-banner__overlay .home .button {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.6rem;
   }
 
   .home-icons {
@@ -139,6 +160,29 @@
 
   .home-banner__overlay .home {
     padding: 200px 20px;
+  }
+}
+
+/* Intermediate desktop sizing (768px to 1200px) */
+@media (max-width: 1200px) and (min-width: 768px) {
+  .home-banner__overlay .home {
+    padding: 120px 20px; /* Reduced vertical padding */
+  }
+
+  .home-banner__overlay .home .button {
+    font-size: 1.2rem;
+    padding: 0.5rem 0.8rem;
+  }
+}
+
+@media (max-width: 992px) and (min-width: 768px) {
+  .home-banner__overlay .home {
+    padding: 80px 15px; 
+  }
+  
+  .home-banner__overlay .home .button {
+    font-size: 1.1rem;
+    padding: 0.4rem 0.6rem;
   }
 }
 
