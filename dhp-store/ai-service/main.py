@@ -26,6 +26,7 @@ if os.getenv("DB_SSL", "").lower() == "true":
 # Initialize AI Engine
 rec_engine = Recommender(db_config)
 
+@app.head("/")
 @app.get("/")
 def home():
     return {"status": "AI Service Running"}
@@ -54,4 +55,5 @@ def chat_endpoint(req: ChatRequest):
     return {"reply": response_text}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=10000)
+    port = int(os.getenv("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
