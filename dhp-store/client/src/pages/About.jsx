@@ -4,8 +4,6 @@ import aboutImage from "../assets/about-image.jpeg";
 import quoteImage from "../assets/about2.jpg";
 
 export default function About() {
-    // No more useEffect, no more event listeners!
-
     return (
         <div className="about-page">
             {/* Hero Section - Standard static header */}
@@ -15,7 +13,7 @@ export default function About() {
                     <p>Driven by passion. Inspired by culture. Designed for everyone.</p>
                 </div>
             </section>
-            
+
             {/* Image Section */}
             <section className="image-section">
                 <img src={aboutImage} alt="About us" />
@@ -57,10 +55,6 @@ export default function About() {
                         <p>We celebrate individuality and inclusivity in everything we create.</p>
                     </div>
                 </div>
-            </section>
-
-            <section className="footer">
-                <p>© 2025 Streetwear Shop. All rights reserved.</p>
             </section>
         </div>
     );

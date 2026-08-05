@@ -7,6 +7,7 @@ import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ChatBot from './components/ChatBot.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
+import Footer from './components/Footer.jsx';
 
 import './styles/main.css';
 
@@ -66,6 +67,7 @@ export default function App() {
               </Routes>
             </Suspense>
           </main>
+          <Footer />
         </SearchProvider>
       </CartProvider>
     </AuthProvider>
