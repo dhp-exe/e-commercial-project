@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
+import * as Sentry from '@sentry/node';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { apiLimiter } from '../middleware/rateLimit.js';
 import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
+import { emailQueue } from '../queues/emailQueue.js';
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -157,6 +159,22 @@ router.post('/', apiLimiter, async (req, res) => {
         }
 
         await connection.commit();
+
+        // Enqueue order confirmation email (only if email provided)
+        if (deliveryInfo?.email) {
+          try {
+            await emailQueue.add('order-confirmation', {
+              type: 'email',
+              to: deliveryInfo.email,
+              template: 'order-confirmation',
+              data: { orderId, customerName: deliveryInfo?.name, total: finalTotal },
+            });
+          } catch (queueErr) {
+            console.error('Failed to enqueue order email:', queueErr.message);
+            Sentry.captureException(queueErr, { tags: { queue: 'email' } });
+          }
+        }
+
         res.json({ message: 'Order placed successfully', orderId });
 
     } catch (error) {

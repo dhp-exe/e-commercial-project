@@ -1,33 +1,15 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import redis from '../cache/redis.js';
+import * as Sentry from '@sentry/node';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
 import upload from '../middleware/upload.js';
 import { formatImageUrl } from '../utils/formatImageUrl.js';
+import { cacheQueue } from '../queues/cacheQueue.js';
 const router = Router();
 
-const clearProductCaches = async (productId = null) => {
-  try {
-    if (productId) {
-      await redis.del(`product:${productId}`);
-    }
-    // Use SCAN instead of KEYS to avoid blocking Redis
-    let cursor = 0;
-    do {
-      const result = await redis.scan(cursor, {
-        MATCH: 'products:*',
-        COUNT: 100,
-      });
-      cursor = result.cursor;
-      if (result.keys.length > 0) {
-        await redis.del(result.keys);
-      }
-    } while (cursor !== 0);
-  } catch (err) {
-    console.error('Redis cache invalidation error:', err);
-  }
-};
+
 
 // GET /api/products
 router.get('/', async (req, res) => {
@@ -184,7 +166,16 @@ router.post('/', requireAuth, verifyAdmin, upload.single('image'), async (req, r
       [name, description, parsedPrice, category_id, parsedStock, imageUrl, true]
     );
 
-    await clearProductCaches();
+    // Enqueue cache invalidation (background worker handles SCAN loop)
+    try {
+      await cacheQueue.add('invalidate', {
+        type: 'cache-invalidate',
+        pattern: 'products:*',
+      });
+    } catch (queueErr) {
+      console.error('Failed to enqueue cache invalidation:', queueErr.message);
+      Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
+    }
 
     res.status(201).json({ 
         id: result.insertId, 
@@ -221,7 +212,19 @@ router.put('/:id/stock', requireAuth, verifyStaff, async (req, res) => {
       }
 
       await pool.execute('UPDATE products SET stock = ? WHERE id = ?', [parsedStock, productId]);
-      await clearProductCaches();
+
+      // Enqueue cache invalidation (background worker handles SCAN loop)
+      try {
+        await cacheQueue.add('invalidate', {
+          type: 'cache-invalidate',
+          pattern: 'products:*',
+          productId,
+        });
+      } catch (queueErr) {
+        console.error('Failed to enqueue cache invalidation:', queueErr.message);
+        Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
+      }
+
       res.json({ message: 'Stock updated', productId, stock: parsedStock });
   } 
   catch (error) {
@@ -246,7 +249,18 @@ router.delete('/:id', requireAuth, verifyAdmin, async (req, res) => {
 
     // Soft Delete
     await pool.execute('UPDATE products SET is_active = false WHERE id = ?', [productId]);
-    await clearProductCaches();
+
+    // Enqueue cache invalidation (background worker handles SCAN loop)
+    try {
+      await cacheQueue.add('invalidate', {
+        type: 'cache-invalidate',
+        pattern: 'products:*',
+        productId,
+      });
+    } catch (queueErr) {
+      console.error('Failed to enqueue cache invalidation:', queueErr.message);
+      Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
+    }
 
     res.status(200).json({ message: 'Product deleted successfully' }); 
   } 

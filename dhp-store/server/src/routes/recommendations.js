@@ -2,8 +2,12 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import redis from '../cache/redis.js';
 import axios from 'axios';
+import * as Sentry from '@sentry/node';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { verifyAdmin } from '../middleware/requireRole.js';
+import { apiLimiter } from '../middleware/rateLimit.js';
 import { formatImageUrl } from '../utils/formatImageUrl.js';
+import { aiRefreshQueue } from '../queues/aiRefreshQueue.js';
 
 const router = Router();
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';
@@ -130,6 +134,21 @@ router.get('/user', requireAuth, async (req, res) => {
     console.error('Recommendation error:', error.message);
     // Graceful degradation: return empty array instead of 500
     res.json([]);
+  }
+});
+
+// POST /api/recommend/refresh — Trigger AI model refresh (admin only)
+router.post('/refresh', requireAuth, verifyAdmin, apiLimiter, async (_req, res) => {
+  try {
+    const job = await aiRefreshQueue.add('ai-refresh', {
+      type: 'ai-refresh',
+    });
+
+    res.json({ message: 'AI model refresh queued', jobId: job.id });
+  } catch (err) {
+    console.error('Failed to enqueue AI refresh:', err.message);
+    Sentry.captureException(err, { tags: { queue: 'ai-refresh' } });
+    res.status(500).json({ message: 'Failed to queue AI refresh' });
   }
 });
 
