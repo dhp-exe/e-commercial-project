@@ -26,3 +26,7 @@ if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 64) {
 if (!process.env.CORS_ORIGINS) {
   console.warn('WARNING: CORS_ORIGINS not set. Defaulting to http://localhost:5173.');
 }
+
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  console.warn('WARNING: STRIPE_WEBHOOK_SECRET not set. Stripe webhooks will not function.');
+}

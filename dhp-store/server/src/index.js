@@ -16,11 +16,24 @@ import orders from './routes/orders.js';
 import feedback from './routes/feedback.js';
 import recommendations from './routes/recommendations.js';
 import chat from './routes/chat.js';
+import webhooks from './routes/webhooks.js';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import { globalLimiter } from './middleware/rateLimit.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
+
+// ── BullMQ Workers & Queues ─────────────────────────────────────────
+import emailWorker from './workers/emailWorker.js';
+import aiRefreshWorker from './workers/aiRefreshWorker.js';
+import cacheWorker from './workers/cacheWorker.js';
+import stripeWorker from './workers/stripeWorker.js';
+import cartCleanupWorker from './workers/cartCleanupWorker.js';
+import { emailQueue } from './queues/emailQueue.js';
+import { aiRefreshQueue } from './queues/aiRefreshQueue.js';
+import { cacheQueue } from './queues/cacheQueue.js';
+import { stripeQueue } from './queues/stripeQueue.js';
+import { cartCleanupQueue, scheduleCartCleanup } from './queues/cartCleanupQueue.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -79,6 +92,9 @@ app.use(
   })
 );
 
+// ── Stripe Webhook (raw body — MUST be before express.json()) ───────
+app.use('/api/webhooks/stripe', webhooks);
+
 app.use(express.json());
 
 // ── Static Files (user uploads only) ────────────────────────────────
@@ -122,7 +138,37 @@ app.use((err, req, res, _next) => {
   res.status(err.status || 500).json({ message });
 });
 
-// ── Start Server ────────────────────────────────────────────────────
-app.listen(process.env.PORT, () => {
+// ── Start Server + Workers ──────────────────────────────────────────────────
+const server = app.listen(process.env.PORT, () => {
   console.log(`Server running on port ${process.env.PORT}`);
+
+  // Schedule the weekly abandoned cart cleanup cron
+  scheduleCartCleanup();
+
+  console.log('BullMQ workers started: email, ai-refresh, cache, stripe, cart-cleanup');
 });
+
+// ── Graceful Shutdown (SIGTERM/SIGINT) ─────────────────────────────────
+const workers = [emailWorker, aiRefreshWorker, cacheWorker, stripeWorker, cartCleanupWorker];
+const queues = [emailQueue, aiRefreshQueue, cacheQueue, stripeQueue, cartCleanupQueue];
+
+async function gracefulShutdown(signal) {
+  console.log(`${signal} received. Shutting down gracefully...`);
+
+  // Drain all workers (finish in-progress jobs)
+  await Promise.all(workers.map((w) => w.close()));
+  console.log('All workers closed.');
+
+  // Close all queue connections
+  await Promise.all(queues.map((q) => q.close()));
+  console.log('All queues closed.');
+
+  // Close HTTP server
+  server.close(() => {
+    console.log('HTTP server closed.');
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

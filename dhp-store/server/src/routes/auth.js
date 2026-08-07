@@ -4,11 +4,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import * as Sentry from '@sentry/node';
 import { requireAuth } from '../middleware/requireAuth.js'; 
 import upload from '../middleware/upload.js';
 import { authLimiter } from '../middleware/rateLimit.js';
-import nodemailer from 'nodemailer';
 import { formatImageUrl } from '../utils/formatImageUrl.js';
+import { emailQueue } from '../queues/emailQueue.js';
 
 dotenv.config();
 
@@ -22,33 +23,6 @@ const cookieOptions = {
   sameSite: isSecureCookie ? 'none' : 'strict',
   maxAge: 60 * 60 * 1000
 };
-
-// SMTP transporter — created once at module level, not per-request
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-async function sendEmail(to, link) {
-  const mailOptions = {
-    from: `"Streetwear Support" <${process.env.EMAIL_USER}>`,
-    to: to,
-    subject: 'Password Reset Request',
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2>Password Reset</h2>
-        <p>Click below to reset:</p>
-        <a href="${link}">Reset Password</a>
-      </div>
-    `
-  };
-
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`📧 Email sent to ${to} (ID: ${info.messageId})`);
-}
 
 // POST /register
 router.post('/register', authLimiter ,async (req, res) => {
@@ -200,10 +174,18 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
       const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
       const resetLink = `${FRONTEND_URL}/reset-password?token=${rawToken}&email=${email}`;
       
-      // Fire-and-forget: respond immediately, email sends in background
-      sendEmail(email, resetLink).catch(err => {
-        console.error('Background email failed:', err.message);
-      });
+      // Enqueue password reset email via BullMQ (replaces fire-and-forget)
+      try {
+        await emailQueue.add('password-reset', {
+          type: 'email',
+          to: email,
+          template: 'password-reset',
+          data: { resetLink },
+        });
+      } catch (queueErr) {
+        console.error('Failed to enqueue password reset email:', queueErr.message);
+        Sentry.captureException(queueErr, { tags: { queue: 'email' } });
+      }
     }
 
     return res.json({ message: 'If the email exists, a reset link has been sent.' });
