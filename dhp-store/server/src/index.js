@@ -20,8 +20,15 @@ import webhooks from './routes/webhooks.js';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import { globalLimiter } from './middleware/rateLimit.js';
+import { requireAuth } from './middleware/requireAuth.js';
+import { verifyAdmin } from './middleware/requireRole.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
+
+// ── Bull Board ──────────────────────────────────────────────────────
+import { createBullBoard } from '@bull-board/api';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 
 // ── BullMQ Workers & Queues ─────────────────────────────────────────
 import emailWorker from './workers/emailWorker.js';
@@ -37,6 +44,21 @@ import { cartCleanupQueue, scheduleCartCleanup } from './queues/cartCleanupQueue
 
 const app = express();
 app.set('trust proxy', 1);
+
+// ── Initialize Bull Board ───────────────────────────────────────────
+const serverAdapter = new ExpressAdapter();
+serverAdapter.setBasePath('/admin/queues');
+
+createBullBoard({
+  queues: [
+    new BullMQAdapter(emailQueue),
+    new BullMQAdapter(aiRefreshQueue),
+    new BullMQAdapter(cacheQueue),
+    new BullMQAdapter(stripeQueue),
+    new BullMQAdapter(cartCleanupQueue),
+  ],
+  serverAdapter: serverAdapter,
+});
 
 // ── Security Headers (Helmet) ───────────────────────────────────────
 const cspConnectSrc = [
@@ -109,6 +131,9 @@ app.use('/api/feedback', feedback);
 app.use('/api/recommend', recommendations);
 app.use('/api/chat', chat);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+// ── Admin Dashboard ─────────────────────────────────────────────────
+app.use('/admin/queues', requireAuth, verifyAdmin, serverAdapter.getRouter());
 
 app.get("/debug-sentry", function triggerError(req, res) {
   throw new Error("Sentry verification test error!");
