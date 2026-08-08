@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.1.0...v1.2.0) (2026-08-08)
+
+
+### Features
+
+* implement optimized full-screen video loading screen for application and authentication states ([82dc617](https://github.com/dhp-exe/e-commercial-project/commit/82dc617873b04a195be54facc0ec715771191468))
+* integrate BullMQ for asynchronous background processing of emai… ([#21](https://github.com/dhp-exe/e-commercial-project/issues/21)) ([3caf75b](https://github.com/dhp-exe/e-commercial-project/commit/3caf75b4ce70e529589454ce70f4befe1a962103))
+* integrate Sentry for error tracking and add a test error button to the UI ([4bcabdc](https://github.com/dhp-exe/e-commercial-project/commit/4bcabdc150f75a9d0e6905027257ed061c6bebf4))
+
+
+### Bug Fixes
+
+* add HEAD route for uptimerobot ping ([84f34e9](https://github.com/dhp-exe/e-commercial-project/commit/84f34e98b44a7a1fcbbcbdde6a93e9f7b736952e))
+
 ## [1.1.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.0.0...v1.1.0) (2026-08-03)
 
 
