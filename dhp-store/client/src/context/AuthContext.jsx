@@ -62,6 +62,19 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false);
   };
 
+  // Google OAuth Login
+  const googleLogin = async (credential) => {
+    try {
+      await api.post('/auth/google', { credential });
+      const res = await api.get('/auth/profile');
+      setUser(res.data);
+      setIsAuthenticated(true);
+    } catch (err) {
+      console.error('Google login sync failed', err);
+      throw err;
+    }
+  };
+
   const value = {
     // legacy fields
     token: isAuthenticated ? '__COOKIE_AUTH__' : null,
@@ -74,7 +87,8 @@ export function AuthProvider({ children }) {
     // actions
     login,
     register,
-    logout
+    logout,
+    googleLogin
   };
 
   return (

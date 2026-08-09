@@ -1,9 +1,11 @@
 import React, { useState, useContext } from 'react';
+import { Helmet } from 'react-helmet-async';
 import './Login.css';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api'; 
-import Form from '../components/Form'; 
+import Form from '../components/Form';
+import GoogleLoginButton from '../components/GoogleLoginButton';
 
 const Login = () => {
     const [isRegister, setIsRegister] = useState(false);
@@ -64,6 +66,9 @@ const Login = () => {
 
     return (
         <div className="login-page"> 
+            <Helmet>
+                <title>{isRegister ? 'Register' : 'Login'} — DHP Streetwear</title>
+            </Helmet>
             <div className="login-container">
                 <h2>{isRegister ? 'Register' : 'Login'}</h2>
                 {error && <p className="error" style={{color: 'red'}}>{error}</p>}
@@ -119,6 +124,21 @@ const Login = () => {
                         {isRegister ? 'Register' : 'Login'}
                     </button>
                 </Form>
+
+                {/* Google OAuth Divider */}
+                {!isRegister && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', margin: '15px 0' }}>
+                      <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #ddd' }} />
+                      <span style={{ padding: '0 10px', color: '#999', fontSize: '0.85em' }}>or</span>
+                      <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #ddd' }} />
+                    </div>
+                    <GoogleLoginButton
+                      onSuccess={() => navigate('/')}
+                      onError={(msg) => setError(msg)}
+                    />
+                  </>
+                )}
                 
                 <p style={{marginTop: '15px'}}>
                     {isRegister ? (

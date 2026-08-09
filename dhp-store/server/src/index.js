@@ -17,6 +17,7 @@ import feedback from './routes/feedback.js';
 import recommendations from './routes/recommendations.js';
 import chat from './routes/chat.js';
 import webhooks from './routes/webhooks.js';
+import sitemap from './routes/sitemap.js';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import { globalLimiter } from './middleware/rateLimit.js';
@@ -65,12 +66,13 @@ const cspConnectSrc = [
   "'self'",
   ...(process.env.CSP_CONNECT_SRC || '').split(',').filter(Boolean),
 ];
-const cspScriptSrc = ["'self'", 'https://js.stripe.com'];
+const cspScriptSrc = ["'self'", 'https://js.stripe.com', 'https://accounts.google.com'];
 const cspFrameSrc = [
   "'self'",
   'https://js.stripe.com',
   'https://www.google.com',
   'https://maps.google.com',
+  'https://accounts.google.com',
 ];
 
 app.use(
@@ -79,10 +81,10 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: cspScriptSrc,
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://accounts.google.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         imgSrc: ["'self'", 'data:', 'https:', 'http:', 'blob:'],
-        connectSrc: cspConnectSrc,
+        connectSrc: cspConnectSrc.concat(['https://accounts.google.com']),
         frameSrc: cspFrameSrc,
       },
     },
@@ -131,6 +133,9 @@ app.use('/api/feedback', feedback);
 app.use('/api/recommend', recommendations);
 app.use('/api/chat', chat);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+// ── SEO ────────────────────────────────────────────────────────────────────
+app.use('/sitemap.xml', sitemap);
 
 // ── Admin Dashboard ─────────────────────────────────────────────────
 app.use('/admin/queues', requireAuth, verifyAdmin, serverAdapter.getRouter());

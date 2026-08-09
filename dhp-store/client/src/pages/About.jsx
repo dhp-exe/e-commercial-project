@@ -1,4 +1,5 @@
 import React from "react"; // Removed useEffect
+import { Helmet } from 'react-helmet-async';
 import "./About.css";
 import aboutImage from "../assets/about-image.jpeg";
 import quoteImage from "../assets/about2.jpg";
@@ -6,6 +7,12 @@ import quoteImage from "../assets/about2.jpg";
 export default function About() {
     return (
         <div className="about-page">
+            <Helmet>
+                <title>About Us — DHP Streetwear</title>
+                <meta name="description" content="Learn about DHP Streetwear — driven by passion, inspired by culture, designed for everyone." />
+                <meta property="og:title" content="About Us — DHP Streetwear" />
+                <meta property="og:description" content="Driven by passion. Inspired by culture. Designed for everyone." />
+            </Helmet>
             {/* Hero Section - Standard static header */}
             <section className="hero">
                 <div className="hero-content">

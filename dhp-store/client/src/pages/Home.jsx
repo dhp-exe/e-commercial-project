@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
 import './Home.css';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -51,6 +52,21 @@ export default function Home() {
 
   return (
     <>
+      <Helmet>
+        <title>DHP Streetwear — Premium Street Fashion</title>
+        <meta name="description" content="DHP Streetwear — Premium Vietnamese street fashion. Shop vintage tees, baggy jeans, bombers & more." />
+        <meta property="og:title" content="DHP Streetwear — Premium Street Fashion" />
+        <meta property="og:description" content="Premium Vietnamese street fashion. Shop vintage tees, baggy jeans, bombers & more." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://e-commercial-project-mauve.vercel.app" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "DHP Streetwear",
+          "url": "https://e-commercial-project-mauve.vercel.app",
+          "description": "Premium Vietnamese street fashion"
+        })}</script>
+      </Helmet>
       <div className="home-banner">
         <img src={homeBanner} alt="Streetwear Banner" />
 

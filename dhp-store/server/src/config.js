@@ -30,3 +30,11 @@ if (!process.env.CORS_ORIGINS) {
 if (!process.env.STRIPE_WEBHOOK_SECRET) {
   console.warn('WARNING: STRIPE_WEBHOOK_SECRET not set. Stripe webhooks will not function.');
 }
+
+if (!process.env.GOOGLE_CLIENT_ID) {
+  console.warn('WARNING: GOOGLE_CLIENT_ID not set. Google OAuth login will not function.');
+}
+
+if (!process.env.SITE_URL) {
+  console.warn('WARNING: SITE_URL not set. Sitemap will use default Vercel URL.');
+}

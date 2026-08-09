@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext'; 
@@ -102,6 +103,30 @@ export default function ProductDetails() {
 
     return (
     <>  
+        {product && (
+          <Helmet>
+            <title>{product.name} — DHP Streetwear</title>
+            <meta name="description" content={product.description || `Shop ${product.name} at DHP Streetwear.`} />
+            <meta property="og:title" content={`${product.name} — DHP Streetwear`} />
+            <meta property="og:description" content={product.description || `Shop ${product.name} at DHP Streetwear.`} />
+            <meta property="og:type" content="product" />
+            <meta property="og:image" content={product.image_url} />
+            <meta property="og:url" content={`https://e-commercial-project-mauve.vercel.app/product/${id}`} />
+            <script type="application/ld+json">{JSON.stringify({
+              "@context": "https://schema.org/",
+              "@type": "Product",
+              "name": product.name,
+              "image": product.image_url,
+              "description": product.description || '',
+              "offers": {
+                "@type": "Offer",
+                "priceCurrency": "USD",
+                "price": String(product.price),
+                "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+              }
+            })}</script>
+          </Helmet>
+        )}
         {flyingItem && (
             <img 
                 src={flyingItem.src} 

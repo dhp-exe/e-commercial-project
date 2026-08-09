@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import * as Sentry from '@sentry/node';
+import { OAuth2Client } from 'google-auth-library';
 import { requireAuth } from '../middleware/requireAuth.js'; 
 import upload from '../middleware/upload.js';
 import { authLimiter } from '../middleware/rateLimit.js';
@@ -261,6 +262,93 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /google — Google OAuth login/register
+router.post('/google', authLimiter, async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) return res.status(400).json({ message: 'Missing credential' });
+
+  try {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.error('GOOGLE_CLIENT_ID not configured');
+      return res.status(500).json({ message: 'Google login not configured' });
+    }
+
+    const client = new OAuth2Client(clientId);
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: clientId,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // Check if user exists by email
+    const [existing] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
+
+    let user;
+    let isNewUser = false;
+
+    if (existing.length > 0) {
+      user = existing[0];
+
+      // Update google_id if not set (linking local account to Google)
+      if (!user.google_id) {
+        await pool.execute(
+          'UPDATE users SET google_id = ?, auth_provider = ? WHERE id = ?',
+          [googleId, user.auth_provider === 'local' ? 'local' : 'google', user.id]
+        );
+      }
+    } else {
+      // Auto-register new user
+      const [result] = await pool.execute(
+        'INSERT INTO users (email, name, password_hash, auth_provider, google_id, profile_picture) VALUES (?, ?, NULL, ?, ?, ?)',
+        [email, name, 'google', googleId, picture || null]
+      );
+      user = { id: result.insertId, email, name };
+      isNewUser = true;
+    }
+
+    // Issue JWT (same payload as existing login)
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '60m' }
+    );
+
+    res.cookie('access_token', token, cookieOptions);
+    res.status(isNewUser ? 201 : 200).json({ name: user.name });
+
+  } catch (err) {
+    console.error('Google OAuth error:', err.message);
+
+    if (err.message?.includes('Token used too late') || err.message?.includes('Invalid token')) {
+      return res.status(401).json({ message: 'Invalid Google token' });
+    }
+
+    // Handle race condition: another request registered the same email
+    if (err.code === 'ER_DUP_ENTRY') {
+      try {
+        const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [req.body.email || '']);
+        if (rows.length > 0) {
+          const token = jwt.sign(
+            { id: rows[0].id, email: rows[0].email },
+            process.env.JWT_SECRET,
+            { expiresIn: '60m' }
+          );
+          res.cookie('access_token', token, cookieOptions);
+          return res.json({ name: rows[0].name });
+        }
+      } catch {
+        // Fall through to generic error
+      }
+    }
+
+    Sentry.captureException(err, { tags: { route: 'auth/google' } });
     res.status(500).json({ message: 'Server error' });
   }
 });

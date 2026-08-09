@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -110,6 +111,12 @@ export default function Products(){
 
   return (
     <>
+      <Helmet>
+        <title>Shop All — DHP Streetwear</title>
+        <meta name="description" content="Browse the full DHP Streetwear collection. Vintage tees, baggy jeans, bomber jackets & more." />
+        <meta property="og:title" content="Shop All — DHP Streetwear" />
+        <meta property="og:description" content="Browse the full DHP Streetwear collection." />
+      </Helmet>
       <div className="home-icons" style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, padding: '16px 1rem' }}>
         <form onSubmit={submitSearch} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {showSearch && (
