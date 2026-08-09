@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.2.0...v1.3.0) (2026-08-09)
+
+
+### Features
+
+* implement Google OAuth authentication and dynamic SEO meta tags with sitemap support ([ce3a6f6](https://github.com/dhp-exe/e-commercial-project/commit/ce3a6f6527369765a0ee7994b524ca36e4951fdc))
+* implement skeleton loading for account page and restrict password changes for Google OAuth users ([5bd654d](https://github.com/dhp-exe/e-commercial-project/commit/5bd654d5ff032af6e620bed3fb0f03c74db37a73))
+
 ## [1.2.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.1.0...v1.2.0) (2026-08-08)
 
 
