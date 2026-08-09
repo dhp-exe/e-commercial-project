@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
 import { useProduct, useProductRecommendations } from '../hooks/useProducts';
 import CartDrawer from '../components/CartDrawer';
 import RecommendRow from '../components/RecommendRow';
@@ -14,8 +14,8 @@ import accountIcon from "../assets/account_icon.png";
 export default function ProductDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
-    
-    const { add, totalQty } = useCart(); 
+
+    const { add, totalQty } = useCart();
     const { token, name } = useAuth();
 
     const { data: product, isLoading: loading } = useProduct(id);
@@ -23,20 +23,20 @@ export default function ProductDetails() {
 
     const [selectedSize, setSelectedSize] = useState(null);
     const [quantity, setQuantity] = useState(1);
-    
+
     const [isCartOpen, setCartOpen] = useState(false);
 
     const productImgRef = useRef(null);
     const cartIconRef = useRef(null);
     const [flyingItem, setFlyingItem] = useState(null);
 
-    if (loading) return <div style={{padding: 40, textAlign:'center'}}>Loading product...</div>;
-    if (!product) return <div style={{padding: 40, textAlign:'center'}}>Product not found.</div>;
+    if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading product...</div>;
+    if (!product) return <div style={{ padding: 40, textAlign: 'center' }}>Product not found.</div>;
 
     const availableSizes = product.sizes ? product.sizes.split(',') : [];
 
     const handleQuantityChange = (delta) => {
-        setQuantity(prev => Math.max(1, prev + delta)); 
+        setQuantity(prev => Math.max(1, prev + delta));
     };
 
     const triggerFlyAnimation = () => {
@@ -57,7 +57,7 @@ export default function ProductDetails() {
                 zIndex: 9999,
                 borderRadius: '12px',
                 pointerEvents: 'none',
-                transition: 'none', 
+                transition: 'none',
             }
         });
 
@@ -78,7 +78,7 @@ export default function ProductDetails() {
                         transition: 'all 0.8s cubic-bezier(0.2, 1, 0.3, 1)'
                     }
                 });
-            }, 20); 
+            }, 20);
         });
 
         setTimeout(() => setFlyingItem(null), 850);
@@ -91,7 +91,7 @@ export default function ProductDetails() {
         }
 
         const success = await add(product.id, quantity, selectedSize);
-        
+
         if (success) {
             if (isBuyNow) {
                 navigate('/checkout');
@@ -102,171 +102,171 @@ export default function ProductDetails() {
     };
 
     return (
-    <>  
-        {product && (
-          <Helmet>
-            <title>{product.name} — DHP Streetwear</title>
-            <meta name="description" content={product.description || `Shop ${product.name} at DHP Streetwear.`} />
-            <meta property="og:title" content={`${product.name} — DHP Streetwear`} />
-            <meta property="og:description" content={product.description || `Shop ${product.name} at DHP Streetwear.`} />
-            <meta property="og:type" content="product" />
-            <meta property="og:image" content={product.image_url} />
-            <meta property="og:url" content={`https://e-commercial-project-mauve.vercel.app/product/${id}`} />
-            <script type="application/ld+json">{JSON.stringify({
-              "@context": "https://schema.org/",
-              "@type": "Product",
-              "name": product.name,
-              "image": product.image_url,
-              "description": product.description || '',
-              "offers": {
-                "@type": "Offer",
-                "priceCurrency": "USD",
-                "price": String(product.price),
-                "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
-              }
-            })}</script>
-          </Helmet>
-        )}
-        {flyingItem && (
-            <img 
-                src={flyingItem.src} 
-                style={flyingItem.style} 
-                className="flying-item" 
-                alt="" 
-            />
-        )}
-        
-        {/* --- HEADER ICONS --- */}
-        <div className="home-icons" 
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '20px 40px',
-            }}>
-            {/* Back Button */}
-            <button
-                onClick={() => navigate(-1)}
-                style={{
-                position: 'relative',
-                color: 'black',
-                fontSize: 18,
-                cursor: 'pointer',
-                borderRadius: 8,
-                border: '1px solid rgba(0,0,0,0.12)',
-                background: 'white',
-                top: 10,
-                left: 30,
-                padding: '10px 14px',
-                }}>
-                ← Back
-            </button>
-
-            {/* Right-side icons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginLeft: 'auto'}}>
-                {/* Cart Icon */}
-                <div ref={cartIconRef} style={{ position: 'relative' }}>
+        <>
+            {product && (
+                <Helmet>
+                    <title>{product.name} | DHP Streetwear</title>
+                    <meta name="description" content={product.description || `Shop ${product.name} at DHP Streetwear.`} />
+                    <meta property="og:title" content={`${product.name} — DHP Streetwear`} />
+                    <meta property="og:description" content={product.description || `Shop ${product.name} at DHP Streetwear.`} />
+                    <meta property="og:type" content="product" />
+                    <meta property="og:image" content={product.image_url} />
+                    <meta property="og:url" content={`https://e-commercial-project-mauve.vercel.app/product/${id}`} />
+                    <script type="application/ld+json">{JSON.stringify({
+                        "@context": "https://schema.org/",
+                        "@type": "Product",
+                        "name": product.name,
+                        "image": product.image_url,
+                        "description": product.description || '',
+                        "offers": {
+                            "@type": "Offer",
+                            "priceCurrency": "USD",
+                            "price": String(product.price),
+                            "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+                        }
+                    })}</script>
+                </Helmet>
+            )}
+            {flyingItem && (
                 <img
-                    src={bagIcon}
-                    alt="Cart"
-                    title="Cart"
-                    onClick={() => setCartOpen(true)}
-                    style={{ width: 32, height: 32, cursor: 'pointer' }}
+                    src={flyingItem.src}
+                    style={flyingItem.style}
+                    className="flying-item"
+                    alt=""
                 />
-                {totalQty > 0 && (
-                    <span
+            )}
+
+            {/* --- HEADER ICONS --- */}
+            <div className="home-icons"
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '20px 40px',
+                }}>
+                {/* Back Button */}
+                <button
+                    onClick={() => navigate(-1)}
                     style={{
-                        position: 'absolute',
-                        bottom: -5,
-                        left: -5,
-                        background: 'black',
-                        color: 'white',
-                        borderRadius: '50%',
-                        padding: '2px 6px',
-                        fontSize: 12,
-                        fontWeight: 'bold',
-                        minWidth: 18,
-                        textAlign: 'center',
-                    }}
-                    >
-                    {totalQty}
-                    </span>
-                )}
+                        position: 'relative',
+                        color: 'black',
+                        fontSize: 18,
+                        cursor: 'pointer',
+                        borderRadius: 8,
+                        border: '1px solid rgba(0,0,0,0.12)',
+                        background: 'white',
+                        top: 10,
+                        left: 30,
+                        padding: '10px 14px',
+                    }}>
+                    ← Back
+                </button>
+
+                {/* Right-side icons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginLeft: 'auto' }}>
+                    {/* Cart Icon */}
+                    <div ref={cartIconRef} style={{ position: 'relative' }}>
+                        <img
+                            src={bagIcon}
+                            alt="Cart"
+                            title="Cart"
+                            onClick={() => setCartOpen(true)}
+                            style={{ width: 32, height: 32, cursor: 'pointer' }}
+                        />
+                        {totalQty > 0 && (
+                            <span
+                                style={{
+                                    position: 'absolute',
+                                    bottom: -5,
+                                    left: -5,
+                                    background: 'black',
+                                    color: 'white',
+                                    borderRadius: '50%',
+                                    padding: '2px 6px',
+                                    fontSize: 12,
+                                    fontWeight: 'bold',
+                                    minWidth: 18,
+                                    textAlign: 'center',
+                                }}
+                            >
+                                {totalQty}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Account Icon */}
+                    <img
+                        src={accountIcon}
+                        alt="Account"
+                        title={token ? `Account (${name || 'me'})` : 'Login / Register'}
+                        onClick={() => navigate(token ? '/account' : '/login')}
+                        style={{ width: 32, height: 32, cursor: 'pointer' }}
+                    />
+                </div>
+            </div>
+
+            {/* --- MAIN PRODUCT CONTENT --- */}
+            <div className="pdp-container fade-in">
+                {/* Left: Image */}
+                <div className="pdp-image-container">
+                    <img
+                        ref={productImgRef}
+                        src={product.image_url}
+                        alt={product.name}
+                        className="pdp-image"
+                    />
                 </div>
 
-                {/* Account Icon */}
-                <img
-                src={accountIcon}
-                alt="Account"
-                title={token ? `Account (${name || 'me'})` : 'Login / Register'}
-                onClick={() => navigate(token ? '/account' : '/login')}
-                style={{ width: 32, height: 32, cursor: 'pointer' }}
-                />
-            </div>
-        </div>
+                {/* Right: Details */}
+                <div className="pdp-info">
+                    <h1 className="pdp-name">{product.name}</h1>
+                    <div className="pdp-price">${Number(product.price).toFixed(2)}</div>
+                    <p style={{ color: '#666', lineHeight: '1.5' }}>
+                        {product.description || "A classic essential for your wardrobe. Made with high-quality materials for lasting comfort and style."}
+                    </p>
 
-        {/* --- MAIN PRODUCT CONTENT --- */}
-        <div className="pdp-container fade-in">
-            {/* Left: Image */}
-            <div className="pdp-image-container">
-                <img 
-                    ref={productImgRef}
-                    src={product.image_url} 
-                    alt={product.name} 
-                    className="pdp-image" 
-                />
-            </div>
+                    {/* Size Selector */}
+                    {availableSizes.length > 0 && (
+                        <div className="size-section">
+                            <h4>Select Size: {selectedSize}</h4>
+                            <div className="size-grids">
+                                {availableSizes.map(size => (
+                                    <div
+                                        key={size}
+                                        className={`size-box ${selectedSize === size ? 'selected' : ''}`}
+                                        onClick={() => setSelectedSize(size)}
+                                    >
+                                        {size}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
-            {/* Right: Details */}
-            <div className="pdp-info">
-                <h1 className="pdp-name">{product.name}</h1>
-                <div className="pdp-price">${Number(product.price).toFixed(2)}</div>
-                <p style={{color:'#666', lineHeight:'1.5'}}>
-                    {product.description || "A classic essential for your wardrobe. Made with high-quality materials for lasting comfort and style."}
-                </p>
-
-                {/* Size Selector */}
-                {availableSizes.length > 0 && (
-                    <div className="size-section">
-                        <h4>Select Size: {selectedSize}</h4>
-                        <div className="size-grids">
-                            {availableSizes.map(size => (
-                                <div 
-                                    key={size} 
-                                    className={`size-box ${selectedSize === size ? 'selected' : ''}`}
-                                    onClick={() => setSelectedSize(size)}
-                                >
-                                    {size}
-                                </div>
-                            ))}
+                    {/* Quantity Selector */}
+                    <div className="qty-section">
+                        <h4>Quantity</h4>
+                        <div className="qty-wrapper">
+                            <button className="qty-btn" onClick={() => handleQuantityChange(-1)}>−</button>
+                            <div className="qty-display">{quantity}</div>
+                            <button className="qty-btn" onClick={() => handleQuantityChange(1)}>+</button>
                         </div>
                     </div>
-                )}
 
-                {/* Quantity Selector */}
-                <div className="qty-section">
-                    <h4>Quantity</h4>
-                    <div className="qty-wrapper">
-                        <button className="qty-btn" onClick={() => handleQuantityChange(-1)}>−</button>
-                        <div className="qty-display">{quantity}</div>
-                        <button className="qty-btn" onClick={() => handleQuantityChange(1)}>+</button>
+                    {/* Buttons */}
+                    <div className="pdp-actions">
+                        <button className="btn-add-cart" onClick={() => handleAddToCart(false)}>
+                            Add to Cart
+                        </button>
+                        <button className="btn-buy-now" onClick={() => handleAddToCart(true)}>
+                            Buy Now
+                        </button>
                     </div>
                 </div>
-
-                {/* Buttons */}
-                <div className="pdp-actions">
-                    <button className="btn-add-cart" onClick={() => handleAddToCart(false)}>
-                        Add to Cart
-                    </button>
-                    <button className="btn-buy-now" onClick={() => handleAddToCart(true)}>
-                        Buy Now
-                    </button>
-                </div>
             </div>
-        </div>
-        {/* Similar products */}
-        <RecommendRow title="Similar Products" products={similarProducts} />
+            {/* Similar products */}
+            <RecommendRow title="Similar Products" products={similarProducts} />
 
-        <CartDrawer isOpen={isCartOpen} onClose={() => setCartOpen(false)} />
-    </>
+            <CartDrawer isOpen={isCartOpen} onClose={() => setCartOpen(false)} />
+        </>
     );
 }

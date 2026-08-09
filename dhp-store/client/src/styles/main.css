@@ -7,3 +7,43 @@
 @import './typography.css';
 @import './layout.css';
 @import './components.css';
+
+/* Skeleton Loading Utilities */
+.skeleton {
+  background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite linear;
+  border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  height: 100%;
+}
+
+.skeleton-img {
+  width: 100%;
+  aspect-ratio: 4/5;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  height: 20px;
+  width: 80%;
+}
+
+.skeleton-text.short {
+  width: 40%;
+}

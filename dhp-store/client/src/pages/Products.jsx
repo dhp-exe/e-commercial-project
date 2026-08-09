@@ -11,7 +11,7 @@ import accountIcon from "../assets/account_icon.png";
 import CartDrawer from "../components/CartDrawer";
 import RecommendRow from "../components/RecommendRow";
 
-function useQueryParams(){ const { search } = useLocation(); return Object.fromEntries(new URLSearchParams(search)); }
+function useQueryParams() { const { search } = useLocation(); return Object.fromEntries(new URLSearchParams(search)); }
 
 const CATEGORY_MAP = {
   1: 'Tees',
@@ -19,13 +19,13 @@ const CATEGORY_MAP = {
   3: 'Jeans/Pants'
 };
 
-export default function Products(){
+export default function Products() {
   const q = useQueryParams();
-  const { data: items = [] } = useProducts({ q: q.q, categoryId: q.categoryId });
+  const { data: items = [], isLoading } = useProducts({ q: q.q, categoryId: q.categoryId });
   const { token, name } = useAuth();
   const { data: recommendations = [] } = useUserRecommendations(token);
-  
-  const { totalQty } = useCart(); 
+
+  const { totalQty } = useCart();
   const navigate = useNavigate();
   const [isCartOpen, setCartOpen] = useState(false);
 
@@ -57,17 +57,17 @@ export default function Products(){
 
   useEffect(() => { if (showSearch && inputRef.current) inputRef.current.focus(); }, [showSearch]);
 
-  function submitSearch(e){ e?.preventDefault?.(); }
+  function submitSearch(e) { e?.preventDefault?.(); }
 
   // Memoized filter & sort — only recomputes when dependencies change
   const processedItems = useMemo(() => {
     return items.filter(p => {
       // Search Filter
       if (searchTerm && !p.name.toLowerCase().includes(searchTerm.trim().toLowerCase())) return false;
-      
+
       // Category Filter
       if (categoryFilter !== 'all') {
-        const productCategoryName = CATEGORY_MAP[p.category_id]; 
+        const productCategoryName = CATEGORY_MAP[p.category_id];
         if (productCategoryName !== categoryFilter) return false;
       }
 
@@ -76,7 +76,7 @@ export default function Products(){
       if (priceFilter === 'under-10') return price < 10;
       if (priceFilter === '10-20') return price >= 10 && price <= 20;
       if (priceFilter === '20-plus') return price > 20;
-      
+
       // Size Filter
       if (sizeFilter !== 'all') {
         const availableSizes = p.sizes ? p.sizes.split(',') : [];
@@ -85,19 +85,19 @@ export default function Products(){
 
       return true;
     })
-    .sort((a, b) => {
-      const priceA = Number(a.price);
-      const priceB = Number(b.price);
-      const soldA = Number(a.sold_count) || 0;
-      const soldB = Number(b.sold_count) || 0;
+      .sort((a, b) => {
+        const priceA = Number(a.price);
+        const priceB = Number(b.price);
+        const soldA = Number(a.sold_count) || 0;
+        const soldB = Number(b.sold_count) || 0;
 
-      switch (sortOption) {
-        case 'asc': return priceA - priceB;
-        case 'desc': return priceB - priceA;
-        case 'best-seller': return soldB - soldA;
-        default: return 0; 
-      }
-    });
+        switch (sortOption) {
+          case 'asc': return priceA - priceB;
+          case 'desc': return priceB - priceA;
+          case 'best-seller': return soldB - soldA;
+          default: return 0;
+        }
+      });
   }, [items, searchTerm, categoryFilter, priceFilter, sizeFilter, sortOption]);
 
   const filterSelectStyle = {
@@ -112,7 +112,7 @@ export default function Products(){
   return (
     <>
       <Helmet>
-        <title>Shop All — DHP Streetwear</title>
+        <title>Shop All | DHP Streetwear</title>
         <meta name="description" content="Browse the full DHP Streetwear collection. Vintage tees, baggy jeans, bomber jackets & more." />
         <meta property="og:title" content="Shop All — DHP Streetwear" />
         <meta property="og:description" content="Browse the full DHP Streetwear collection." />
@@ -137,7 +137,7 @@ export default function Products(){
           />
         </form>
 
-        <div style={{ position: "relative", display: "inline-block" }}> 
+        <div style={{ position: "relative", display: "inline-block" }}>
           <img
             src={bagIcon}
             alt="Cart"
@@ -147,19 +147,19 @@ export default function Products(){
           />
           {totalQty > 0 && (
             <span style={{
-                position: "absolute",
-                bottom: -5,
-                left: -5,
-                background: "black",
-                color: "white",
-                borderRadius: "50%",
-                padding: "2px 6px",
-                fontSize: "12px",
-                fontWeight: "bold",
-                lineHeight: 1,
-                minWidth: "18px",
-                textAlign: "center"
-              }}>
+              position: "absolute",
+              bottom: -5,
+              left: -5,
+              background: "black",
+              color: "white",
+              borderRadius: "50%",
+              padding: "2px 6px",
+              fontSize: "12px",
+              fontWeight: "bold",
+              lineHeight: 1,
+              minWidth: "18px",
+              textAlign: "center"
+            }}>
               {totalQty}
             </span>
           )}
@@ -174,10 +174,10 @@ export default function Products(){
         />
       </div>
 
-      <div className="filter-bar" style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
+      <div className="filter-bar" style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         padding: '10px 20px',
         margin: '0 auto 20px',
         maxWidth: '1200px',
@@ -185,8 +185,8 @@ export default function Products(){
         gap: '10px'
       }}>
         <div className="filter-selects" style={{ display: 'flex', gap: '15px' }}>
-          <select 
-            value={priceFilter} 
+          <select
+            value={priceFilter}
             onChange={(e) => setPriceFilter(e.target.value)}
             style={filterSelectStyle}
           >
@@ -196,8 +196,8 @@ export default function Products(){
             <option value="20-plus">$20+</option>
           </select>
 
-          <select 
-            value={categoryFilter} 
+          <select
+            value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             style={filterSelectStyle}
           >
@@ -208,7 +208,7 @@ export default function Products(){
           </select>
 
           <select
-            value ={sizeFilter}
+            value={sizeFilter}
             onChange={(e) => setSizeFilter(e.target.value)}
             style={filterSelectStyle}
           >
@@ -222,10 +222,10 @@ export default function Products(){
 
         <div className="sort-container">
           <label style={{ marginRight: '10px', fontSize: '14px', color: '#666' }}>Sort by:</label>
-          <select 
-            value={sortOption} 
+          <select
+            value={sortOption}
             onChange={(e) => setSortOption(e.target.value)}
-            style={{...filterSelectStyle, fontWeight: '500'}}
+            style={{ ...filterSelectStyle, fontWeight: '500' }}
           >
             <option value="relevant">Relevant</option>
             <option value="best-seller">Best Seller</option>
@@ -238,17 +238,25 @@ export default function Products(){
       <RecommendRow title="Recommended For You" products={recommendations} />
 
       <div className="products-grid">
-        {processedItems.length > 0 ? (
-          processedItems.map(p=> (
-            <div 
-                key={p.id} 
-                className="card fade-in" 
-                style={{cursor: 'pointer'}}
-                onClick={() => navigate(`/product/${p.id}`)}
+        {isLoading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="skeleton-card">
+              <div className="skeleton skeleton-img"></div>
+              <div className="skeleton skeleton-text"></div>
+              <div className="skeleton skeleton-text short"></div>
+            </div>
+          ))
+        ) : processedItems.length > 0 ? (
+          processedItems.map(p => (
+            <div
+              key={p.id}
+              className="card fade-in"
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate(`/product/${p.id}`)}
             >
               <img src={p.image_url} alt={p.name} />
               <h3>{p.name}</h3>
-              <span style={{fontSize:'13px', color:'#666'}}>{CATEGORY_MAP[p.category_id]}</span>
+              <span style={{ fontSize: '13px', color: '#666' }}>{CATEGORY_MAP[p.category_id]}</span>
               <strong>${Number(p.price).toFixed(2)}</strong>
             </div>
           ))

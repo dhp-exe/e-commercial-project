@@ -5,10 +5,9 @@ import api from '../api';
  * GoogleLoginButton — Renders the Google Identity Services "Sign in with Google" button.
  *
  * Uses the GIS library loaded via <script> in index.html.
- * On successful authentication, sends the credential to our backend
- * and calls onSuccess with the response.
+ * On successful authentication, it calls onSuccess with the credential.
  *
- * @param {function} onSuccess - Called with { name } after successful login
+ * @param {function} onSuccess - Called with the credential (id_token) after successful login
  * @param {function} onError - Called with error message on failure
  */
 export default function GoogleLoginButton({ onSuccess, onError }) {
@@ -22,12 +21,11 @@ export default function GoogleLoginButton({ onSuccess, onError }) {
       client_id: clientId,
       callback: async (response) => {
         try {
-          const { data } = await api.post('/auth/google', {
-            credential: response.credential,
-          });
-          onSuccess?.(data);
+          if (onSuccess) {
+            await onSuccess(response.credential);
+          }
         } catch (err) {
-          const msg = err.response?.data?.message || 'Google login failed';
+          const msg = err.response?.data?.message || err.message || 'Google login failed';
           onError?.(msg);
         }
       },
@@ -37,10 +35,10 @@ export default function GoogleLoginButton({ onSuccess, onError }) {
       theme: 'outline',
       size: 'large',
       width: '100%',
-      text: 'signin_with',
+      text: 'continue_with',
       shape: 'rectangular',
     });
   }, [onSuccess, onError]);
 
-  return <div ref={buttonRef} style={{ marginTop: '15px', display: 'flex', justifyContent: 'center' }} />;
+  return <div ref={buttonRef} style={{ display: 'flex', justifyContent: 'center' }} />;
 }

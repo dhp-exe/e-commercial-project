@@ -14,7 +14,7 @@ import CartDrawer from "../components/CartDrawer";
 import { useState } from 'react';
 
 export default function Home() {
-  const { data: items = [] } = useProducts();
+  const { data: items = [], isLoading } = useProducts();
   const { totalQty } = useCart();
   const { token, name } = useAuth();
   const navigate = useNavigate();
@@ -53,7 +53,7 @@ export default function Home() {
   return (
     <>
       <Helmet>
-        <title>DHP Streetwear — Premium Street Fashion</title>
+        <title>DHP | Premium Streetwear Fashion</title>
         <meta name="description" content="DHP Streetwear — Premium Vietnamese street fashion. Shop vintage tees, baggy jeans, bombers & more." />
         <meta property="og:title" content="DHP Streetwear — Premium Street Fashion" />
         <meta property="og:description" content="Premium Vietnamese street fashion. Shop vintage tees, baggy jeans, bombers & more." />
@@ -110,8 +110,8 @@ export default function Home() {
           />
           <span style={{
             position: "absolute",
-            bottom: -5,   
-            left: -5,    
+            bottom: -5,
+            left: -5,
             background: "black",
             color: "white",
             borderRadius: "50%",
@@ -140,20 +140,30 @@ export default function Home() {
       <section className="container">
         <h2 role="button" onClick={() => navigate('/products')} className="home-section-title">All Products</h2>
         <div className="grid home-grid">
-          {items
-            .filter((p) => {
-              if (searchTerm.trim() === "") {
-                return true; 
-              }
-              return p.name.toLowerCase().includes(searchTerm.toLowerCase());
-            })
-            .map(p => (
-              <div key={p.id} className="card fade-in" style ={{cursor: 'pointer'}} onClick={() => navigate(`/product/${p.id}`)}>
-                <img src={p.image_url} alt={p.name} />
-                <h3>{p.name}</h3>
-                <strong>${Number(p.price).toFixed(2)}</strong>
+          {isLoading ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="skeleton-card">
+                <div className="skeleton skeleton-img"></div>
+                <div className="skeleton skeleton-text"></div>
+                <div className="skeleton skeleton-text short"></div>
               </div>
-            ))}
+            ))
+          ) : (
+            items
+              .filter((p) => {
+                if (searchTerm.trim() === "") {
+                  return true;
+                }
+                return p.name.toLowerCase().includes(searchTerm.toLowerCase());
+              })
+              .map(p => (
+                <div key={p.id} className="card fade-in" style={{ cursor: 'pointer' }} onClick={() => navigate(`/product/${p.id}`)}>
+                  <img src={p.image_url} alt={p.name} />
+                  <h3>{p.name}</h3>
+                  <strong>${Number(p.price).toFixed(2)}</strong>
+                </div>
+              ))
+          )}
         </div>
       </section>{/* Cart Icon */}
       {/* Drawer */}

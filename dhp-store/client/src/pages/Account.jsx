@@ -15,6 +15,7 @@ export default function Account() {
     phone: '',
     address: '',
     profilePicture: null,
+    authProvider: '',
   });
   const [orders, setOrders] = useState({
     new: 0,
@@ -57,6 +58,7 @@ export default function Account() {
         phone: data.phone || '',
         address: data.address || '',
         profilePicture: data.profilePicture || null,
+        authProvider: data.authProvider || '',
       });
       setOrders(data.orders || { new: 0, confirmed: 0, shipping: 0, received: 0, cancelled: 0 });
       setVouchers(data.vouchers || []);
@@ -160,7 +162,33 @@ export default function Account() {
   }
 
   if (loading) {
-    return <div className="account-page"><p>Loading...</p></div>;
+    return (
+      <div className="account-page">
+        <div className="account-container">
+          <aside className="account-sidebar">
+            <div className="profile-card">
+              <div className="skeleton" style={{ width: 100, height: 100, borderRadius: '50%', margin: '0 auto 20px' }}></div>
+              <div className="skeleton skeleton-text" style={{ margin: '0 auto 30px' }}></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                <div className="skeleton skeleton-text short"></div>
+                <div className="skeleton skeleton-text short"></div>
+                <div className="skeleton skeleton-text short"></div>
+              </div>
+            </div>
+          </aside>
+          <main className="account-main">
+            <section className="account-section">
+              <div className="skeleton skeleton-text" style={{ width: '30%', height: 40, marginBottom: 30 }}></div>
+              <div className="orders-grid">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="skeleton" style={{ height: 100, borderRadius: 8 }}></div>
+                ))}
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -207,12 +235,15 @@ export default function Account() {
                 My Vouchers
               </button>
 
-              <button 
-                className={`nav-item ${activeTab === 'password' ? 'active' : ''}`} 
-                onClick={() => setActiveTab('password')}
-              >
-                Change Password
-              </button>
+              {userInfo.authProvider !== 'google' && (
+                <button 
+                  className={`nav-item ${activeTab === 'password' ? 'active' : ''}`} 
+                  onClick={() => setActiveTab('password')}
+                >
+                  Change Password
+                </button>
+              )}
+              
               <button className="nav-item logout-btn" onClick={handleLogout}>Log Out</button>
             </nav>
           </div>
@@ -293,7 +324,7 @@ export default function Account() {
           )}
 
           {/* Password Section */}
-          {activeTab === 'password' && (
+          {activeTab === 'password' && userInfo.authProvider !== 'google' && (
             <section className="account-section">
               <h1>Change Password</h1>
               <form onSubmit={handleChangePassword} className="password-form">

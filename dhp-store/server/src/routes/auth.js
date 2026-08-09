@@ -86,7 +86,7 @@ router.post('/logout', (_req, res) => {
 // GET /profile - Get current user info
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    const [rows] = await pool.execute('SELECT id, name, email, role ,phone, address, profile_picture FROM users WHERE id=?', [req.user.id]);
+    const [rows] = await pool.execute('SELECT id, name, email, role ,phone, address, profile_picture, auth_provider FROM users WHERE id=?', [req.user.id]);
     const user = rows[0];
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -111,6 +111,7 @@ router.get('/profile', requireAuth, async (req, res) => {
       phone: user.phone || '',
       address: user.address || '',
       profilePicture: formatImageUrl(user.profile_picture),
+      authProvider: user.auth_provider,
       orders: orderStats,
       vouchers: dummyVouchers
     });

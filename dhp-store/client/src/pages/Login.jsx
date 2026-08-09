@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import './Login.css';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../api'; 
+import { api } from '../api';
 import Form from '../components/Form';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 
@@ -15,7 +15,7 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
 
-    const { login, register } = useAuth();
+    const { login, register, googleLogin } = useAuth();
     const navigate = useNavigate();
     const [showRecovery, setShowRecovery] = useState(false);
     const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -27,9 +27,9 @@ const Login = () => {
         e.preventDefault();
         setError('');
         try {
-            if(isRegister) {
-                await register( username, email, password );
-                navigate('/'); 
+            if (isRegister) {
+                await register(username, email, password);
+                navigate('/');
             } else {
                 await login(email, password);
                 navigate('/');
@@ -44,18 +44,17 @@ const Login = () => {
         e.preventDefault();
         setRecoveryError('');
         setRecoveryMessage('');
-        
+
         if (!recoveryEmail) return setRecoveryError('Please enter your email');
-        
+
         setRecoveryLoading(true);
         try {
-            // This ensures it hits http://localhost:5001/api/auth/forgot-password
-            const { data } = await api.post('/auth/forgot-password', { 
-                email: recoveryEmail 
+            const { data } = await api.post('/auth/forgot-password', {
+                email: recoveryEmail
             });
-            
+
             setRecoveryMessage(data.message || 'If this email exists, recovery instructions were sent.');
-            
+
         } catch (err) {
             console.error("Recovery Error:", err);
             setRecoveryMessage('If this email exists, recovery instructions were sent.');
@@ -65,56 +64,74 @@ const Login = () => {
     };
 
     return (
-        <div className="login-page"> 
+        <div className="login-page">
             <Helmet>
-                <title>{isRegister ? 'Register' : 'Login'} — DHP Streetwear</title>
+                <title>{isRegister ? 'Register' : 'Login'} | DHP Streetwear</title>
             </Helmet>
             <div className="login-container">
                 <h2>{isRegister ? 'Register' : 'Login'}</h2>
-                {error && <p className="error" style={{color: 'red'}}>{error}</p>}
+                {error && <p className="error" style={{ color: 'red' }}>{error}</p>}
 
                 <Form onSubmit={handleSubmit}>
+                    {/* Google OAuth Divider */}
+                    {!isRegister && (
+                        <>
+                            <GoogleLoginButton
+                                onSuccess={async (credential) => {
+                                    await googleLogin(credential);
+                                    navigate('/');
+                                }}
+                                onError={(msg) => setError(msg)}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', margin: '5px 0' }}>
+                                <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #ddd' }} />
+                                <span style={{ padding: '0 10px', color: '#999', fontSize: '0.85em' }}>Or</span>
+                                <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #ddd' }} />
+                            </div>
+                        </>
+                    )}
+
                     {isRegister && (
                         <div className="input-group">
                             <label>Username</label>
-                            <input 
-                                type="text" 
-                                value={username} 
-                                onChange={(e) => setUsername(e.target.value)} 
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 placeholder='Peter Parker'
-                                required 
+                                required
                             />
                         </div>
                     )}
                     <div className="input-group">
                         <label>Email</label>
-                        <input 
-                            type="email" 
-                            value={email} 
-                            onChange={(e) => setEmail(e.target.value)} 
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             placeholder='peterparker@example.com'
-                            required 
+                            required
                         />
                     </div>
                     <div className="input-group">
                         <label>Password</label>
-                        <input 
-                            type={showPassword ? "text" : "password"} 
-                            value={password} 
-                            onChange={(e) => setPassword(e.target.value)} 
-                            required 
+                        <input
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
                         />
-                        <div style={{marginTop: '10px'}}>
-                            <input 
+                        <div style={{ marginTop: '10px' }}>
+                            <input
                                 type="checkbox"
                                 checked={showPassword}
                                 onChange={() => setShowPassword(!showPassword)}
-                            /> <span style={{fontSize: '0.9em'}}>Show Password</span>
+                            /> <span style={{ fontSize: '0.9em' }}>Show Password</span>
                         </div>
                     </div>
-                    <div className="forgot-password" style={{marginTop: '10px' }}>
+                    <div className="forgot-password" style={{ marginTop: '10px' }}>
                         <button type="button"
-                            style={{background: 'none', border: 'none', color: '#000000', cursor: 'pointer', padding: 0, fontSize: '0.9em', textDecoration: 'underline'}}
+                            style={{ background: 'none', border: 'none', color: '#000000', cursor: 'pointer', padding: 0, fontSize: '0.9em', textDecoration: 'underline' }}
                             onClick={() => setShowRecovery(true)}>
                             Forgot Password?
                         </button>
@@ -125,49 +142,34 @@ const Login = () => {
                     </button>
                 </Form>
 
-                {/* Google OAuth Divider */}
-                {!isRegister && (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', margin: '15px 0' }}>
-                      <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #ddd' }} />
-                      <span style={{ padding: '0 10px', color: '#999', fontSize: '0.85em' }}>or</span>
-                      <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #ddd' }} />
-                    </div>
-                    <GoogleLoginButton
-                      onSuccess={() => navigate('/')}
-                      onError={(msg) => setError(msg)}
-                    />
-                  </>
-                )}
-                
-                <p style={{marginTop: '15px'}}>
+                <p style={{ marginTop: '15px' }}>
                     {isRegister ? (
                         <>
-                        Already have an account?{' '}
-                        <span 
-                            onClick={() => setIsRegister(false)}
-                            style={{ cursor: 'pointer', color: '#000', fontWeight: 'bold' }}
-                        >
-                            Login
-                        </span>
+                            Already have an account?{' '}
+                            <span
+                                onClick={() => setIsRegister(false)}
+                                style={{ cursor: 'pointer', color: '#000', fontWeight: 'bold' }}
+                            >
+                                Login
+                            </span>
                         </>
                     ) : (
                         <>
-                        Don't have an account?{' '}
-                        <span 
-                            onClick={() => setIsRegister(true)}
-                            style={{ cursor: 'pointer', color: '#000', fontWeight: 'bold' }}
-                        >
-                            Register
-                        </span>
+                            Don't have an account?{' '}
+                            <span
+                                onClick={() => setIsRegister(true)}
+                                style={{ cursor: 'pointer', color: '#000', fontWeight: 'bold' }}
+                            >
+                                Register
+                            </span>
                         </>
                     )}
                 </p>
             </div>
-            
+
             {showRecovery && (
-                <div 
-                    className="recovery-overlay" 
+                <div
+                    className="recovery-overlay"
                     onClick={() => setShowRecovery(false)}
                     style={{
                         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex',
@@ -177,29 +179,29 @@ const Login = () => {
                     <div
                         className="recovery-panel"
                         onClick={(e) => e.stopPropagation()}
-                        style={{background: '#fff', padding: '20px', borderRadius: '6px', width: '320px', boxShadow: '0 6px 18px rgba(0,0,0,0.2)'}}
+                        style={{ background: '#fff', padding: '20px', borderRadius: '6px', width: '320px', boxShadow: '0 6px 18px rgba(0,0,0,0.2)' }}
                     >
-                        <h3 style={{marginTop: 0}}>Password recovery</h3>
+                        <h3 style={{ marginTop: 0 }}>Password recovery</h3>
                         {recoveryMessage ? (
-                            <div style={{textAlign: 'center'}}>
-                                <p style={{color: 'green', marginBottom: '15px'}}>{recoveryMessage}</p>
-                                <button onClick={() => setShowRecovery(false)} style={{padding: '8px 16px'}}>Close</button>
+                            <div style={{ textAlign: 'center' }}>
+                                <p style={{ color: 'green', marginBottom: '15px' }}>{recoveryMessage}</p>
+                                <button onClick={() => setShowRecovery(false)} style={{ padding: '8px 16px' }}>Close</button>
                             </div>
                         ) : (
                             <Form onSubmit={handleRecoverySubmit}>
-                                <div style={{marginBottom: '10px'}}>
-                                    <label style={{display: 'block', fontSize: '0.9em', marginBottom: '6px'}}>Email</label>
+                                <div style={{ marginBottom: '10px' }}>
+                                    <label style={{ display: 'block', fontSize: '0.9em', marginBottom: '6px' }}>Email</label>
                                     <input
                                         type="email"
                                         value={recoveryEmail}
                                         onChange={(e) => setRecoveryEmail(e.target.value)}
-                                        style={{width: '100%', padding: '8px', boxSizing: 'border-box'}}
+                                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
                                     />
-                                    {recoveryError && <p style={{color: 'red', marginTop: '6px'}}>{recoveryError}</p>}
+                                    {recoveryError && <p style={{ color: 'red', marginTop: '6px' }}>{recoveryError}</p>}
                                 </div>
-                                <div style={{display: 'flex', justifyContent: 'flex-end', gap: '8px'}}>
-                                    <button type="button" onClick={() => setShowRecovery(false)} style={{padding: '8px 12px'}}>Cancel</button>
-                                    <button type="submit" style={{padding: '8px 12px'}} disabled={recoveryLoading}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                    <button type="button" onClick={() => setShowRecovery(false)} style={{ padding: '8px 12px' }}>Cancel</button>
+                                    <button type="submit" style={{ padding: '8px 12px' }} disabled={recoveryLoading}>
                                         {recoveryLoading ? 'Sending...' : 'Send'}
                                     </button>
                                 </div>
