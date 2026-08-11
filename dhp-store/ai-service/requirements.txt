@@ -6,3 +6,5 @@ scikit-learn
 python-dotenv
 requests
 google-genai
+pymysql
+redis
