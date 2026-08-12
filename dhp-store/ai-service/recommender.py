@@ -2,7 +2,7 @@ import mysql.connector
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import google.generativeai as genai
+from google import genai
 import os
 import re
 
@@ -23,11 +23,10 @@ class Recommender:
             print("AI recommendations will be unavailable until data is loaded.")
 
         if os.getenv("GOOGLE_API_KEY"):
-            genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-            model_name = os.getenv("MODEL_NAME", "gemini-2.5-flash")
-            self.model = genai.GenerativeModel(model_name)
+            self.model_name = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+            self.genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         else:
-            self.model = None
+            self.genai_client = None
 
     def refresh(self):
         print("Loading data from TiDB...")
@@ -134,7 +133,7 @@ class Recommender:
         return "GENERAL"
     
     def chat(self, user_message):
-        if not self.model:
+        if not self.genai_client:
             return "I'm sorry, AI isn't connected right now."
 
         intent = self.detect_intent(user_message)
@@ -158,7 +157,7 @@ class Recommender:
             Question: "{user_message}"
             """
 
-            response = self.model.generate_content(prompt)
+            response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text.strip()
 
         # ===== PRODUCT SEARCH =====
@@ -189,7 +188,7 @@ class Recommender:
             {context}
             """
 
-            response = self.model.generate_content(prompt)
+            response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text.strip()
         if intent == "GENERAL":
             prompt = f"""
@@ -201,6 +200,6 @@ class Recommender:
             User question: "{user_message}"
             """
 
-            response = self.model.generate_content(prompt)
+            response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text.strip()
         return "Can you please clarify what you're looking for?"

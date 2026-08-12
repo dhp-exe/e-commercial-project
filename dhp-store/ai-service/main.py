@@ -4,6 +4,7 @@ from recommender import Recommender
 import uvicorn
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from app.vector_store import VectorStore
 
 load_dotenv()
 
@@ -25,6 +26,7 @@ if os.getenv("DB_SSL", "").lower() == "true":
 
 # Initialize AI Engine
 rec_engine = Recommender(db_config)
+vector_store = VectorStore(db_config)
 
 @app.head("/")
 @app.get("/")
@@ -43,7 +45,7 @@ def recommend(product_id: int):
 @app.post("/refresh")
 def refresh_model(background_tasks: BackgroundTasks):
     """Call this when you add new products to update the AI (runs in background)"""
-    background_tasks.add_task(rec_engine.refresh)
+    background_tasks.add_task(vector_store.sync_products_to_pinecone)
     return {"status": "Refresh started"}
 
 class ChatRequest(BaseModel):
