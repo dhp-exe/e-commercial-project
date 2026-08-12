@@ -1,5 +1,6 @@
 import os
 from google import genai
+from google.genai import types
 from pinecone import Pinecone
 import mysql.connector
 
@@ -25,8 +26,9 @@ class VectorStore:
             return []
         try:
             result = self.genai_client.models.embed_content(
-                model="text-embedding-004",
-                contents=text
+                model="gemini-embedding-2",
+                contents=text,
+                config=types.EmbedContentConfig(output_dimensionality=768)
             )
             return result.embeddings[0].values
         except Exception as e:

@@ -1,26 +1,21 @@
-import mysql.connector
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from google import genai
 import os
 import re
+from google import genai
+from google.genai import types
+from pinecone import Pinecone
 
 class Recommender:
     def __init__(self, db_config):
         self.db_config = db_config
-        self.df = None
-        self.products = []
-        self.similarity_matrix = None
-        self.vectorizer = None
-        self.tfidf_matrix = None
-        self.id_to_index = None
         
-        try:
-            self.refresh()
-        except Exception as e:
-            print(f"WARNING: Failed to load product data on startup: {e}")
-            print("AI recommendations will be unavailable until data is loaded.")
+        pinecone_key = os.getenv("PINECONE_API_KEY")
+        if pinecone_key:
+            self.pc = Pinecone(api_key=pinecone_key)
+            self.index = self.pc.Index("dhp-store")
+        else:
+            self.pc = None
+            self.index = None
+            print("WARNING: PINECONE_API_KEY not found.")
 
         if os.getenv("GOOGLE_API_KEY"):
             self.model_name = os.getenv("MODEL_NAME", "gemini-2.5-flash")
@@ -28,53 +23,38 @@ class Recommender:
         else:
             self.genai_client = None
 
-    def refresh(self):
-        print("Loading data from TiDB...")
-        conn = mysql.connector.connect(**self.db_config)
-        
-        # Fetch Data (ID, Name, Description, Price, Category)
-        query = """
-            SELECT p.id, p.name, p.description, p.price, c.name as category 
-            FROM products p 
-            JOIN categories c ON p.category_id = c.id
-        """
-        self.df = pd.read_sql(query, conn)
-        conn.close()
-
-        self.products = self.df[["id", "name", "description", "price", "category"]].to_dict("records")
-
-        self.df['soup'] = self.df['name'] + " " + self.df['description'] + " " + self.df['category']
-        
-        # Vectorize (Text -> numbers)
-        self.vectorizer = TfidfVectorizer(stop_words='english')
-        self.tfidf_matrix = self.vectorizer.fit_transform(self.df['soup'])
-        
-        # Cosine Similarity
-        self.similarity_matrix = cosine_similarity(self.tfidf_matrix, self.tfidf_matrix)
-        
-        # Create a lookup map (Product ID -> Matrix Index)
-        self.id_to_index = pd.Series(self.df.index, index=self.df['id'])
-        print("AI Model Ready!")
+        print("AI Model Ready (Pinecone integrated)!")
 
     def get_similar(self, product_id, top_n=4):
-        if self.id_to_index is None or self.similarity_matrix is None:
+        if not self.index:
             return []
-        if product_id not in self.id_to_index:
+            
+        # Fetch target product vector from Pinecone
+        response = self.index.fetch(ids=[str(product_id)])
+        if str(product_id) not in response.vectors:
             return []
-
-        idx = self.id_to_index[product_id]
-
-        scores = list(enumerate(self.similarity_matrix[idx]))
-
-        # Sort by score (highest first)
-        scores = sorted(scores, key=lambda x: x[1], reverse=True)
-
-        # Get top N 
-        top_indices = [i[0] for i in scores[1:top_n+1]]
-
-        return self.df['id'].iloc[top_indices].tolist()
+            
+        target_vector = response.vectors[str(product_id)].values
+        
+        # Query for nearest neighbors
+        query_response = self.index.query(
+            vector=target_vector,
+            top_k=top_n + 1,
+            include_metadata=False
+        )
+        
+        similar_ids = []
+        for match in query_response.matches:
+            if match.id != str(product_id):
+                similar_ids.append(int(match.id))
+                
+        # Return exactly top_n (since we requested top_n + 1 to account for the product itself)
+        return similar_ids[:top_n]
     
     def search_products(self, user_message):
+        if not self.index or not self.genai_client:
+            return []
+            
         text = user_message.lower()
 
         # ---------- price extraction ----------
@@ -92,32 +72,50 @@ class Recommender:
 
         # ---------- product type extraction ----------
         product_keywords = {
-            "tee": ["tee", "tees", "t-shirt", "tshirt", "shirt", "top", "tops"],
-            "jeans": ["jean", "jeans", "denim", "bottom", "bottoms"]
+            "Tees": ["tee", "tees", "t-shirt", "tshirt", "shirt", "top", "tops"],
+            "Jeans": ["jean", "jeans", "denim", "bottom", "bottoms"]
         }
 
         matched_types = []
-        for ptype, keys in product_keywords.items():
+        for category, keys in product_keywords.items():
             if any(k in text for k in keys):
-                matched_types.append(ptype)
+                matched_types.append(category)
 
-        # ---------- filtering ----------
+        # Generate embedding for user query
+        try:
+            embed_result = self.genai_client.models.embed_content(
+                model="gemini-embedding-2",
+                contents=text,
+                config=types.EmbedContentConfig(output_dimensionality=768)
+            )
+            query_vector = embed_result.embeddings[0].values
+        except Exception as e:
+            print(f"Error generating embedding for search: {e}")
+            return []
+
+        # Construct Pinecone metadata filter
+        pinecone_filter = {}
+        
+        if price_limit is not None:
+            pinecone_filter["price"] = {"$lte": price_limit}
+            
+        if matched_types:
+            pinecone_filter["category"] = {"$in": matched_types}
+             
+        query_args = {
+            "vector": query_vector,
+            "top_k": 4,
+            "include_metadata": True
+        }
+        if pinecone_filter:
+            query_args["filter"] = pinecone_filter
+
+        response = self.index.query(**query_args)
+        
         results = []
-
-        for product in (self.products or []):
-            name = product["name"].lower()
-            price = float(product["price"])
-
-            # type filter
-            if matched_types and not any(t in name for t in matched_types):
-                continue
-
-            # price filter
-            if price_limit is not None and price >= price_limit:
-                continue
-
-            results.append(product)
-
+        for match in response.matches:
+            results.append(match.metadata)
+            
         return results
     
     def detect_intent(self, text: str) -> str:
@@ -190,16 +188,16 @@ class Recommender:
 
             response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text.strip()
-        if intent == "GENERAL":
-            prompt = f"""
-            You are a helpful sales assistant for 'DHP Store', a trendy streetwear brand.
+            
+        # ===== GENERAL =====
+        prompt = f"""
+        You are a helpful sales assistant for 'DHP Store', a trendy streetwear brand.
 
-            Rules:
-            - Answer the user's question clearly and concisely.
+        Rules:
+        - Answer the user's question clearly and concisely.
 
-            User question: "{user_message}"
-            """
+        User question: "{user_message}"
+        """
 
-            response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
-            return response.text.strip()
-        return "Can you please clarify what you're looking for?"
+        response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
+        return response.text.strip()
