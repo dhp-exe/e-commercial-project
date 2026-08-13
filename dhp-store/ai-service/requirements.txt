@@ -5,4 +5,6 @@ pandas
 scikit-learn
 python-dotenv
 requests
-google-generativeai
+google-genai
+pinecone
+cachetools
