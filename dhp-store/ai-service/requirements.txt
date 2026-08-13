@@ -7,3 +7,4 @@ python-dotenv
 requests
 google-genai
 pinecone
+cachetools

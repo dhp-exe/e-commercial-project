@@ -52,3 +52,32 @@
   - Query the Pinecone index using the user's vector and the constructed filters.
   - Return the top 3-5 results.
   - Pass the results back to Gemini for the final natural language synthesis.
+
+# Technical Specification: Hallucination Fixes, Structured Outputs, & Caching
+**Status:** APPROVED
+**Date:** 2026-08-13
+
+## Goal
+Fix product hallucination by adding strict guardrails, upgrade intent extraction to use LLM Structured Outputs (Pydantic), and add long-term caching (14-day TTL) to the recommendation engine.
+
+## Decisions Made
+1. **Intent Extraction:** Included `STORE_INFO` in the `SearchFilters` Pydantic schema along with `PRODUCT_SEARCH` and `GENERAL`.
+2. **Cache Invalidation:** Calling `cache_clear()` inside `main.py`'s `/refresh` background task after `sync_products_to_pinecone` finishes is approved.
+
+## Proposed Changes
+
+### Phase 1: Strict Grounding Guardrails
+- **recommender.py:** Update the `PRODUCT_SEARCH` prompt to include the strict grounding guardrail instructing the model to only recommend products from the provided context and never hallucinate.
+
+### Phase 2: LLM Structured Output
+- **recommender.py:** 
+  - Add Pydantic dependency.
+  - Remove `detect_intent()`, price patterns, and `product_keywords`.
+  - Implement `SearchFilters(BaseModel)`.
+  - Refactor `search_products()` to use structured output for constraint extraction (intent, max_price, category, search_query) and pass filters to Pinecone.
+  - Refactor `chat()` to use `search_products` properly.
+
+### Phase 3: 14-Day Recommendation Caching
+- **requirements.txt:** Add `cachetools`.
+- **recommender.py:** Apply `@cached(cache=TTLCache(maxsize=1024, ttl=1209600))` to `get_similar()`.
+- **main.py:** Update `/refresh` to call `vector_store.sync_products_to_pinecone()` and then `rec_engine.get_similar.cache_clear()`.

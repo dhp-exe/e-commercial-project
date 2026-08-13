@@ -1,8 +1,17 @@
 import os
-import re
+import json
 from google import genai
 from google.genai import types
 from pinecone import Pinecone
+from pydantic import BaseModel
+from typing import Optional, Literal
+from cachetools import cached, TTLCache
+
+class SearchFilters(BaseModel):
+    intent: Literal["PRODUCT_SEARCH", "GENERAL", "STORE_INFO"]
+    category: Optional[Literal["Tees", "Hoodies/Jackets", "Jeans/Pants"]]
+    max_price: Optional[float]
+    search_query: str
 
 class Recommender:
     def __init__(self, db_config):
@@ -25,6 +34,7 @@ class Recommender:
 
         print("AI Model Ready (Pinecone integrated)!")
 
+    @cached(cache=TTLCache(maxsize=1024, ttl=1209600))
     def get_similar(self, product_id, top_n=4):
         if not self.index:
             return []
@@ -51,93 +61,31 @@ class Recommender:
         # Return exactly top_n (since we requested top_n + 1 to account for the product itself)
         return similar_ids[:top_n]
     
-    def search_products(self, user_message):
-        if not self.index or not self.genai_client:
-            return []
-            
-        text = user_message.lower()
-
-        # ---------- price extraction ----------
-        price_limit = None
-        price_patterns = [
-            r"(less than|under|below)\s*\$?\s*(\d+)",
-            r"\$?\s*(\d+)\s*(bucks|dollars)"
-        ]
-
-        for pattern in price_patterns:
-            match = re.search(pattern, text)
-            if match:
-                price_limit = float(match.group(match.lastindex))
-                break
-
-        # ---------- product type extraction ----------
-        product_keywords = {
-            "Tees": ["tee", "tees", "t-shirt", "tshirt", "shirt", "top", "tops"],
-            "Jeans": ["jean", "jeans", "denim", "bottom", "bottoms"]
-        }
-
-        matched_types = []
-        for category, keys in product_keywords.items():
-            if any(k in text for k in keys):
-                matched_types.append(category)
-
-        # Generate embedding for user query
-        try:
-            embed_result = self.genai_client.models.embed_content(
-                model="gemini-embedding-2",
-                contents=text,
-                config=types.EmbedContentConfig(output_dimensionality=768)
-            )
-            query_vector = embed_result.embeddings[0].values
-        except Exception as e:
-            print(f"Error generating embedding for search: {e}")
-            return []
-
-        # Construct Pinecone metadata filter
-        pinecone_filter = {}
-        
-        if price_limit is not None:
-            pinecone_filter["price"] = {"$lte": price_limit}
-            
-        if matched_types:
-            pinecone_filter["category"] = {"$in": matched_types}
-             
-        query_args = {
-            "vector": query_vector,
-            "top_k": 4,
-            "include_metadata": True
-        }
-        if pinecone_filter:
-            query_args["filter"] = pinecone_filter
-
-        response = self.index.query(**query_args)
-        
-        results = []
-        for match in response.matches:
-            results.append(match.metadata)
-            
-        return results
-    
-    def detect_intent(self, text: str) -> str:
-        t = text.lower()
-
-        if any(k in t for k in ["owner", "store owner", "who", "manager", "ceo", "creator", "admin", "founder", "DHP", "Phuoc", "Naviah", 
-                                "location", "where", "address", "open", "close", "hours", "time"]):
-            return "STORE_INFO"
-
-        if any(k in t for k in ["buy", "price", "product", "products", "recommend", "search", "best seller", "trending", "tee", "tees", "jeans", "shirt", "t-shirt"]):
-            return "PRODUCT_SEARCH"
-
-        return "GENERAL"
-    
     def chat(self, user_message):
         if not self.genai_client:
             return "I'm sorry, AI isn't connected right now."
 
-        intent = self.detect_intent(user_message)
+        # Extract structured intent and filters
+        try:
+            extraction_prompt = f"Analyze this user query and extract intent, category, max price, and a clean search query:\nQuery: {user_message}"
+            structured_response = self.genai_client.models.generate_content(
+                model=self.model_name,
+                contents=extraction_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=SearchFilters
+                )
+            )
+            # Parse the JSON string into the Pydantic model
+            filters_data = json.loads(structured_response.text)
+            filters = SearchFilters(**filters_data)
+        except Exception as e:
+            print(f"Error parsing structured output: {e}")
+            # Fallback
+            filters = SearchFilters(intent="GENERAL", search_query=user_message, category=None, max_price=None)
 
         # ===== STORE INFO =====
-        if intent == "STORE_INFO":
+        if filters.intent == "STORE_INFO":
             prompt = f"""
             You are Naviah, a helpful store information assistant/manager.
 
@@ -154,13 +102,41 @@ class Recommender:
 
             Question: "{user_message}"
             """
-
             response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text.strip()
 
         # ===== PRODUCT SEARCH =====
-        if intent == "PRODUCT_SEARCH":
-            found_products = self.search_products(user_message)
+        elif filters.intent == "PRODUCT_SEARCH":
+            found_products = []
+            if self.index:
+                # Embed the refined search query
+                try:
+                    embed_result = self.genai_client.models.embed_content(
+                        model="gemini-embedding-2",
+                        contents=filters.search_query,
+                        config=types.EmbedContentConfig(output_dimensionality=768)
+                    )
+                    query_vector = embed_result.embeddings[0].values
+                    
+                    # Construct Pinecone metadata filter
+                    pinecone_filter = {}
+                    if filters.max_price is not None:
+                        pinecone_filter["price"] = {"$lte": filters.max_price}
+                    if filters.category is not None:
+                        pinecone_filter["category"] = {"$eq": filters.category}
+                        
+                    query_args = {
+                        "vector": query_vector,
+                        "top_k": 4,
+                        "include_metadata": True
+                    }
+                    if pinecone_filter:
+                        query_args["filter"] = pinecone_filter
+
+                    response = self.index.query(**query_args)
+                    found_products = [match.metadata for match in response.matches]
+                except Exception as e:
+                    print(f"Error in product search: {e}")
 
             if found_products:
                 context = "Available products:\n"
@@ -180,24 +156,25 @@ class Recommender:
             - If products are found, recommend them specifically.
             - If the user asks for price range, answer correctly.
             - Keep answers short (under 40 words).
+            
+            CRITICAL GUARDRAIL: You must ONLY recommend products explicitly listed in the [Available products] context below. DO NOT invent, hallucinate, or guess any products. If the provided products do not perfectly match the user's aesthetic request, recommend the closest available matches from the context and politely inform them of our current stock.
 
             User question: "{user_message}"
 
             {context}
             """
-
             response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
             return response.text.strip()
             
         # ===== GENERAL =====
-        prompt = f"""
-        You are a helpful sales assistant for 'DHP Store', a trendy streetwear brand.
+        else:
+            prompt = f"""
+            You are a helpful sales assistant for 'DHP Store', a trendy streetwear brand.
 
-        Rules:
-        - Answer the user's question clearly and concisely.
+            Rules:
+            - Answer the user's question clearly and concisely.
 
-        User question: "{user_message}"
-        """
-
-        response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
-        return response.text.strip()
+            User question: "{user_message}"
+            """
+            response = self.genai_client.models.generate_content(model=self.model_name, contents=prompt)
+            return response.text.strip()

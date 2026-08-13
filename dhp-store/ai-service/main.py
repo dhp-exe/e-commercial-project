@@ -45,7 +45,11 @@ def recommend(product_id: int):
 @app.post("/refresh")
 def refresh_model(background_tasks: BackgroundTasks):
     """Call this when you add new products to update the AI (runs in background)"""
-    background_tasks.add_task(vector_store.sync_products_to_pinecone)
+    def background_refresh():
+        vector_store.sync_products_to_pinecone()
+        rec_engine.get_similar.cache_clear()
+    
+    background_tasks.add_task(background_refresh)
     return {"status": "Refresh started"}
 
 class ChatRequest(BaseModel):
