@@ -138,7 +138,7 @@ export default function Home() {
       </div>
 
       <section className="container">
-        <h2 role="button" onClick={() => navigate('/products')} className="home-section-title">All Products</h2>
+        <h2 role="button" onClick={() => navigate('/products')} className="home-section-title">Latest Arrivals</h2>
         <div className="grid home-grid">
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
