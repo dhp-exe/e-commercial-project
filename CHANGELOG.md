@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.3.0...v1.4.0) (2026-08-13)
+
+
+### Features
+
+* implement product vectorization and sync with Pinecone using Go… ([#25](https://github.com/dhp-exe/e-commercial-project/issues/25)) ([6d64ad6](https://github.com/dhp-exe/e-commercial-project/commit/6d64ad682363370cb4e6f7f6c3ec434ad32ef568))
+
 ## [1.3.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.2.0...v1.3.0) (2026-08-09)
 
 
