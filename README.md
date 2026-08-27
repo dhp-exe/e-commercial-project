@@ -1,7 +1,7 @@
 <p align="center">
   <img src="dhp-store/client/public/logo2.png" height = "400" width="600">
 </p>
-***Website link:** https://e-commercial-project-mauve.vercel.app
+***Website link:** https://www.dhpstore.studio
 
 *(Wait a few seconds for the site to load)*
 

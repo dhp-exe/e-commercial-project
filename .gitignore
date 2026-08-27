@@ -5,15 +5,12 @@ node_modules/
 .env
 .env.*     # ignore all env variants
 
-
-
 build/
 .cache/
 .next/
 .nuxt/
 __pycache__/
 *.pyc
-
 
 npm-debug.log*
 yarn-debug.log*
@@ -31,9 +28,8 @@ Thumbs.db
 # test coverage
 coverage/
 
-# Ignore all uploaded files
-# (updated to new project folder name)
 dhp-store/server/src/uploads/*
 
-# But allow the gitkeep file (see Step 2)
 !dhp-store/server/src/uploads/.gitkeep
+
+*.tex
