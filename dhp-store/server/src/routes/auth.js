@@ -11,24 +11,77 @@ import upload from '../middleware/upload.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { formatImageUrl } from '../utils/formatImageUrl.js';
 import { emailQueue } from '../queues/emailQueue.js';
+import { validatePassword } from '../utils/validatePassword.js';
 
 dotenv.config();
 
 const router = Router();
 
-// Determine cookie options that work with ngrok / forwarded requests.
+// ── Cookie Configuration ────────────────────────────────────────────
 const isSecureCookie = process.env.NODE_ENV === 'production' || process.env.USE_NGROK === 'true' || process.env.TRUST_PROXY === '1';
-const cookieOptions = {
+
+const accessCookieOptions = {
   httpOnly: true,
   secure: isSecureCookie,
   sameSite: isSecureCookie ? 'none' : 'strict',
-  maxAge: 60 * 60 * 1000
+  maxAge: 15 * 60 * 1000, // 15 minutes (short-lived access token)
 };
+
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: isSecureCookie,
+  sameSite: isSecureCookie ? 'none' : 'strict',
+  path: '/api/auth',         // Only sent to auth endpoints (minimizes exposure)
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
+// ── Token Helper Functions ──────────────────────────────────────────
+
+function generateAccessToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+}
+
+/**
+ * Generate a rotating refresh token and store its SHA-256 hash in the DB.
+ * Returns the raw token to be set as a cookie.
+ */
+async function generateRefreshToken(userId) {
+  const rawToken = crypto.randomBytes(64).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  await pool.execute(
+    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+    [userId, tokenHash, expiresAt]
+  );
+
+  return rawToken;
+}
+
+/**
+ * Issue both access + refresh tokens as HttpOnly cookies.
+ */
+async function issueTokenPair(res, user) {
+  const accessToken = generateAccessToken(user);
+  const refreshToken = await generateRefreshToken(user.id);
+
+  res.cookie('access_token', accessToken, accessCookieOptions);
+  res.cookie('refresh_token', refreshToken, refreshCookieOptions);
+}
 
 // POST /register
 router.post('/register', authLimiter ,async (req, res) => {
   const { email, password, name } = req.body;
   if (!email || !password || !name) return res.status(400).json({ message: 'Missing fields' });
+
+  // Password complexity validation
+  const pwCheck = validatePassword(password);
+  if (!pwCheck.valid) return res.status(400).json({ message: pwCheck.message });
+
   const hash = await bcrypt.hash(password, 10);
   try {
     const [result] = await pool.execute(
@@ -36,13 +89,9 @@ router.post('/register', authLimiter ,async (req, res) => {
       [email, hash, name]
     );
     const userId = result.insertId;
-    const token = jwt.sign(
-      { id: userId, email },
-      process.env.JWT_SECRET,
-      { expiresIn: '60m' }
-    );
+    const user = { id: userId, email };
 
-    res.cookie('access_token', token, cookieOptions);
+    await issueTokenPair(res, user);
     res.json({ name });
   } 
   catch (e) {
@@ -62,13 +111,7 @@ router.post('/login', authLimiter, async (req, res) => {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ message: 'Invalid email or password' });
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '60m' }
-    );
-
-    res.cookie('access_token', token, cookieOptions);
+    await issueTokenPair(res, user);
     res.json({ name: user.name });
   } 
   catch (e) {
@@ -77,9 +120,67 @@ router.post('/login', authLimiter, async (req, res) => {
   }
 });
 
+// POST /refresh — Silent token refresh using rotating refresh tokens
+router.post('/refresh', async (req, res) => {
+  const rawToken = req.cookies?.refresh_token;
+  if (!rawToken) return res.status(401).json({ message: 'No refresh token' });
+
+  try {
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    const [rows] = await pool.execute(
+      'SELECT * FROM refresh_tokens WHERE token_hash = ? AND expires_at > NOW() AND revoked = false',
+      [tokenHash]
+    );
+
+    if (rows.length === 0) {
+      // Invalid or expired — clear cookies
+      res.clearCookie('access_token', accessCookieOptions);
+      res.clearCookie('refresh_token', refreshCookieOptions);
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+
+    const refreshRecord = rows[0];
+
+    // Revoke the old refresh token (rotation — each token is single-use)
+    await pool.execute('UPDATE refresh_tokens SET revoked = true WHERE id = ?', [refreshRecord.id]);
+
+    // Verify the user still exists
+    const [userRows] = await pool.execute('SELECT id, email FROM users WHERE id = ?', [refreshRecord.user_id]);
+    if (userRows.length === 0) {
+      res.clearCookie('access_token', accessCookieOptions);
+      res.clearCookie('refresh_token', refreshCookieOptions);
+      return res.status(401).json({ message: 'User no longer exists' });
+    }
+
+    const user = userRows[0];
+
+    // Issue a brand new token pair
+    await issueTokenPair(res, user);
+    res.json({ message: 'Token refreshed' });
+
+  } catch (err) {
+    console.error('Refresh token error:', err);
+    Sentry.captureException(err, { tags: { route: 'auth/refresh' } });
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // POST /logout
-router.post('/logout', (_req, res) => {
-  res.clearCookie('access_token', cookieOptions);
+router.post('/logout', async (req, res) => {
+  // Revoke the refresh token in the database
+  const rawToken = req.cookies?.refresh_token;
+  if (rawToken) {
+    try {
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      await pool.execute('UPDATE refresh_tokens SET revoked = true WHERE token_hash = ?', [tokenHash]);
+    } catch (err) {
+      console.error('Error revoking refresh token:', err.message);
+    }
+  }
+
+  res.clearCookie('access_token', accessCookieOptions);
+  res.clearCookie('refresh_token', refreshCookieOptions);
   res.json({ message: 'Logged out' });
 });
 
@@ -204,6 +305,10 @@ router.post('/change-password', authLimiter, requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) return res.status(400).json({ message: 'Missing fields' });
 
+  // Password complexity validation
+  const pwCheck = validatePassword(newPassword);
+  if (!pwCheck.valid) return res.status(400).json({ message: pwCheck.message });
+
   try {
     const [rows] = await pool.execute('SELECT password_hash FROM users WHERE id=?', [req.user.id]);
     const user = rows[0];
@@ -224,12 +329,15 @@ router.post('/change-password', authLimiter, requireAuth, async (req, res) => {
 
 // POST /reset-password
 router.post('/reset-password', authLimiter, async (req, res) => {
-  // ... (No URL fixes needed here, keeping logic the same)
   const { token, newPassword } = req.body;
 
   if (!token || !newPassword) {
     return res.status(400).json({ message: 'Missing token or password' });
   }
+
+  // Password complexity validation
+  const pwCheck = validatePassword(newPassword);
+  if (!pwCheck.valid) return res.status(400).json({ message: pwCheck.message });
 
   try {
     const tokenHash = crypto
@@ -314,14 +422,8 @@ router.post('/google', authLimiter, async (req, res) => {
       isNewUser = true;
     }
 
-    // Issue JWT (same payload as existing login)
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '60m' }
-    );
-
-    res.cookie('access_token', token, cookieOptions);
+    // Issue token pair (access + refresh)
+    await issueTokenPair(res, user);
     res.status(isNewUser ? 201 : 200).json({ name: user.name });
 
   } catch (err) {
@@ -336,12 +438,7 @@ router.post('/google', authLimiter, async (req, res) => {
       try {
         const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [req.body.email || '']);
         if (rows.length > 0) {
-          const token = jwt.sign(
-            { id: rows[0].id, email: rows[0].email },
-            process.env.JWT_SECRET,
-            { expiresIn: '60m' }
-          );
-          res.cookie('access_token', token, cookieOptions);
+          await issueTokenPair(res, rows[0]);
           return res.json({ name: rows[0].name });
         }
       } catch {

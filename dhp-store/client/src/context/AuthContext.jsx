@@ -19,6 +19,8 @@ export function AuthProvider({ children }) {
         setUser(res.data);          // full user object
         setIsAuthenticated(true);
       } catch (err) {
+        // The api interceptor already tried a silent refresh on 401.
+        // If we still get here, the session is truly expired.
         setUser(null);
         setIsAuthenticated(false);
       } finally {
@@ -55,9 +57,14 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Logout
+  // Logout — clears both access + refresh tokens server-side
   const logout = async () => {
-    await api.post('/auth/logout');
+    try {
+      await api.post('/auth/logout');
+    } catch (err) {
+      // Even if the API call fails, clear local state
+      console.error('Logout API call failed', err);
+    }
     setUser(null);
     setIsAuthenticated(false);
   };
