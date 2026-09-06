@@ -20,6 +20,7 @@ import webhooks from './routes/webhooks.js';
 import sitemap from './routes/sitemap.js';
 import path from 'path';
 import cookieParser from 'cookie-parser';
+import { csrfProtection } from './middleware/csrf.js';
 import { globalLimiter } from './middleware/rateLimit.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { verifyAdmin } from './middleware/requireRole.js';
@@ -121,6 +122,9 @@ app.use('/api/webhooks/stripe', webhooks);
 
 app.use(express.json());
 
+// ── CSRF Protection (after cookie-parser + express.json, before routes) ─
+app.use(csrfProtection);
+
 // ── Static Files (user uploads only) ────────────────────────────────
 app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
 
@@ -137,12 +141,14 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 // ── SEO ────────────────────────────────────────────────────────────────────
 app.use('/sitemap.xml', sitemap);
 
-// ── Admin Dashboard ─────────────────────────────────────────────────
-app.use('/admin/queues', requireAuth, verifyAdmin, serverAdapter.getRouter());
+// ── Admin Dashboard (disabled in production for security) ───────────
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/admin/queues', requireAuth, verifyAdmin, serverAdapter.getRouter());
 
-app.get("/debug-sentry", function triggerError(req, res) {
-  throw new Error("Sentry verification test error!");
-});
+  app.get("/debug-sentry", function triggerError(req, res) {
+    throw new Error("Sentry verification test error!");
+  });
+}
 
 // ── API 404 Fallback ────────────────────────────────────────────────
 app.use('/api', (_req, res) => {

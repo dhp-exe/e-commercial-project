@@ -203,7 +203,8 @@ router.get('/', requireAuth, async (req, res) => {
       params.push(status);
     }
     
-    query += ` ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
     const [orders] = await pool.execute(query, params);
 

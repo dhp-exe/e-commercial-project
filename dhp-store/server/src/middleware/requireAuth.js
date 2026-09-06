@@ -40,7 +40,9 @@ export const requireAuth = async (req, res, next) => {
     req.user = user;
     next();
   } catch (err) {
-    res.clearCookie('access_token'); 
+    // Access token expired or invalid — clear it but DON'T clear refresh_token here.
+    // The frontend will attempt a silent refresh via POST /api/auth/refresh first.
+    res.clearCookie('access_token');
     res.status(401).json({ message: 'Token is not valid' });
   }
 };
