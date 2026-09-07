@@ -79,7 +79,9 @@ export default function Products() {
 
       // Size Filter
       if (sizeFilter !== 'all') {
-        const availableSizes = p.sizes ? p.sizes.split(',') : [];
+        const availableSizes = p.variants && p.variants.length > 0
+          ? p.variants.map(v => v.size?.name || v.size)
+          : (p.sizes ? p.sizes.split(',') : []);
         if (!availableSizes.includes(sizeFilter)) return false;
       }
 
