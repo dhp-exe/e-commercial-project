@@ -33,3 +33,7 @@ dhp-store/server/src/uploads/*
 !dhp-store/server/src/uploads/.gitkeep
 
 *.tex
+
+# migrations
+migrations/*
+run_migration.js

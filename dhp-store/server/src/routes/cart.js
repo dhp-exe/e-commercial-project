@@ -12,7 +12,7 @@ async function getOrCreateCart(userId) {
   return { id: r.insertId, user_id: userId, status: 'active' };
 }
 
-// GET /api/cart - Retrieve the user's cart
+// GET /api/cart
 router.get('/', requireAuth, async (req, res) => {
   try {
     const cart = await getOrCreateCart(req.user.id);
@@ -23,7 +23,6 @@ router.get('/', requireAuth, async (req, res) => {
          ci.variant_id,
          ci.product_id,
          ci.qty,
-         ci.size,
          p.name AS product_name,
          p.name,
          p.base_price,
@@ -39,10 +38,10 @@ router.get('/', requireAuth, async (req, res) => {
          p.image_url AS fallback_image
        FROM cart_items ci
        JOIN products p ON p.id = ci.product_id
-       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
-       LEFT JOIN colors c ON pv.color_id = c.id
-       LEFT JOIN sizes s ON pv.size_id = s.id
-       LEFT JOIN inventory i ON i.variant_id = pv.id
+       JOIN product_variants pv ON ci.variant_id = pv.id
+       JOIN colors c ON pv.color_id = c.id
+       JOIN sizes s ON pv.size_id = s.id
+       JOIN inventory i ON i.variant_id = pv.id
        LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.is_primary = TRUE
        WHERE ci.cart_id = ?
        ORDER BY ci.id ASC`,
@@ -51,7 +50,6 @@ router.get('/', requireAuth, async (req, res) => {
 
     const items = rows.map((item) => {
       const imageUrl = formatImageUrl(item.primary_image || item.fallback_image);
-      const effectiveSize = item.size_name || item.size;
       return {
         id: item.id,
         variant_id: item.variant_id,
@@ -61,10 +59,10 @@ router.get('/', requireAuth, async (req, res) => {
         product_name: item.product_name,
         name: item.name,
         sku: item.sku,
-        color_name: item.color_name || 'Default',
-        color_hex: item.color_hex || '#000000',
-        size_name: effectiveSize,
-        size: effectiveSize,
+        color_name: item.color_name,
+        color_hex: item.color_hex,
+        size_name: item.size_name,
+        size: item.size_name,
         qty: item.qty,
         price: Number(item.price),
         stock: item.stock,
@@ -80,80 +78,53 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/cart/add - Add an item to the user's cart
+// POST /api/cart/add 
 router.post('/add', requireAuth, async (req, res) => {
-  const { variantId, productId, qty, size } = req.body;
-  const userId = req.user.id;
+  const rawVariantId = req.body.variantId ?? req.body.variant_id;
+  const variantId = Number(rawVariantId);
 
-  const parsedQty = Number(qty);
+  if (!Number.isInteger(variantId) || variantId <= 0) {
+    return res.status(400).json({ message: 'Valid variantId is required' });
+  }
+
+  const parsedQty = Number(req.body.qty);
   if (!Number.isInteger(parsedQty) || parsedQty <= 0) {
     return res.status(400).json({ message: 'Invalid quantity' });
   }
 
+  const userId = req.user.id;
   let conn;
+
   try {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    // 1. Resolve variant and product
-    let resolvedVariantId = variantId ? Number(variantId) : null;
-    let resolvedProductId = productId ? Number(productId) : null;
-    let resolvedSizeName = size ? String(size).trim() : null;
+    // 1. Fetch variant, product, size, and available inventory atomically
+    const [vRows] = await conn.execute(
+      `SELECT pv.id AS variant_id,
+              pv.product_id,
+              s.name AS size_name,
+              GREATEST(0, COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0)) AS available_stock
+       FROM product_variants pv
+       JOIN sizes s ON pv.size_id = s.id
+       JOIN inventory i ON i.variant_id = pv.id
+       WHERE pv.id = ? AND pv.is_active = TRUE`,
+      [variantId]
+    );
 
-    if (resolvedVariantId) {
-      const [vRows] = await conn.execute(
-        `SELECT pv.id, pv.product_id, s.name AS size_name,
-                GREATEST(0, COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0)) AS available_stock
-         FROM product_variants pv
-         JOIN sizes s ON pv.size_id = s.id
-         LEFT JOIN inventory i ON i.variant_id = pv.id
-         WHERE pv.id = ? AND pv.is_active = TRUE`,
-        [resolvedVariantId]
-      );
-
-      if (vRows.length === 0) {
-        await conn.rollback();
-        return res.status(404).json({ message: 'Product variant not found or inactive' });
-      }
-
-      resolvedProductId = vRows[0].product_id;
-      resolvedSizeName = vRows[0].size_name;
-      const availableStock = vRows[0].available_stock;
-
-      if (parsedQty > availableStock) {
-        await conn.rollback();
-        return res.status(400).json({
-          message: `Only ${availableStock} items available in stock`,
-          available_stock: availableStock,
-        });
-      }
-    } else if (resolvedProductId && resolvedSizeName) {
-      // Legacy fallback: find variant by productId + size
-      const [vRows] = await conn.execute(
-        `SELECT pv.id,
-                GREATEST(0, COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0)) AS available_stock
-         FROM product_variants pv
-         JOIN sizes s ON pv.size_id = s.id
-         LEFT JOIN inventory i ON i.variant_id = pv.id
-         WHERE pv.product_id = ? AND s.name = ? AND pv.is_active = TRUE
-         LIMIT 1`,
-        [resolvedProductId, resolvedSizeName]
-      );
-
-      if (vRows.length > 0) {
-        resolvedVariantId = vRows[0].id;
-        const availableStock = vRows[0].available_stock;
-        if (parsedQty > availableStock) {
-          await conn.rollback();
-          return res.status(400).json({
-            message: `Only ${availableStock} items available in stock`,
-            available_stock: availableStock,
-          });
-        }
-      }
-    } else {
+    if (vRows.length === 0) {
       await conn.rollback();
-      return res.status(400).json({ message: 'variantId or (productId and size) is required' });
+      return res.status(404).json({ message: 'Product variant not found or inactive' });
+    }
+
+    const { product_id, size_name, available_stock } = vRows[0];
+
+    if (parsedQty > available_stock) {
+      await conn.rollback();
+      return res.status(400).json({
+        message: `Only ${available_stock} items available in stock`,
+        available_stock,
+      });
     }
 
     // 2. Get or create active cart
@@ -161,6 +132,7 @@ router.post('/add', requireAuth, async (req, res) => {
       'SELECT id FROM carts WHERE user_id = ? AND status = "active"',
       [userId]
     );
+
     let cartId;
     if (carts.length > 0) {
       cartId = carts[0].id;
@@ -169,51 +141,37 @@ router.post('/add', requireAuth, async (req, res) => {
       cartId = newCart.insertId;
     }
 
-    // 3. Find existing item in cart
-    let existingQuery = 'SELECT id, qty FROM cart_items WHERE cart_id = ? AND ';
-    let existingParams = [cartId];
-
-    if (resolvedVariantId) {
-      existingQuery += 'variant_id = ?';
-      existingParams.push(resolvedVariantId);
-    } else {
-      existingQuery += 'product_id = ? AND size = ?';
-      existingParams.push(resolvedProductId, resolvedSizeName);
-    }
-
-    const [existing] = await conn.execute(existingQuery, existingParams);
+    // 3. Check existing item in cart strictly by variant_id
+    const [existing] = await conn.execute(
+      'SELECT id, qty FROM cart_items WHERE cart_id = ? AND variant_id = ?',
+      [cartId, variantId]
+    );
 
     if (existing.length > 0) {
       const newQty = existing[0].qty + parsedQty;
 
-      // Validate new total against stock
-      if (resolvedVariantId) {
-        const [inv] = await conn.execute(
-          'SELECT GREATEST(0, quantity - reserved_quantity) AS available FROM inventory WHERE variant_id = ?',
-          [resolvedVariantId]
-        );
-        if (inv.length > 0 && newQty > inv[0].available) {
-          await conn.rollback();
-          return res.status(400).json({
-            message: `Cannot add more. Only ${inv[0].available} items available in stock`,
-            available_stock: inv[0].available,
-          });
-        }
+      // Validate cumulative quantity against available stock
+      if (newQty > available_stock) {
+        await conn.rollback();
+        return res.status(400).json({
+          message: `Cannot add more. Only ${available_stock} items available in stock`,
+          available_stock,
+        });
       }
 
       await conn.execute(
-        'UPDATE cart_items SET qty = ?, variant_id = COALESCE(?, variant_id), size = ? WHERE id = ?',
-        [newQty, resolvedVariantId, resolvedSizeName, existing[0].id]
+        'UPDATE cart_items SET qty = ?, size = ? WHERE id = ?',
+        [newQty, size_name, existing[0].id]
       );
     } else {
       await conn.execute(
         'INSERT INTO cart_items (cart_id, product_id, variant_id, qty, size) VALUES (?, ?, ?, ?, ?)',
-        [cartId, resolvedProductId, resolvedVariantId, parsedQty, resolvedSizeName]
+        [cartId, product_id, variantId, parsedQty, size_name]
       );
     }
 
     await conn.commit();
-    res.json({ message: 'Item added to cart', cartId, variantId: resolvedVariantId });
+    res.json({ message: 'Item added to cart', cartId, variantId });
   } catch (error) {
     if (conn) await conn.rollback();
     console.error('Add to cart error:', error);
@@ -223,53 +181,55 @@ router.post('/add', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/cart/update - Update quantity
+// POST /api/cart/update 
 router.post('/update', requireAuth, async (req, res) => {
-  const { variantId, productId, size, qty } = req.body;
-  const userId = req.user.id;
+  const rawVariantId = req.body.variantId ?? req.body.variant_id;
+  const variantId = Number(rawVariantId);
 
-  const parsedQty = Number(qty);
-  if (Number.isNaN(parsedQty)) {
+  if (!Number.isInteger(variantId) || variantId <= 0) {
+    return res.status(400).json({ message: 'Valid variantId is required' });
+  }
+
+  const parsedQty = Number(req.body.qty);
+  if (!Number.isInteger(parsedQty)) {
     return res.status(400).json({ message: 'Invalid quantity' });
   }
 
   try {
-    const cart = await getOrCreateCart(userId);
+    const cart = await getOrCreateCart(req.user.id);
 
     if (parsedQty <= 0) {
-      if (variantId) {
-        await pool.execute('DELETE FROM cart_items WHERE cart_id = ? AND variant_id = ?', [cart.id, variantId]);
-      } else {
-        await pool.execute(
-          'DELETE FROM cart_items WHERE cart_id = ? AND product_id = ? AND size = ?',
-          [cart.id, productId, size]
-        );
-      }
+      await pool.execute(
+        'DELETE FROM cart_items WHERE cart_id = ? AND variant_id = ?',
+        [cart.id, variantId]
+      );
       return res.json({ ok: true, message: 'Item removed' });
     }
 
-    // Check available stock if variantId is provided
-    if (variantId) {
-      const [inv] = await pool.execute(
-        'SELECT GREATEST(0, quantity - reserved_quantity) AS available FROM inventory WHERE variant_id = ?',
-        [variantId]
-      );
-      if (inv.length > 0 && parsedQty > inv[0].available) {
-        return res.status(400).json({
-          message: `Cannot update. Only ${inv[0].available} items available in stock`,
-          available_stock: inv[0].available,
-        });
-      }
+    // Check available stock in inventory
+    const [inv] = await pool.execute(
+      'SELECT GREATEST(0, quantity - reserved_quantity) AS available FROM inventory WHERE variant_id = ?',
+      [variantId]
+    );
 
-      await pool.execute(
-        'UPDATE cart_items SET qty = ? WHERE cart_id = ? AND variant_id = ?',
-        [parsedQty, cart.id, variantId]
-      );
-    } else {
-      await pool.execute(
-        'UPDATE cart_items SET qty = ? WHERE cart_id = ? AND product_id = ? AND size = ?',
-        [parsedQty, cart.id, productId, size]
-      );
+    if (inv.length === 0) {
+      return res.status(404).json({ message: 'Variant inventory not found' });
+    }
+
+    if (parsedQty > inv[0].available) {
+      return res.status(400).json({
+        message: `Cannot update. Only ${inv[0].available} items available in stock`,
+        available_stock: inv[0].available,
+      });
+    }
+
+    const [result] = await pool.execute(
+      'UPDATE cart_items SET qty = ? WHERE cart_id = ? AND variant_id = ?',
+      [parsedQty, cart.id, variantId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Item not found in cart' });
     }
 
     res.json({ ok: true });
