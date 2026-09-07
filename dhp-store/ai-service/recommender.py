@@ -121,7 +121,7 @@ class Recommender:
                     # Construct Pinecone metadata filter
                     pinecone_filter = {}
                     if filters.max_price is not None:
-                        pinecone_filter["price"] = {"$lte": filters.max_price}
+                        pinecone_filter["min_price"] = {"$lte": filters.max_price}
                     if filters.category is not None:
                         pinecone_filter["category"] = {"$eq": filters.category}
                         
@@ -141,7 +141,12 @@ class Recommender:
             if found_products:
                 context = "Available products:\n"
                 for p in found_products:
-                    context += f"- {p['name']} (${p['price']}): {p['description']}\n"
+                    min_p = p.get('min_price', p.get('price', 0))
+                    max_p = p.get('max_price', p.get('price', 0))
+                    price_str = f"${min_p:.2f}" if min_p == max_p else f"${min_p:.2f}-${max_p:.2f}"
+                    sizes_str = f". Sizes: {p['available_sizes']}" if p.get('available_sizes') else ""
+                    colors_str = f". Colors: {p['available_colors']}" if p.get('available_colors') else ""
+                    context += f"- {p['name']} ({price_str}): {p.get('description', '')}{sizes_str}{colors_str}\n"
             else:
                 context = "No matching products were found."
 

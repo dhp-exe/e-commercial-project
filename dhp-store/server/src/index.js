@@ -38,11 +38,13 @@ import aiRefreshWorker from './workers/aiRefreshWorker.js';
 import cacheWorker from './workers/cacheWorker.js';
 import stripeWorker from './workers/stripeWorker.js';
 import cartCleanupWorker from './workers/cartCleanupWorker.js';
+import reservationCleanupWorker from './workers/reservationCleanupWorker.js';
 import { emailQueue } from './queues/emailQueue.js';
 import { aiRefreshQueue } from './queues/aiRefreshQueue.js';
 import { cacheQueue } from './queues/cacheQueue.js';
 import { stripeQueue } from './queues/stripeQueue.js';
 import { cartCleanupQueue, scheduleCartCleanup } from './queues/cartCleanupQueue.js';
+import { reservationCleanupQueue, scheduleReservationCleanup } from './queues/reservationCleanupQueue.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -58,6 +60,7 @@ createBullBoard({
     new BullMQAdapter(cacheQueue),
     new BullMQAdapter(stripeQueue),
     new BullMQAdapter(cartCleanupQueue),
+    new BullMQAdapter(reservationCleanupQueue),
   ],
   serverAdapter: serverAdapter,
 });
@@ -180,13 +183,15 @@ const server = app.listen(process.env.PORT, () => {
 
   // Schedule the weekly abandoned cart cleanup cron
   scheduleCartCleanup();
+  // Schedule the 5-minute inventory reservation cleanup cron
+  scheduleReservationCleanup();
 
-  console.log('BullMQ workers started: email, ai-refresh, cache, stripe, cart-cleanup');
+  console.log('BullMQ workers started: email, ai-refresh, cache, stripe, cart-cleanup, reservation-cleanup');
 });
 
 // ── Graceful Shutdown (SIGTERM/SIGINT) ─────────────────────────────────
-const workers = [emailWorker, aiRefreshWorker, cacheWorker, stripeWorker, cartCleanupWorker];
-const queues = [emailQueue, aiRefreshQueue, cacheQueue, stripeQueue, cartCleanupQueue];
+const workers = [emailWorker, aiRefreshWorker, cacheWorker, stripeWorker, cartCleanupWorker, reservationCleanupWorker];
+const queues = [emailQueue, aiRefreshQueue, cacheQueue, stripeQueue, cartCleanupQueue, reservationCleanupQueue];
 
 async function gracefulShutdown(signal) {
   console.log(`${signal} received. Shutting down gracefully...`);

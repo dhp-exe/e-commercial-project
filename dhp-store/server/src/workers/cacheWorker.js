@@ -28,19 +28,19 @@ const cacheWorker = new Worker(
     }
 
     // SCAN loop to find and delete matching keys (avoids KEYS blocking)
-    let cursor = 0;
+    let cursor = '0';
     let totalDeleted = 0;
     do {
       const result = await redis.scan(cursor, {
         MATCH: pattern,
         COUNT: 100,
       });
-      cursor = result.cursor;
+      cursor = String(result.cursor);
       if (result.keys.length > 0) {
         await redis.del(result.keys);
         totalDeleted += result.keys.length;
       }
-    } while (cursor !== 0);
+    } while (cursor !== '0');
 
     console.log(`🧹 Cache invalidation complete: ${totalDeleted} keys deleted`);
   },

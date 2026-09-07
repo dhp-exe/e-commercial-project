@@ -41,9 +41,19 @@ class VectorStore:
         cursor = conn.cursor(dictionary=True)
         
         query = """
-            SELECT p.id, p.name, p.description, p.price, c.name as category 
+            SELECT 
+              p.id, p.name, p.description, p.base_price, c.name as category,
+              GROUP_CONCAT(DISTINCT s.name ORDER BY s.sort_order SEPARATOR ', ') as available_sizes,
+              GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') as available_colors,
+              MIN(COALESCE(pv.price_override, p.base_price)) as min_price,
+              MAX(COALESCE(pv.price_override, p.base_price)) as max_price
             FROM products p 
             JOIN categories c ON p.category_id = c.id
+            LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = TRUE
+            LEFT JOIN sizes s ON pv.size_id = s.id
+            LEFT JOIN colors cl ON pv.color_id = cl.id
+            WHERE p.is_active = TRUE
+            GROUP BY p.id, p.name, p.description, p.base_price, c.name
         """
         cursor.execute(query)
         products = cursor.fetchall()
@@ -51,17 +61,27 @@ class VectorStore:
         
         vectors = []
         for p in products:
-            text_to_embed = f"{p['name']} {p['description']} {p['category']}"
+            text_to_embed = (
+                f"{p['name']} {p['description'] or ''} {p['category']} "
+                f"Sizes: {p['available_sizes'] or 'N/A'} "
+                f"Colors: {p['available_colors'] or 'N/A'}"
+            )
             embedding = self.get_embedding(text_to_embed)
             if embedding:
+                min_p = float(p['min_price'] if p['min_price'] is not None else p['base_price'])
+                max_p = float(p['max_price'] if p['max_price'] is not None else p['base_price'])
                 vectors.append({
                     "id": str(p['id']),
                     "values": embedding,
                     "metadata": {
                         "name": p['name'],
                         "description": p['description'] or "",
-                        "price": float(p['price']),
+                        "price": min_p,
+                        "min_price": min_p,
+                        "max_price": max_p,
                         "category": p['category'],
+                        "available_sizes": p['available_sizes'] or "",
+                        "available_colors": p['available_colors'] or "",
                         "id": p['id']
                     }
                 })
