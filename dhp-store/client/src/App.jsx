@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import CartProvider from './context/CartContext.jsx';
 import { SearchProvider } from './context/SearchContext.jsx';
+import { ToastProvider } from './context/ToastContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ChatBot from './components/ChatBot.jsx';
@@ -34,9 +35,10 @@ export default function App() {
     <AuthProvider>
       <CartProvider>
         <SearchProvider>
-          <Navbar />
-          <ChatBot />
-          <main className="container">
+          <ToastProvider>
+            <Navbar />
+            <ChatBot />
+            <main className="container">
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
                 {/* Public Storefront */}
@@ -68,7 +70,8 @@ export default function App() {
             </Suspense>
           </main>
           <Footer />
-        </SearchProvider>
+        </ToastProvider>
+      </SearchProvider>
       </CartProvider>
     </AuthProvider>
   );

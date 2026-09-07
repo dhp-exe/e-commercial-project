@@ -134,10 +134,10 @@ async function run() {
     console.log(`  ✅ Sizes seeded: ${STANDARD_SIZES.map((s) => s.name).join(', ')}`);
 
     await conn.execute(
-      'INSERT IGNORE INTO colors (name, hex_code) VALUES (?, ?)',
-      [DEFAULT_COLOR_NAME, '#000000']
+      'INSERT IGNORE INTO colors (name, hex_code) VALUES (?, ?), (?, ?), (?, ?)',
+      [DEFAULT_COLOR_NAME, '#000000', 'Black', '#000000', 'White', '#FFFFFF']
     );
-    console.log(`  ✅ Default color seeded: "${DEFAULT_COLOR_NAME}"\n`);
+    console.log(`  ✅ Colors seeded: "${DEFAULT_COLOR_NAME}", "Black", "White"\n`);
 
     // ────────────────────────────────────────────────────────────────────────
     // STEP 3: Check if data migration already ran

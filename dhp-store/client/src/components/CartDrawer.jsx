@@ -34,17 +34,11 @@ export default function CartDrawer({ isOpen, onClose }) {
               <img src={item.image_url} alt={item.name} />
               <div style={{ flex: 1 }}>
                 <h4>{item.name}</h4>
-                <p style={{ fontSize: "12px", color: "#666", margin: "2px 0" }}>
-                  {item.color_name && item.color_name !== 'Default' && (
-                    <span style={{ marginRight: 8 }}>Color: <strong>{item.color_name}</strong></span>
-                  )}
+                <p style={{ fontSize: "12px", color: "#666", margin: "2px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>Color: <strong>{item.color_name || "Default"}</strong></span>
+                  <span>•</span>
                   <span>Size: <strong>{item.size_name || item.size || "Standard"}</strong></span>
                 </p>
-                {item.sku && (
-                  <p style={{ fontSize: "11px", color: "#999", margin: "2px 0" }}>
-                    SKU: {item.sku}
-                  </p>
-                )}
                 <p style={{ fontWeight: "600", margin: "4px 0" }}>${Number(item.price * item.qty).toFixed(2)}</p>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <button onClick={() => update({ variantId: item.variant_id, productId: item.product_id, qty: Math.max(0, item.qty - 1), size: item.size })}>-</button>

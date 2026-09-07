@@ -1,23 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { useToast } from '../../context/ToastContext';
 
 export default function ManageOrders() {
+  const { showToast } = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null); // Controls the Popup
 
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  async function fetchOrders() {
+  async function fetchOrders(showSpinner = false) {
+    if (showSpinner) setIsRefreshing(true);
     try {
-      const { data } = await api.get('/orders/admin/all');
+      const { data } = await api.get(`/orders/admin/all?_t=${Date.now()}`);
       setOrders(data);
+      if (showSpinner) showToast('Orders refreshed', 'info');
     } catch (err) {
       console.error("Failed to load orders", err);
+      if (showSpinner) showToast('Failed to refresh orders', 'error');
     } finally {
       setLoading(false);
+      if (showSpinner) setIsRefreshing(false);
     }
   }
 
@@ -25,8 +32,9 @@ export default function ManageOrders() {
     try {
       await api.put(`/orders/${orderId}/status`, { status: newStatus });
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      showToast(`Order status updated to ${newStatus}`, 'success');
     } catch (err) {
-      alert("Failed to update status: " + (err.response?.data?.message || err.message));
+      showToast("Failed to update status: " + (err.response?.data?.message || err.message), 'error');
     }
   }
 
@@ -34,7 +42,29 @@ export default function ManageOrders() {
 
   return (
     <div style={{ padding: '20px' }}>
-      <h2>Manage Orders</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h2 style={{ margin: 0 }}>Manage Orders</h2>
+        <button
+          onClick={() => fetchOrders(true)}
+          disabled={isRefreshing}
+          style={{
+            padding: '8px 16px',
+            background: '#2563eb',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            cursor: isRefreshing ? 'not-allowed' : 'pointer',
+            fontWeight: 600,
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          }}
+        >
+          🔄 {isRefreshing ? 'Refreshing...' : 'Refresh Orders'}
+        </button>
+      </div>
       
       <div style={{
           overflow: 'auto',                
@@ -156,7 +186,7 @@ export default function ManageOrders() {
                     <div>
                        <p style={{margin: '0 0 5px 0', fontWeight: 'bold'}}>{item.name}</p>
                        <p style={{margin: 0, fontSize: '0.9em', color: '#555'}}>
-                         Size: {item.size} | Qty: {item.quantity}
+                         {item.color_name ? `Color: ${item.color_name} • ` : ''}Size: {item.size} | Qty: {item.quantity}
                        </p>
                        <p style={{margin: '5px 0 0 0', fontWeight: 500}}>
                          ${Number(item.price).toFixed(2)}

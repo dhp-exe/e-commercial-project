@@ -145,12 +145,18 @@ export async function hydrateProducts(products, conn = pool) {
 // GET /api/products
 router.get('/', async (req, res) => {
   try {
-    const { q, categoryId } = req.query;
+    const { q, categoryId, _t } = req.query;
 
     const cacheKey = `products:q=${q || ''}:cat=${categoryId || ''}`;
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      return res.json(JSON.parse(cached));
+    if (!_t) {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+    } else {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
     }
 
     const where = ['p.is_active = true'];
@@ -245,6 +251,17 @@ router.get('/categories', async (_req, res) => {
   } catch (e) {
     console.error('Fetch categories error:', e);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/products/colors - Get all colors for variant configuration
+router.get('/colors', async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, name, hex_code FROM colors ORDER BY name ASC');
+    res.json(rows);
+  } catch (e) {
+    console.error('Fetch colors error:', e);
+    res.status(500).json({ message: 'Server error fetching colors' });
   }
 });
 
@@ -513,6 +530,357 @@ router.put('/variants/:variantId/inventory', requireAuth, verifyStaff, async (re
   } catch (error) {
     console.error('Update variant inventory error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/products/variants/:variantId - Update variant price, color, and stock (staff and admin)
+router.put('/variants/:variantId', requireAuth, verifyStaff, async (req, res) => {
+  const variantId = Number(req.params.variantId);
+  const { price_override, color_id, color_name, color_hex, stock } = req.body;
+
+  if (Number.isNaN(variantId) || variantId <= 0) {
+    return res.status(400).json({ message: 'Invalid variant ID' });
+  }
+
+  try {
+    const [variants] = await pool.execute(
+      `SELECT pv.id, pv.product_id, pv.sku, pv.color_id, pv.size_id, pv.price_override,
+              p.name AS product_name, c.name AS category_name, s.name AS size_name
+       FROM product_variants pv
+       JOIN products p ON pv.product_id = p.id
+       JOIN categories c ON p.category_id = c.id
+       JOIN sizes s ON pv.size_id = s.id
+       WHERE pv.id = ?`,
+      [variantId]
+    );
+
+    if (variants.length === 0) {
+      return res.status(404).json({ message: 'Variant not found' });
+    }
+
+    const currentVariant = variants[0];
+    let finalColorId = currentVariant.color_id;
+    let finalColorName = null;
+
+    // 1. Resolve Color if provided
+    if (color_name && typeof color_name === 'string' && color_name.trim()) {
+      const cName = color_name.trim();
+      const cHex = (color_hex || '#000000').trim();
+      await pool.execute(
+        'INSERT IGNORE INTO colors (name, hex_code) VALUES (?, ?)',
+        [cName, cHex]
+      );
+      const [cRows] = await pool.execute('SELECT id, name FROM colors WHERE name = ?', [cName]);
+      if (cRows.length > 0) {
+        finalColorId = cRows[0].id;
+        finalColorName = cRows[0].name;
+      }
+    } else if (color_id !== undefined && color_id !== null && color_id !== '') {
+      const cId = Number(color_id);
+      const [cRows] = await pool.execute('SELECT id, name FROM colors WHERE id = ?', [cId]);
+      if (cRows.length === 0) {
+        return res.status(400).json({ message: 'Selected color does not exist' });
+      }
+      finalColorId = cRows[0].id;
+      finalColorName = cRows[0].name;
+    }
+
+    // Check duplicate color + size on this product if color changed
+    if (finalColorId !== currentVariant.color_id) {
+      const [dup] = await pool.execute(
+        'SELECT id FROM product_variants WHERE product_id = ? AND color_id = ? AND size_id = ? AND id != ?',
+        [currentVariant.product_id, finalColorId, currentVariant.size_id, variantId]
+      );
+      if (dup.length > 0) {
+        return res.status(400).json({ message: 'A variant with this color and size already exists on this product.' });
+      }
+    }
+
+    // Determine new SKU if color changed
+    let updatedSku = currentVariant.sku;
+    if (finalColorName && finalColorId !== currentVariant.color_id) {
+      let skuCandidate = generateSku(
+        currentVariant.category_name,
+        currentVariant.product_name,
+        finalColorName,
+        currentVariant.size_name
+      );
+      const [skuCheck] = await pool.execute(
+        'SELECT id FROM product_variants WHERE sku = ? AND id != ?',
+        [skuCandidate, variantId]
+      );
+      if (skuCheck.length > 0) {
+        skuCandidate = `${skuCandidate}-${variantId}`;
+      }
+      updatedSku = skuCandidate;
+    }
+
+    // 2. Resolve Price Override
+    let finalPriceOverride = currentVariant.price_override;
+    if (price_override === null || price_override === '' || price_override === undefined) {
+      finalPriceOverride = null;
+    } else {
+      const parsedPrice = Number(price_override);
+      if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+        return res.status(400).json({ message: 'Invalid price override value' });
+      }
+      finalPriceOverride = parsedPrice;
+    }
+
+    // Update variant record
+    await pool.execute(
+      'UPDATE product_variants SET color_id = ?, price_override = ?, sku = ? WHERE id = ?',
+      [finalColorId, finalPriceOverride, updatedSku, variantId]
+    );
+
+    // 3. Resolve Stock if provided
+    let finalStock = null;
+    if (stock !== undefined && stock !== null && stock !== '') {
+      const parsedStock = Number(stock);
+      if (!Number.isInteger(parsedStock) || parsedStock < 0) {
+        return res.status(400).json({ message: 'Invalid stock quantity' });
+      }
+      finalStock = parsedStock;
+      await pool.execute(
+        `INSERT INTO inventory (variant_id, quantity, reserved_quantity)
+         VALUES (?, ?, 0)
+         ON DUPLICATE KEY UPDATE quantity = ?`,
+        [variantId, parsedStock, parsedStock]
+      );
+    }
+
+    // Invalidate Redis cache immediately
+    try {
+      await redis.del(`product:${currentVariant.product_id}`);
+      await redis.del('products:q=:cat=');
+      await cacheQueue.add('invalidate', {
+        type: 'cache-invalidate',
+        pattern: 'products:*',
+        productId: currentVariant.product_id,
+      });
+    } catch (queueErr) {
+      console.error('Failed to enqueue cache invalidation:', queueErr.message);
+      Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
+    }
+
+    res.json({
+      message: 'Variant updated successfully',
+      variant: {
+        id: variantId,
+        product_id: currentVariant.product_id,
+        sku: updatedSku,
+        color_id: finalColorId,
+        price_override: finalPriceOverride,
+        stock: finalStock,
+      },
+    });
+  } catch (error) {
+    console.error('Update variant error:', error);
+    res.status(500).json({ message: 'Server error updating variant' });
+  }
+});
+
+// POST /api/products/:id/variants - Add a new variant to an existing product (staff and admin)
+router.post('/:id/variants', requireAuth, verifyStaff, async (req, res) => {
+  const productId = Number(req.params.id);
+  const { color_id, color_name, color_hex, size_name, size_id, price_override, stock } = req.body;
+
+  if (Number.isNaN(productId) || productId <= 0) {
+    return res.status(400).json({ message: 'Invalid product ID' });
+  }
+
+  try {
+    const [products] = await pool.execute(
+      `SELECT p.id, p.name, p.base_price, c.name AS category_name
+       FROM products p
+       JOIN categories c ON p.category_id = c.id
+       WHERE p.id = ?`,
+      [productId]
+    );
+
+    if (products.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const product = products[0];
+
+    // 1. Resolve Color
+    let finalColorId;
+    let finalColorName;
+    if (color_name && typeof color_name === 'string' && color_name.trim()) {
+      const cName = color_name.trim();
+      const cHex = (color_hex || '#000000').trim();
+      await pool.execute(
+        'INSERT IGNORE INTO colors (name, hex_code) VALUES (?, ?)',
+        [cName, cHex]
+      );
+      const [cRows] = await pool.execute('SELECT id, name FROM colors WHERE name = ?', [cName]);
+      finalColorId = cRows[0].id;
+      finalColorName = cRows[0].name;
+    } else if (color_id !== undefined && color_id !== null && color_id !== '') {
+      const [cRows] = await pool.execute('SELECT id, name FROM colors WHERE id = ?', [Number(color_id)]);
+      if (cRows.length === 0) {
+        return res.status(400).json({ message: 'Selected color does not exist' });
+      }
+      finalColorId = cRows[0].id;
+      finalColorName = cRows[0].name;
+    } else {
+      const [cRows] = await pool.execute('SELECT id, name FROM colors LIMIT 1');
+      finalColorId = cRows[0].id;
+      finalColorName = cRows[0].name;
+    }
+
+    // 2. Resolve Size
+    let finalSizeId;
+    let finalSizeName;
+    if (size_name && typeof size_name === 'string' && size_name.trim()) {
+      const sName = size_name.trim().toUpperCase();
+      await pool.execute(
+        'INSERT IGNORE INTO sizes (name, sort_order) VALUES (?, ?)',
+        [sName, 99]
+      );
+      const [sRows] = await pool.execute('SELECT id, name FROM sizes WHERE name = ?', [sName]);
+      finalSizeId = sRows[0].id;
+      finalSizeName = sRows[0].name;
+    } else if (size_id !== undefined && size_id !== null && size_id !== '') {
+      const [sRows] = await pool.execute('SELECT id, name FROM sizes WHERE id = ?', [Number(size_id)]);
+      if (sRows.length === 0) {
+        return res.status(400).json({ message: 'Selected size does not exist' });
+      }
+      finalSizeId = sRows[0].id;
+      finalSizeName = sRows[0].name;
+    } else {
+      finalSizeName = 'M';
+      const [sRows] = await pool.execute('SELECT id, name FROM sizes WHERE name = ?', ['M']);
+      if (sRows.length > 0) {
+        finalSizeId = sRows[0].id;
+      } else {
+        const [anySize] = await pool.execute('SELECT id, name FROM sizes LIMIT 1');
+        finalSizeId = anySize[0].id;
+        finalSizeName = anySize[0].name;
+      }
+    }
+
+    // 3. Check for existing variant with same product + color + size
+    const [existing] = await pool.execute(
+      'SELECT id FROM product_variants WHERE product_id = ? AND color_id = ? AND size_id = ?',
+      [productId, finalColorId, finalSizeId]
+    );
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'A variant with this color and size already exists on this product.' });
+    }
+
+    // 4. Generate SKU
+    let sku = generateSku(product.category_name, product.name, finalColorName, finalSizeName);
+    const [skuCheck] = await pool.execute('SELECT id FROM product_variants WHERE sku = ?', [sku]);
+    if (skuCheck.length > 0) {
+      sku = `${sku}-${Date.now().toString().slice(-4)}`;
+    }
+
+    // 5. Resolve Price Override & Stock
+    const priceOverride = price_override !== undefined && price_override !== null && price_override !== ''
+      ? Number(price_override)
+      : null;
+    const stockQty = Math.max(0, Number(stock) || 0);
+
+    // 6. Insert Variant
+    const [variantResult] = await pool.execute(
+      `INSERT INTO product_variants (product_id, sku, color_id, size_id, price_override, is_active)
+       VALUES (?, ?, ?, ?, ?, true)`,
+      [productId, sku, finalColorId, finalSizeId, priceOverride]
+    );
+    const variantId = variantResult.insertId;
+
+    // 7. Insert Inventory
+    await pool.execute(
+      'INSERT INTO inventory (variant_id, quantity, reserved_quantity) VALUES (?, ?, 0)',
+      [variantId, stockQty]
+    );
+
+    // Invalidate Redis cache immediately
+    try {
+      await redis.del(`product:${productId}`);
+      await redis.del('products:q=:cat=');
+      await cacheQueue.add('invalidate', {
+        type: 'cache-invalidate',
+        pattern: 'products:*',
+        productId,
+      });
+    } catch (queueErr) {
+      console.error('Failed to enqueue cache invalidation:', queueErr.message);
+      Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
+    }
+
+    res.status(201).json({
+      message: 'Variant created successfully',
+      variant: {
+        id: variantId,
+        product_id: productId,
+        sku,
+        color_id: finalColorId,
+        size_id: finalSizeId,
+        price_override: priceOverride,
+        stock: stockQty,
+      },
+    });
+  } catch (error) {
+    console.error('Create variant error:', error);
+    res.status(500).json({ message: 'Server error creating variant' });
+  }
+});
+
+// DELETE /api/products/variants/:variantId - Delete a variant from an existing product (staff and admin)
+router.delete('/variants/:variantId', requireAuth, verifyStaff, async (req, res) => {
+  const variantId = Number(req.params.variantId);
+
+  if (Number.isNaN(variantId) || variantId <= 0) {
+    return res.status(400).json({ message: 'Invalid variant ID' });
+  }
+
+  try {
+    const [variants] = await pool.execute(
+      'SELECT id, product_id, sku FROM product_variants WHERE id = ?',
+      [variantId]
+    );
+
+    if (variants.length === 0) {
+      return res.status(404).json({ message: 'Variant not found' });
+    }
+
+    const variant = variants[0];
+
+    // Ensure we don't delete the last remaining variant of a product
+    const [countRows] = await pool.execute(
+      'SELECT COUNT(*) AS cnt FROM product_variants WHERE product_id = ?',
+      [variant.product_id]
+    );
+
+    if (countRows[0].cnt <= 1) {
+      return res.status(400).json({
+        message: 'Cannot delete the only remaining variant of a product. Products must have at least one variant.',
+      });
+    }
+
+    await pool.execute('DELETE FROM product_variants WHERE id = ?', [variantId]);
+
+    // Invalidate Redis cache immediately
+    try {
+      await redis.del(`product:${variant.product_id}`);
+      await redis.del('products:q=:cat=');
+      await cacheQueue.add('invalidate', {
+        type: 'cache-invalidate',
+        pattern: 'products:*',
+        productId: variant.product_id,
+      });
+    } catch (queueErr) {
+      console.error('Failed to enqueue cache invalidation:', queueErr.message);
+      Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
+    }
+
+    res.json({ message: 'Variant deleted successfully', variantId });
+  } catch (error) {
+    console.error('Delete variant error:', error);
+    res.status(500).json({ message: 'Server error deleting variant' });
   }
 });
 

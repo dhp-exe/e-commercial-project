@@ -270,8 +270,7 @@ router.get('/', requireAuth, async (req, res) => {
       params.push(status);
     }
 
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    query += ` ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 
     const [orders] = await pool.execute(query, params);
 
@@ -424,10 +423,13 @@ router.get('/admin/all', requireAuth, verifyStaff, async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
   const offset = (page - 1) * limit;
 
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
   try {
     const [orders] = await pool.execute(
-      'SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?',
-      [limit, offset]
+      `SELECT * FROM orders ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
     );
 
     const orderIds = orders.map((o) => o.id);

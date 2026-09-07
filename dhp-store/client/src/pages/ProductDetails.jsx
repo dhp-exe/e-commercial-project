@@ -335,7 +335,7 @@ export default function ProductDetails() {
           <div>
             <div className="pdp-category-tag">{product.category_name}</div>
             <h1 className="pdp-name">{product.name}</h1>
-            {activeVariant?.sku && <div className="pdp-sku">SKU: {activeVariant.sku}</div>}
+            {activeVariant?.sku && <div className="pdp-sku">Code: {activeVariant.sku}</div>}
           </div>
 
           <div className="pdp-price-row">
@@ -350,11 +350,6 @@ export default function ProductDetails() {
               </span>
             )}
           </div>
-
-          <p style={{ color: '#666', lineHeight: '1.6' }}>
-            {product.description ||
-              'A classic essential for your wardrobe. Made with high-quality materials for lasting comfort and style.'}
-          </p>
 
           {/* Color Selector */}
           {colors.length > 0 && (
