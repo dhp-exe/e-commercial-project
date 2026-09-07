@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.4.0...v1.5.0) (2026-09-07)
+
+
+### Features
+
+* implement product variant hierarchy with database schema, SKU g… ([#31](https://github.com/dhp-exe/e-commercial-project/issues/31)) ([0916405](https://github.com/dhp-exe/e-commercial-project/commit/091640544f2f653ec8d7e9f85394ec2b75715fd2))
+
+
+### Bug Fixes
+
+* update recommendation logic to use hydrated product data, display price ranges, and enhance TiDB SSL connection configuration ([4be48b4](https://github.com/dhp-exe/e-commercial-project/commit/4be48b4d541c085ffa2fa473f63261ba13122ca7))
+
 ## [1.4.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.3.0...v1.4.0) (2026-08-13)
 
 
