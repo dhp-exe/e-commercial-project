@@ -106,6 +106,18 @@ async function run() {
       console.log('  ⏭️  order_items.variant_id already exists');
     }
 
+    // 4. Ensure products.sold_count exists
+    const [soldCol] = await conn.execute(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'sold_count'
+    `);
+    if (soldCol.length === 0) {
+      await conn.execute('ALTER TABLE products ADD COLUMN sold_count INT DEFAULT 0');
+      console.log('  ✅ Added sold_count to products');
+    } else {
+      console.log('  ⏭️  products.sold_count already exists');
+    }
+
     // ────────────────────────────────────────────────────────────────────────
     // STEP 2: Seed lookup tables
     // ────────────────────────────────────────────────────────────────────────
