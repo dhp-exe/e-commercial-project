@@ -59,7 +59,9 @@ export default function RecommendRow({ title, products }) {
               {p.name}
             </h4>
             <div style={{ fontWeight: 'bold', color: '#333' }}>
-              ${Number(p.price).toFixed(2)}
+              {p.min_price !== undefined && p.max_price !== undefined && Number(p.min_price) !== Number(p.max_price)
+                ? `$${Number(p.min_price).toFixed(2)} - $${Number(p.max_price).toFixed(2)}`
+                : `$${Number(p.price ?? p.base_price ?? p.min_price ?? 0).toFixed(2)}`}
             </div>
           </div>
         ))}

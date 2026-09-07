@@ -6,8 +6,8 @@ import * as Sentry from '@sentry/node';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { verifyAdmin } from '../middleware/requireRole.js';
 import { apiLimiter } from '../middleware/rateLimit.js';
-import { formatImageUrl } from '../utils/formatImageUrl.js';
 import { aiRefreshQueue } from '../queues/aiRefreshQueue.js';
+import { hydrateProducts } from './products.js';
 
 const router = Router();
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';
@@ -20,12 +20,8 @@ const aiClient = axios.create({
 
 async function fetchProductsByIds(ids) {
   if (!ids || ids.length === 0) return [];
-  const [rows] = await pool.query('SELECT * FROM products WHERE id IN (?)', [ids]);
-
-  return rows.map(p => ({
-    ...p,
-    image_url: formatImageUrl(p.image_url)
-  }));
+  const [rows] = await pool.query('SELECT * FROM products WHERE id IN (?) AND is_active = true', [ids]);
+  return await hydrateProducts(rows, pool);
 }
 
 // GET /api/recommend/product/:id (For "Similar Products" section)
@@ -114,10 +110,7 @@ router.get('/user', requireAuth, async (req, res) => {
             'SELECT * FROM products WHERE id IN (?) AND is_active = true LIMIT 4',
             [[...randomIds]]
           );
-          recommendedProducts = trending.map(p => ({
-            ...p,
-            image_url: formatImageUrl(p.image_url)
-          }));
+          recommendedProducts = await hydrateProducts(trending, pool);
         }
       }
     }
