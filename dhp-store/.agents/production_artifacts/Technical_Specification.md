@@ -1,754 +1,815 @@
-# Technical Specification: Catalog Schema Enhancement — Product Variant Hierarchy
+# Technical Specification: Modular Monolith Refactoring
 
-> **Revision 2** — Updated to address: AI/Pinecone integration, abandoned reservation cleanup, admin product creation payload, and SKU auto-generation.
+> **Author:** @pm (Senior Product Manager)
+> **Date:** 2026-09-10
+> **Scope:** `server/src/` structural reorganization
+> **Constraint:** Zero business logic & API regressions
+
+---
 
 ## 1. Overview
 
-The current `products` table is a monolithic structure that stores sizes as comma-separated strings (`'S,M,L,XL'`), stock as a single integer, and only supports one image per product. This architecture cannot support:
+This specification defines the structural refactoring of the DHP Store Express backend (`server/src/`) from a flat layered architecture into a **Modular Monolith**. The goal is to establish clear domain boundaries, enforce module isolation through public facades, and prepare the codebase for future scalability — all **without** changing any existing API routes, request/response contracts, or business logic.
 
-- **Per-variant pricing** (e.g., a color costs more than another)
-- **Per-variant inventory** (e.g., Size M is out of stock but Size L is available)
-- **Concurrent checkout safety** (reserved quantity during checkout)
-- **Multiple product/variant images**
-- **Color variants**
+### 1.1 Business Value
 
-This feature redesigns the schema into a normalized **Product → Variant → Inventory** hierarchy, migrates all existing data without loss, and documents the full impact on the backend, frontend, and AI microservice codebase.
-
-## 2. User Stories
-
-- As a **customer**, I want to select both a color and size when adding to cart, so I can get exactly the variant I want.
-- As a **customer**, I want to see real-time stock availability per variant, so I don't order items that are sold out.
-- As a **store admin**, I want to manage inventory per variant (color + size), so I can track and restock precisely.
-- As a **store admin**, I want to create a product with all its variants and images in a single API call.
-- As a **store admin**, I want to upload multiple images per product and per color variant, so customers can see the product from different angles.
-- As a **system**, I want to reserve inventory during checkout, so two customers can't buy the last item simultaneously.
-- As a **system**, I want abandoned checkout reservations to automatically release after 15 minutes, so stock doesn't leak.
-- As a **system**, I want the AI RAG pipeline (Pinecone + Gemini) to correctly embed aggregated variant data for product search and chat.
-
-## 3. Technical Design
-
-### 3.1 Phase 1 — Target Schema Design (DDL)
-
-> **IMPORTANT**: This is a **breaking schema change**. The `order_items` and `cart_items` tables will reference `variant_id` instead of `product_id`. A data migration script is required.
-
-#### 3.1.1 New Lookup Tables
-
-```sql
--- ============================================================================
--- DHP Store — Migration 004: Catalog Schema Enhancement
--- Product → Variant (Color/Size) → Inventory Hierarchy
--- ============================================================================
-
--- 1. Colors lookup table
-CREATE TABLE IF NOT EXISTS colors (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50) NOT NULL,
-  hex_code VARCHAR(7) DEFAULT NULL,           -- e.g., '#FF0000'
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_color_name (name)
-);
-
--- 2. Sizes lookup table
-CREATE TABLE IF NOT EXISTS sizes (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(10) NOT NULL,                  -- e.g., 'XS', 'S', 'M', 'L', 'XL'
-  sort_order INT DEFAULT 0,                   -- for display ordering
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_size_name (name)
-);
-
--- Seed standard sizes
-INSERT IGNORE INTO sizes (name, sort_order) VALUES
-  ('XS', 1), ('S', 2), ('M', 3), ('L', 4), ('XL', 5);
-
--- Seed default color
-INSERT IGNORE INTO colors (name, hex_code) VALUES ('Default', '#000000');
-```
-
-#### 3.1.2 Product Variants Table
-
-```sql
--- 3. Product Variants — SKU combinations (color + size)
-CREATE TABLE IF NOT EXISTS product_variants (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  product_id BIGINT NOT NULL,
-  sku VARCHAR(100) NOT NULL,                  -- auto-generated: {CAT}-{NAME}-{COLOR}-{SIZE}
-  color_id BIGINT NOT NULL,
-  size_id BIGINT NOT NULL,
-  price_override DECIMAL(10,2) DEFAULT NULL,  -- NULL = use product.base_price
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  UNIQUE KEY uq_variant (product_id, color_id, size_id),
-  UNIQUE KEY uq_sku (sku),
-  INDEX idx_variant_product (product_id),
-  
-  CONSTRAINT fk_variant_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-  CONSTRAINT fk_variant_color FOREIGN KEY (color_id) REFERENCES colors(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_variant_size FOREIGN KEY (size_id) REFERENCES sizes(id) ON DELETE RESTRICT
-);
-```
-
-#### 3.1.3 Inventory Table
-
-```sql
--- 4. Inventory — separate stock tracking per variant
-CREATE TABLE IF NOT EXISTS inventory (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  variant_id BIGINT NOT NULL UNIQUE,          -- 1:1 with product_variants
-  quantity INT NOT NULL DEFAULT 0,            -- total physical stock
-  reserved_quantity INT NOT NULL DEFAULT 0,   -- held during checkout
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_inventory_variant (variant_id),
-  
-  CONSTRAINT fk_inventory_variant FOREIGN KEY (variant_id) 
-    REFERENCES product_variants(id) ON DELETE CASCADE,
-  CONSTRAINT chk_quantity CHECK (quantity >= 0),
-  CONSTRAINT chk_reserved CHECK (reserved_quantity >= 0),
-  CONSTRAINT chk_available CHECK (quantity >= reserved_quantity)
-);
--- Available stock = quantity - reserved_quantity
-```
-
-#### 3.1.4 Reservation Tracking Table (for abandoned reservation cleanup)
-
-```sql
--- 5. Inventory Reservations — tracks who reserved what and when
-CREATE TABLE IF NOT EXISTS inventory_reservations (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  variant_id BIGINT NOT NULL,
-  user_id BIGINT DEFAULT NULL,                -- NULL for guest checkouts
-  session_id VARCHAR(128) DEFAULT NULL,       -- for guest identification
-  quantity INT NOT NULL,
-  status ENUM('active', 'fulfilled', 'expired') DEFAULT 'active',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  expires_at DATETIME NOT NULL,               -- created_at + 15 minutes
-  
-  INDEX idx_reservation_status_expires (status, expires_at),
-  INDEX idx_reservation_variant (variant_id),
-  
-  CONSTRAINT fk_reservation_variant FOREIGN KEY (variant_id) 
-    REFERENCES product_variants(id) ON DELETE CASCADE
-);
-```
-
-#### 3.1.5 Image Tables
-
-```sql
--- 6. Product Images — multiple images per product
-CREATE TABLE IF NOT EXISTS product_images (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  product_id BIGINT NOT NULL,
-  image_url VARCHAR(500) NOT NULL,
-  is_primary BOOLEAN DEFAULT FALSE,           -- the default/hero image
-  sort_order INT DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_product_images_product (product_id),
-  
-  CONSTRAINT fk_product_images_product FOREIGN KEY (product_id) 
-    REFERENCES products(id) ON DELETE CASCADE
-);
-
--- 7. Variant Images — color-specific images
-CREATE TABLE IF NOT EXISTS variant_images (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  variant_id BIGINT NOT NULL,
-  image_url VARCHAR(500) NOT NULL,
-  is_primary BOOLEAN DEFAULT FALSE,
-  sort_order INT DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_variant_images_variant (variant_id),
-  
-  CONSTRAINT fk_variant_images_variant FOREIGN KEY (variant_id) 
-    REFERENCES product_variants(id) ON DELETE CASCADE
-);
-```
-
-#### 3.1.6 Schema Changes to `products` Table
-
-```sql
--- 8. Rename 'price' -> 'base_price' for clarity (the variant can override)
-ALTER TABLE products CHANGE COLUMN price base_price DECIMAL(10,2) NOT NULL;
-
--- The old 'stock', 'sizes', 'image_url' columns will be KEPT during migration
--- and dropped AFTER the data migration script succeeds and is verified.
-```
-
-#### 3.1.7 Schema Changes to `cart_items`
-
-```sql
--- 9. cart_items: add variant_id
-ALTER TABLE cart_items ADD COLUMN variant_id BIGINT DEFAULT NULL;
-ALTER TABLE cart_items ADD CONSTRAINT fk_cart_items_variant 
-  FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE CASCADE;
-ALTER TABLE cart_items ADD INDEX idx_cart_items_variant (cart_id, variant_id);
-```
-
-#### 3.1.8 Schema Changes to `order_items`
-
-```sql
--- 10. order_items: add variant_id for new orders
-ALTER TABLE order_items ADD COLUMN variant_id BIGINT DEFAULT NULL;
-ALTER TABLE order_items ADD CONSTRAINT fk_order_items_variant 
-  FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE SET NULL;
-ALTER TABLE order_items ADD INDEX idx_order_items_variant (variant_id);
-```
-
-> **NOTE**: Both `cart_items` and `order_items` keep the old `product_id` and `size` columns temporarily. New code paths will write `variant_id`. Historical `order_items` will have `variant_id = NULL` (old orders before migration).
+- **Maintainability:** Developers can reason about isolated domains instead of navigating a flat `routes/` directory where 970-line files mix routing, business logic, and SQL.
+- **Testability:** Each module exposes a clean facade, enabling unit testing of services without HTTP/database coupling.
+- **Scalability:** Module boundaries make future microservice extraction trivial — each module can be lifted out with its own data contracts intact.
+- **Onboarding:** New contributors immediately understand domain ownership by reading a single `index.js` facade per module.
 
 ---
 
-### 3.2 SKU Auto-Generation Format
+## 2. Architectural Audit — Current State
 
-SKUs follow the pattern: `{CATEGORY_PREFIX}-{NAME_ABBREV}-{COLOR_ABBREV}-{SIZE}`
+### 2.1 Current Directory Structure
 
-**Category Prefix Map:**
+```
+server/src/
+├── config.js                 # Env validation, dotenv
+├── db.js                     # MySQL2 connection pool
+├── index.js                  # Express bootstrap, route mounting, workers, shutdown
+├── cache/
+│   └── redis.js              # node-redis client (graceful degradation)
+├── middleware/
+│   ├── csrf.js               # Custom CSRF header check
+│   ├── rateLimit.js          # Global, API, and Auth rate limiters
+│   ├── requireAuth.js        # JWT cookie verification + Redis user cache
+│   ├── requireRole.js        # Admin/Staff role guards
+│   └── upload.js             # Multer disk storage configuration
+├── routes/
+│   ├── auth.js               # 454 lines — Auth, sessions, OAuth, profile, passwords
+│   ├── products.js           # 971 lines — Product CRUD, variants, images, inventory, categories
+│   ├── cart.js               # 242 lines — Cart CRUD, stock validation
+│   ├── orders.js             # 510 lines — Order creation, payment intents, status management
+│   ├── feedback.js           # 35 lines  — User feedback submission
+│   ├── recommendations.js    # 148 lines — AI recommendation proxy, refresh trigger
+│   ├── chat.js               # 52 lines  — AI chat proxy
+│   ├── webhooks.js           # 64 lines  — Stripe webhook receiver
+│   └── sitemap.js            # 81 lines  — Dynamic XML sitemap generator
+├── queues/
+│   ├── connection.js          # Shared IORedis BullMQ connection
+│   ├── emailQueue.js          # Email job queue
+│   ├── stripeQueue.js         # Stripe webhook processing queue
+│   ├── aiRefreshQueue.js      # AI model refresh queue
+│   ├── cacheQueue.js          # Cache invalidation queue
+│   ├── cartCleanupQueue.js    # Abandoned cart cleanup (cron)
+│   └── reservationCleanupQueue.js  # Reservation cleanup (cron)
+├── workers/
+│   ├── emailWorker.js         # Email template builder + send
+│   ├── stripeWorker.js        # Stripe event reconciliation
+│   ├── aiRefreshWorker.js     # AI service refresh trigger
+│   ├── cacheWorker.js         # Redis SCAN cache invalidation
+│   ├── cartCleanupWorker.js   # Abandoned cart soft-delete
+│   └── reservationCleanupWorker.js  # Expired reservation release
+├── utils/
+│   ├── formatImageUrl.js      # Full URL construction from DB path
+│   ├── generateSku.js         # Deterministic SKU generation
+│   ├── mailer.js              # Nodemailer SMTP transporter
+│   └── validatePassword.js    # Password complexity rules
+└── uploads/                   # User-uploaded files (runtime)
+```
 
-| Category | Prefix |
+### 2.2 Cross-Module Coupling Analysis
+
+The following table maps every **cross-domain dependency** found in the current code:
+
+| Source File | Imports From | Coupling Type | Severity |
+|---|---|---|---|
+| `routes/auth.js` | `queues/emailQueue.js` | Enqueues password-reset emails | ⚠️ Cross-domain side effect |
+| `routes/auth.js` | `utils/formatImageUrl.js` | Formats profile picture URLs | ✅ Shared utility (fine) |
+| `routes/auth.js` | `utils/validatePassword.js` | Password validation | ✅ Shared utility (fine) |
+| `routes/auth.js:194` | **`orders` table directly** | `SELECT status, COUNT(*) FROM orders WHERE user_id = ?` | 🔴 **Direct cross-domain data access** |
+| `routes/orders.js` | `queues/emailQueue.js` | Enqueues order-confirmation emails | ⚠️ Cross-domain side effect |
+| `routes/orders.js` | **`products`, `product_variants`, `inventory` tables** | Reads prices, deducts inventory | 🔴 **Direct cross-domain data access** |
+| `routes/orders.js` | **`carts`, `cart_items` tables** | Reads cart for checkout, clears cart | 🔴 **Direct cross-domain data access** |
+| `routes/cart.js` | **`products`, `product_variants`, `inventory` tables** | Stock validation, price lookups | 🔴 **Direct cross-domain data access** |
+| `routes/recommendations.js` | `routes/products.js` (`hydrateProducts`) | **Direct import of another route file's export** | 🔴 **Architectural violation** |
+| `routes/recommendations.js` | `queues/aiRefreshQueue.js` | Enqueues AI refresh jobs | ✅ Correct queue usage |
+| `routes/recommendations.js` | **`orders`, `order_items` tables** | Reads user purchase history | 🔴 **Direct cross-domain data access** |
+| `routes/sitemap.js` | **`products` table** | Reads active product IDs | ⚠️ Read-only cross-domain |
+| `routes/webhooks.js` | `queues/stripeQueue.js` | Enqueues webhook events | ✅ Correct queue usage |
+| `workers/stripeWorker.js` | **`orders` table** | Updates order status | 🔴 **Direct cross-domain data access** |
+| `workers/cartCleanupWorker.js` | **`carts`, `cart_items` tables** | Deletes abandoned carts | ✅ Owns these tables |
+| `workers/reservationCleanupWorker.js` | **`inventory`, `inventory_reservations` tables** | Releases expired reservations | ⚠️ Inventory is catalog's domain |
+| `middleware/requireAuth.js` | `db.js`, `cache/redis.js` | Looks up user by ID | ✅ Auth domain (correct) |
+
+### 2.3 Critical Coupling Summary
+
+1. **`auth.js` → `orders` table:** Profile endpoint queries order counts directly. Should call the orders module facade.
+2. **`orders.js` → `products`/`inventory`/`carts` tables:** Order creation reads product prices, deducts inventory, and clears cart. These are the heaviest cross-domain transactions.
+3. **`cart.js` → `products`/`inventory` tables:** Cart add/update validates stock against inventory.
+4. **`recommendations.js` → `hydrateProducts` from `products.js`:** Direct import of a route file's exported function — the strongest architectural violation.
+5. **`recommendations.js` → `orders`/`order_items` tables:** Reads purchase history for personalized recommendations.
+6. **`stripeWorker.js` → `orders` table:** Updates order status on payment success.
+7. **`reservationCleanupWorker.js` → `inventory` tables:** Releases expired reservations.
+
+---
+
+## 3. Module Boundary Design
+
+### 3.1 Module Definitions
+
+| Module | Domain Responsibility | Owned Database Tables |
+|---|---|---|
+| **`auth_user`** | Authentication, sessions, JWT tokens, OAuth, password management, profile CRUD, user roles | `users`, `refresh_tokens`, `password_resets` |
+| **`catalog`** | Products, categories, variants, colors, sizes, inventory, product images, SKU generation, sitemap | `products`, `categories`, `product_variants`, `colors`, `sizes`, `inventory`, `product_images`, `inventory_reservations` |
+| **`orders`** | Shopping cart, order lifecycle, checkout, payment intents, Stripe webhooks, order items | `carts`, `cart_items`, `orders`, `order_items` |
+| **`ai`** | AI recommendation proxy, chat proxy, AI model refresh triggers | None (stateless proxy to Python service) |
+| **`communication`** | Email transporter, email templates, email sending | `feedback` |
+
+### 3.2 Module Dependency Graph
+
+```mermaid
+graph TD
+    subgraph "shared/"
+        DB["db/ (MySQL Pool)"]
+        Cache["cache/ (Redis)"]
+        MW["middleware/"]
+        Utils["utils/"]
+        Errors["errors/"]
+    end
+
+    subgraph "modules/"
+        AU["auth_user"]
+        CAT["catalog"]
+        ORD["orders"]
+        AI["ai"]
+        COMM["communication"]
+    end
+
+    AU -->|"uses"| DB
+    AU -->|"uses"| Cache
+    AU -->|"calls facade"| ORD
+    AU -->|"enqueues email"| COMM
+
+    CAT -->|"uses"| DB
+    CAT -->|"uses"| Cache
+
+    ORD -->|"uses"| DB
+    ORD -->|"calls facade"| CAT
+    ORD -->|"enqueues email"| COMM
+
+    AI -->|"calls facade"| CAT
+    AI -->|"calls facade"| ORD
+    AI -->|"uses"| Cache
+
+    COMM -->|"uses"| DB
+
+    style AU fill:#4a90d9,stroke:#333,color:#fff
+    style CAT fill:#7cb342,stroke:#333,color:#fff
+    style ORD fill:#ef6c00,stroke:#333,color:#fff
+    style AI fill:#ab47bc,stroke:#333,color:#fff
+    style COMM fill:#26a69a,stroke:#333,color:#fff
+```
+
+### 3.3 Allowed Cross-Module Calls (Facade Contracts)
+
+#### `catalog/index.js` — Public Facade
+
+```javascript
+// Functions exposed by the catalog module for other modules to call
+
+/**
+ * Hydrate product rows with variants, images, inventory.
+ * Used by: ai module (recommendation hydration)
+ */
+export { hydrateProducts } from './service.js';
+
+/**
+ * Fetch products by an array of IDs.
+ * Used by: ai module (recommendation results), sitemap
+ */
+export { getProductsByIds } from './service.js';
+
+/**
+ * Fetch a product's price (base_price or variant price_override).
+ * Used by: orders module (price verification at checkout)
+ */
+export { getVariantPrice, getProductBasePrice } from './service.js';
+
+/**
+ * Atomically deduct inventory for a variant.
+ * Used by: orders module (stock deduction at order creation)
+ */
+export { deductInventory, restoreInventory } from './service.js';
+
+/**
+ * Check available stock for a variant.
+ * Used by: orders module (stock validation)
+ */
+export { getAvailableStock } from './service.js';
+
+/**
+ * Get all active product IDs with update timestamps.
+ * Used by: catalog/sitemap (and potentially other modules)
+ */
+export { getActiveProductSummaries } from './service.js';
+
+/**
+ * Express router for /api/products routes.
+ */
+export { default as catalogRouter } from './routes.js';
+```
+
+#### `orders/index.js` — Public Facade
+
+```javascript
+/**
+ * Get order status counts for a given user.
+ * Used by: auth_user module (profile page order stats)
+ */
+export { getOrderStatsByUserId } from './service.js';
+
+/**
+ * Get the most recent product ID purchased by a user.
+ * Used by: ai module (personalized recommendations)
+ */
+export { getLastPurchasedProductId } from './service.js';
+
+/**
+ * Express routers.
+ */
+export { default as ordersRouter } from './routes.js';
+export { default as webhooksRouter } from './webhooks.js';
+```
+
+#### `auth_user/index.js` — Public Facade
+
+```javascript
+/**
+ * Express router for /api/auth routes.
+ */
+export { default as authRouter } from './routes.js';
+```
+
+#### `ai/index.js` — Public Facade
+
+```javascript
+/**
+ * Express routers for /api/recommend and /api/chat routes.
+ */
+export { default as recommendRouter } from './routes/recommendations.js';
+export { default as chatRouter } from './routes/chat.js';
+```
+
+#### `communication/index.js` — Public Facade
+
+```javascript
+/**
+ * Email queue for enqueuing transactional emails.
+ * Used by: auth_user module, orders module
+ */
+export { emailQueue } from './queues/emailQueue.js';
+
+/**
+ * Express router for /api/feedback routes.
+ */
+export { default as feedbackRouter } from './routes.js';
+```
+
+---
+
+## 4. Target Directory Structure
+
+```
+server/src/
+├── config.js                              # Environment validation (unchanged)
+├── index.js                               # Express bootstrap, route mounting, graceful shutdown
+│
+├── shared/                                # Cross-cutting infrastructure
+│   ├── db/
+│   │   └── pool.js                        # MySQL2 connection pool (moved from db.js)
+│   ├── cache/
+│   │   └── redis.js                       # node-redis client (moved from cache/redis.js)
+│   ├── middleware/
+│   │   ├── csrf.js                        # CSRF header validation
+│   │   ├── rateLimit.js                   # Rate limiters (global, api, auth)
+│   │   ├── requireAuth.js                 # JWT verification + Redis user cache
+│   │   ├── requireRole.js                 # Admin/Staff role guards
+│   │   └── upload.js                      # Multer configuration
+│   ├── errors/
+│   │   └── AppError.js                    # Custom error class (NEW — optional enhancement)
+│   ├── queues/
+│   │   └── connection.js                  # Shared IORedis BullMQ connection config
+│   └── utils/
+│       ├── formatImageUrl.js              # Image URL constructor
+│       ├── generateSku.js                 # SKU generator
+│       └── validatePassword.js            # Password complexity validator
+│
+├── modules/
+│   ├── auth_user/
+│   │   ├── index.js                       # Public facade (re-exports authRouter)
+│   │   ├── routes.js                      # /api/auth route definitions
+│   │   ├── controller.js                  # HTTP request/response handling
+│   │   ├── service.js                     # Auth business logic (token issuance, OAuth)
+│   │   └── repository.js                  # User, refresh_tokens, password_resets SQL queries
+│   │
+│   ├── catalog/
+│   │   ├── index.js                       # Public facade (hydrateProducts, getProductsByIds, etc.)
+│   │   ├── routes.js                      # /api/products route definitions
+│   │   ├── controller.js                  # HTTP request/response handling
+│   │   ├── service.js                     # Product/variant/inventory business logic
+│   │   ├── repository.js                  # Products, variants, colors, sizes, inventory SQL
+│   │   ├── sitemap.js                     # /sitemap.xml route (uses catalog service)
+│   │   ├── queues/
+│   │   │   └── cacheQueue.js              # Cache invalidation queue
+│   │   └── workers/
+│   │       ├── cacheWorker.js             # Redis SCAN cache invalidation worker
+│   │       └── reservationCleanupWorker.js # Expired reservation cleanup worker
+│   │
+│   ├── orders/
+│   │   ├── index.js                       # Public facade (getOrderStatsByUserId, etc.)
+│   │   ├── routes.js                      # /api/orders and /api/cart route definitions
+│   │   ├── controller.js                  # HTTP request/response handling
+│   │   ├── service.js                     # Order/cart business logic
+│   │   ├── repository.js                  # Orders, order_items, carts, cart_items SQL
+│   │   ├── webhooks.js                    # /api/webhooks/stripe route
+│   │   ├── queues/
+│   │   │   ├── stripeQueue.js             # Stripe webhook processing queue
+│   │   │   ├── cartCleanupQueue.js        # Abandoned cart cleanup queue (cron)
+│   │   │   └── reservationCleanupQueue.js # Reservation cleanup queue (cron)
+│   │   └── workers/
+│   │       ├── stripeWorker.js            # Stripe event reconciliation worker
+│   │       └── cartCleanupWorker.js       # Abandoned cart cleanup worker
+│   │
+│   ├── ai/
+│   │   ├── index.js                       # Public facade (recommendRouter, chatRouter)
+│   │   ├── routes/
+│   │   │   ├── recommendations.js         # /api/recommend routes
+│   │   │   └── chat.js                    # /api/chat routes
+│   │   ├── service.js                     # AI proxy business logic
+│   │   ├── queues/
+│   │   │   └── aiRefreshQueue.js          # AI refresh queue
+│   │   └── workers/
+│   │       └── aiRefreshWorker.js         # AI refresh trigger worker
+│   │
+│   └── communication/
+│       ├── index.js                       # Public facade (emailQueue, feedbackRouter)
+│       ├── routes.js                      # /api/feedback route
+│       ├── controller.js                  # HTTP request/response handling
+│       ├── service.js                     # Feedback insertion logic
+│       ├── repository.js                  # Feedback SQL queries
+│       ├── mailer.js                      # Nodemailer transporter (moved from utils/)
+│       ├── queues/
+│       │   └── emailQueue.js              # Email job queue
+│       └── workers/
+│           └── emailWorker.js             # Email template builder + send worker
+│
+└── uploads/                               # User-uploaded files (unchanged)
+```
+
+### 4.1 Key Design Decisions
+
+| Decision | Rationale |
 |---|---|
-| Tees | `T` |
-| Hoodies | `HD` |
-| Jackets | `JK` |
-| Jeans | `J` |
-| Pants | `P` |
-| Other / Unknown | `X` |
-
-**Name Abbreviation Logic:**
-- Take the first letter of each word in the product name, uppercase.
-- Max 4 characters. E.g., "Vintage Washed Tee" → `VWT`, "Street Style Hoodie" → `SSH`.
-
-**Color Abbreviation:**
-- First 3 letters, uppercase. E.g., "Default" → `DEF`, "Black" → `BLK`, "White" → `WHT`.
-
-**Examples:**
-| Product | Color | Size | Generated SKU |
-|---|---|---|---|
-| Vintage Washed Tee (Tees) | Default | S | `T-VWT-DEF-S` |
-| Vintage Washed Tee (Tees) | Default | M | `T-VWT-DEF-M` |
-| Street Style Hoodie (Hoodies) | Black | L | `HD-SSH-BLK-L` |
-| Classic Denim Jeans (Jeans) | Default | XL | `J-CDJ-DEF-XL` |
-
-**Implementation:** A shared `generateSku(categoryName, productName, colorName, sizeName)` utility function in `server/src/utils/generateSku.js`, used by both the migration script and the `POST /api/products` route.
+| **Cart routes live in `orders/`** | Cart is a pre-order concept. Cart → Checkout → Order is a single domain lifecycle. Keeping them together avoids facade overhead for the tight cart↔order data flow. |
+| **Webhooks live in `orders/`** | Stripe webhooks exclusively update order status. This keeps payment processing colocated with order lifecycle management. |
+| **`reservationCleanupQueue` in `orders/`, worker in `catalog/`** | The queue is scheduled by the order lifecycle (reservations are created during checkout). The worker operates on `inventory` tables owned by catalog. The queue definition lives in orders (the producer), and the worker lives in catalog (the data owner). |
+| **Sitemap lives in `catalog/`** | Sitemap queries product data exclusively. It's a read-only view of the catalog domain. |
+| **`communication/` owns `feedback`** | Feedback is a write-only contact form that may later trigger email notifications. It's too small for its own module but naturally fits with communication. |
+| **Shared `queues/connection.js`** | All BullMQ queues and workers share the same IORedis connection config. This stays in `shared/` since it's infrastructure, not domain logic. |
+| **No new dependencies** | The refactoring uses zero new npm packages. All cross-module calls are plain JavaScript function imports through module facades. |
 
 ---
 
-### 3.3 Phase 2 — Data Migration Script
+## 5. Cross-Module Communication Patterns
 
-A Node.js script (`server/migrations/004_catalog_schema_enhance.js`) that:
+### 5.1 Pattern: Synchronous Facade Call
 
-1. **Creates** all new tables and alters existing ones (DDL from Phase 1).
-2. **Seeds** the `sizes` lookup table with `XS`, `S`, `M`, `L`, `XL`.
-3. **Seeds** the `colors` lookup table with a `'Default'` entry.
-4. **For each existing product** in `streetwear_shop.products`:
-   - Splits the `sizes` comma-separated string into individual size names.
-   - For each size, creates a `product_variant` row with `color_id = DEFAULT_COLOR_ID`, matching `size_id`, and auto-generated `sku` using the format `{CAT}-{NAME}-DEF-{SIZE}`.
-   - Creates an `inventory` row with `quantity = 50`, `reserved_quantity = 0` per variant.
-   - Migrates the existing `image_url` into `product_images` with `is_primary = TRUE`.
-5. **Backfills** existing `cart_items` rows with the correct `variant_id` by matching `product_id` + `size` → `product_variants`.
-6. **Wraps** critical operations in a transaction with proper rollback on failure.
-7. **Logs** progress to stdout for observability.
-
-**Key Design Decisions:**
-- Stock is set to `50` per variant as specified.
-- Existing `order_items` are **NOT backfilled** with `variant_id` — they retain the old `product_id` + `size` for historical accuracy. Only new orders will use `variant_id`.
-
----
-
-### 3.4 Phase 3 — Abandoned Reservation Cleanup
-
-#### 3.4.1 The Problem
-
-When a customer begins checkout, `inventory.reserved_quantity` is incremented to hold stock. If the customer abandons the checkout (closes browser, navigates away, payment fails), the reservation is never released, permanently reducing available stock.
-
-#### 3.4.2 Solution: `reservationCleanupWorker` (BullMQ Cron Job)
-
-**New files:**
-- `server/src/queues/reservationCleanupQueue.js` — BullMQ queue with repeatable cron
-- `server/src/workers/reservationCleanupWorker.js` — Worker that processes expired reservations
-
-**Cron Schedule:** Every 5 minutes (`*/5 * * * *`)
-
-**Worker Logic:**
+**Example: Order creation verifying product price and deducting inventory**
 
 ```
-1. BEGIN TRANSACTION
-2. SELECT all rows from `inventory_reservations`
-   WHERE status = 'active' AND expires_at < NOW()
-3. For each expired reservation:
-   a. UPDATE inventory SET reserved_quantity = reserved_quantity - reservation.quantity
-      WHERE variant_id = reservation.variant_id
-      AND reserved_quantity >= reservation.quantity  -- safety check
-   b. UPDATE inventory_reservations SET status = 'expired'
-      WHERE id = reservation.id
-4. COMMIT
-5. Log: "Released N expired reservations"
+┌──────────────┐              ┌──────────────┐
+│   orders/    │   import     │   catalog/   │
+│  service.js  │ ──────────── │   index.js   │
+│              │              │   (facade)   │
+│  createOrder │              ├──────────────┤
+│     │        │              │ getVariant   │
+│     ├──────► │──────call───►│   Price()    │
+│     │        │              │              │
+│     ├──────► │──────call───►│ deductInven  │
+│     │        │              │   tory()     │
+│     │        │              └──────────────┘
+└──────────────┘
 ```
 
-**Reservation Lifecycle:**
+**Concrete code example (after refactoring):**
 
-```
-  Customer starts checkout
-          │
-          ▼
-  ┌─────────────────────────┐
-  │ INSERT inventory_       │
-  │ reservations (active)   │
-  │ expires_at = NOW() +    │
-  │ 15 minutes              │
-  │                         │
-  │ UPDATE inventory SET    │
-  │ reserved_quantity += qty │
-  └────────────┬────────────┘
-               │
-       ┌───────┴───────┐
-       │               │
-   Order placed     Abandoned
-       │               │
-       ▼               ▼
-  status='fulfilled'  Cron picks up
-  reserved_qty -= qty  after 15 min
-  quantity -= qty     status='expired'
-                      reserved_qty -= qty
-```
+```javascript
+// modules/orders/service.js
+import { getVariantPrice, deductInventory } from '../catalog/index.js';
 
-**Integration with `index.js`:**
-- Import `reservationCleanupWorker` and `reservationCleanupQueue`
-- Add to `createBullBoard` adapters
-- Add to `workers[]` and `queues[]` for graceful shutdown
-- Call `scheduleReservationCleanup()` in server startup
-
----
-
-### 3.5 Phase 3 — AI Microservice & Pinecone Integration
-
-#### 3.5.1 Current State Audit
-
-**`ai-service/app/vector_store.py`** (`sync_products_to_pinecone()`):
-- Queries `SELECT p.id, p.name, p.description, p.price, c.name as category`
-- Embeds text: `f"{p['name']} {p['description']} {p['category']}"`
-- Stores Pinecone metadata: `{name, description, price, category, id}`
-
-**`ai-service/recommender.py`** (`chat()` — PRODUCT_SEARCH path):
-- Embeds user query → queries Pinecone with metadata filters: `price` (≤) and `category` (=)
-- Uses `match.metadata` for RAG context: `f"- {p['name']} (${p['price']}): {p['description']}"`
-
-**`ai-service/recommender.py`** (`get_similar()`):
-- Fetches target product vector → queries nearest neighbors by cosine similarity
-- Returns list of product IDs
-
-#### 3.5.2 Breaking Changes
-
-| Issue | Impact | Fix Required |
-|---|---|---|
-| `p.price` → `p.base_price` | Column rename breaks the SQL query in `vector_store.py` | Update query to use `base_price` |
-| No variant data in embeddings | Chat RAG can't answer "do you have this in size M?" or "what colors does X come in?" | Aggregate variant metadata (available sizes, colors, price range) into the embedded text and Pinecone metadata |
-| `price` metadata filter | Pinecone filter `price ≤ X` uses a single price, but variants can have `price_override` | Store `min_price` and `max_price` in metadata, filter on `min_price` |
-
-#### 3.5.3 Required Changes
-
-**`ai-service/app/vector_store.py`** — `sync_products_to_pinecone()`:
-
-Updated SQL query:
-```sql
-SELECT 
-  p.id, p.name, p.description, p.base_price, c.name as category,
-  GROUP_CONCAT(DISTINCT s.name ORDER BY s.sort_order SEPARATOR ', ') as available_sizes,
-  GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') as available_colors,
-  MIN(COALESCE(pv.price_override, p.base_price)) as min_price,
-  MAX(COALESCE(pv.price_override, p.base_price)) as max_price
-FROM products p
-JOIN categories c ON p.category_id = c.id
-LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = TRUE
-LEFT JOIN sizes s ON pv.size_id = s.id
-LEFT JOIN colors cl ON pv.color_id = cl.id
-WHERE p.is_active = TRUE
-GROUP BY p.id, p.name, p.description, p.base_price, c.name
-```
-
-Updated embedding text:
-```python
-text_to_embed = (
-    f"{p['name']} {p['description']} {p['category']} "
-    f"Sizes: {p['available_sizes'] or 'N/A'} "
-    f"Colors: {p['available_colors'] or 'N/A'}"
-)
-```
-
-Updated Pinecone metadata:
-```python
-"metadata": {
-    "name": p['name'],
-    "description": p['description'] or "",
-    "min_price": float(p['min_price'] or p['base_price']),
-    "max_price": float(p['max_price'] or p['base_price']),
-    "category": p['category'],
-    "available_sizes": p['available_sizes'] or "",
-    "available_colors": p['available_colors'] or "",
-    "id": p['id']
-}
-```
-
-**`ai-service/recommender.py`** — `chat()` PRODUCT_SEARCH path:
-
-Updated Pinecone filter:
-```python
-if filters.max_price is not None:
-    pinecone_filter["min_price"] = {"$lte": filters.max_price}
-```
-
-Updated RAG context string:
-```python
-context += f"- {p['name']} (${p['min_price']}-${p['max_price']}): {p['description']}. Sizes: {p['available_sizes']}. Colors: {p['available_colors']}\n"
-```
-
-**`server/src/workers/aiRefreshWorker.js`** — No change needed. It already calls `POST /refresh` on the Python service, which calls `vector_store.sync_products_to_pinecone()`. The Python side handles the new query.
-
----
-
-### 3.6 Phase 3 — Application Code Impact Audit
-
-#### 3.6.1 Backend Routes — Breaking Changes
-
-| File | Route | Impact | Change Required |
-|---|---|---|---|
-| `products.js` | `GET /api/products` | Returns `p.*` (includes `stock`, `sizes`, `image_url`) | Return `base_price`; JOIN variants+inventory+images; return nested `variants[]` with per-variant stock |
-| `products.js` | `GET /api/products/:id` | Returns single flat product | Return product with `variants[]` array, each containing `{id, sku, color, size, price, stock, images[]}` |
-| `products.js` | `POST /api/products` | Inserts flat product with `stock` | **New nested payload** (see §5.5); create product + variants + inventory + images in one transaction |
-| `products.js` | `PUT /api/products/:id/stock` | Updates `products.stock` | **Repurpose** to `PUT /api/products/variants/:variantId/inventory` — update `inventory.quantity` WHERE `variant_id = ?` |
-| `products.js` | `POST /api/products/batch` | Returns `SELECT *` | Include primary image + variant summary for cart enrichment |
-| `cart.js` | `GET /api/cart` | JOINs `cart_items` with `products` | JOIN with `product_variants`, `inventory`, `colors`, `sizes`; use `variant_id` |
-| `cart.js` | `POST /api/cart/add` | Uses `productId` + `size` | Accept `variantId`; deduplicate by `variant_id`; **reserve inventory** (create `inventory_reservations` row, increment `reserved_quantity`) |
-| `cart.js` | `POST /api/cart/update` | Uses `productId` + `size` | Use `variantId`; adjust reservation quantities |
-| `orders.js` | `POST /api/orders` | Decrements `products.stock` | Decrement `inventory.quantity`; mark reservations as `'fulfilled'`; decrement `reserved_quantity` |
-| `orders.js` | `PUT /api/orders/:id/status` | Updates `products.stock` on confirm/cancel | Update `inventory.quantity` on the variant's inventory row |
-| `orders.js` | `fetchItemsForOrders()` | JOINs `order_items` with `products` | Add LEFT JOIN with `product_variants`, `colors`, `sizes` for richer order detail |
-| `orders.js` | `POST /api/orders/create-payment` | Reads `p.price` | Resolve effective price: `COALESCE(pv.price_override, p.base_price)` |
-| `recommendations.js` | `fetchProductsByIds()` | Returns `SELECT *` | Return `base_price` + primary image from `product_images` |
-| `sitemap.js` | `GET /sitemap.xml` | Reads `products.updated_at` | No structural change needed |
-
-#### 3.6.2 Frontend Components — Breaking Changes
-
-| File | Component | Impact | Change Required |
-|---|---|---|---|
-| `ProductDetails.jsx` | `ProductDetails` | Reads `product.sizes.split(',')`, `product.stock`, `product.price`, `product.image_url` | Parse `product.variants[]`; show color selector; derive stock from selected variant; use `product.images[]` for gallery; call `add()` with `variantId` |
-| `Products.jsx` | `Products` | Reads `p.sizes.split(',')` for size filter, `p.price`, `p.image_url` | Derive available sizes from `p.variants[]`; use `p.base_price`; use `p.primary_image` |
-| `Home.jsx` | `Home` | Reads `p.image_url`, `p.price` | Use `p.primary_image`; use `p.base_price` |
-| `CartContext.jsx` | `CartProvider` | `add(productId, qty, size)`, `update(productId, qty, size)` | Change to `add(variantId, qty)`, `update(variantId, qty)`; update local cart keys |
-| `CartDrawer.jsx` | `CartDrawer` | Key by `product_id-size`, shows `item.size` | Key by `variant_id`; show `item.color_name + item.size_name`; call `update(item.variant_id, ...)` |
-| `Checkout.jsx` | `Checkout` | Key by `product_id-size`, shows `item.size` | Key by `variant_id`; show color + size |
-| `Account.jsx` | `Account` (order popup) | Shows `item.size` | Show `item.color_name` + `item.size_name` |
-| `ManageProducts.jsx` | `ManageProducts` | Shows `p.stock`, form has `stock` field | **Redesign**: nested form for creating product + variants + images; show variants table with per-variant stock; manage inventory per variant |
-| `ManageOrders.jsx` | `ManageOrders` | Shows `item.size` | Show `item.color_name` + `item.size_name` |
-| `RecommendRow.jsx` | `RecommendRow` | Renders `p.image_url`, `p.price` | Use `p.primary_image`, `p.base_price` |
-
-#### 3.6.3 AI Microservice — Breaking Changes
-
-| File | Function | Impact | Change Required |
-|---|---|---|---|
-| `vector_store.py` | `sync_products_to_pinecone()` | Queries `p.price` (renamed), no variant data | Update SQL to use `base_price`; JOIN variants for sizes/colors/price range; update embedding text and Pinecone metadata (see §3.5.3) |
-| `recommender.py` | `chat()` PRODUCT_SEARCH | Filters on `price` metadata, context uses `p['price']` | Filter on `min_price`; update RAG context to include sizes/colors/price range |
-| `recommender.py` | `get_similar()` | Uses product ID vectors | No change needed — vectors are still keyed by `product_id` |
-
-#### 3.6.4 Workers — New & Modified
-
-| File | Worker | Change |
-|---|---|---|
-| `reservationCleanupWorker.js` | **[NEW]** | Cron every 5 min: release expired `inventory_reservations` (see §3.4) |
-| `reservationCleanupQueue.js` | **[NEW]** | Queue + `scheduleReservationCleanup()` |
-| `cartCleanupWorker.js` | **[MODIFY]** | Also release any active reservations for the abandoned carts being cleaned up |
-| `aiRefreshWorker.js` | No change | Still calls `POST /refresh` — Python side handles the updated query |
-| `index.js` | **[MODIFY]** | Import and register new reservation queue/worker, add to Bull Board + graceful shutdown |
-
----
-
-## 4. Data Models — ERD
-
-```
-┌──────────────┐     ┌──────────────────┐     ┌───────────┐
-│  categories  │     │    products       │     │  colors   │
-│──────────────│     │──────────────────│     │───────────│
-│ id (PK)      │◄────│ category_id (FK) │     │ id (PK)   │
-│ name         │     │ id (PK)          │     │ name (UK) │
-│              │     │ name             │     │ hex_code  │
-│              │     │ description      │     └─────┬─────┘
-│              │     │ base_price       │           │
-│              │     │ is_active        │     ┌─────┴──────────────┐
-│              │     │ sold_count       │     │ product_variants   │
-└──────────────┘     │ created_at       │     │────────────────────│
-                     │ updated_at       │     │ id (PK)            │
-                     └────────┬─────────┘     │ product_id (FK) ───┘
-                              │               │ sku (UK)           │
-                              │               │ color_id (FK) ─────┘
-                     ┌────────┴─────────┐     │ size_id (FK) ──────┐
-                     │ product_images   │     │ price_override     │
-                     │─────────────────│     │ is_active          │
-                     │ id (PK)          │     └─────────┬──────────┘
-                     │ product_id (FK)  │               │
-                     │ image_url        │     ┌─────────┴──────────┐
-                     │ is_primary       │     │   inventory        │  
-                     │ sort_order       │     │────────────────────│
-                     └─────────────────┘     │ id (PK)            │
-                                              │ variant_id (FK,UK) │
-                     ┌───────────┐            │ quantity           │
-                     │  sizes    │            │ reserved_quantity  │
-                     │───────────│            │ updated_at         │
-                     │ id (PK)   │            └────────┬───────────┘
-                     │ name (UK) │─────────────────────┘
-                     │ sort_order│
-                     └───────────┘     ┌─────────────────────────┐
-                                       │ inventory_reservations  │
-                     ┌──────────────── │─────────────────────────│
-                     │ variant_images  │ id (PK)                 │
-                     │────────────────ˇ│ variant_id (FK)         │
-                     │ id (PK)        ││ user_id                 │
-                     │ variant_id (FK)││ session_id              │
-                     │ image_url      ││ quantity                │
-                     │ is_primary     ││ status (active/         │
-                     │ sort_order     ││         fulfilled/      │
-                     └────────────────┘│         expired)        │
-                                       │ expires_at              │
-                                       └─────────────────────────┘
-
-    cart_items.variant_id ──► product_variants.id
-    order_items.variant_id ─► product_variants.id (nullable)
-```
-
----
-
-## 5. API Contracts
-
-### 5.1 `GET /api/products` — New Response Shape
-
-```json
-[
-  {
-    "id": 1,
-    "name": "Vintage Washed Tee",
-    "description": "...",
-    "category_id": 1,
-    "category_name": "Tees",
-    "base_price": 19.99,
-    "is_active": true,
-    "sold_count": 42,
-    "primary_image": "https://example.com/uploads/tee1.jpg",
-    "images": [
-      { "id": 1, "image_url": "https://...", "is_primary": true },
-      { "id": 2, "image_url": "https://...", "is_primary": false }
-    ],
-    "variants": [
-      {
-        "id": 10,
-        "sku": "T-VWT-DEF-S",
-        "color": { "id": 1, "name": "Default", "hex_code": "#000000" },
-        "size": { "id": 2, "name": "S", "sort_order": 2 },
-        "price": 19.99,
-        "stock": 50,
-        "is_active": true
-      },
-      {
-        "id": 11,
-        "sku": "T-VWT-DEF-M",
-        "color": { "id": 1, "name": "Default", "hex_code": "#000000" },
-        "size": { "id": 3, "name": "M", "sort_order": 3 },
-        "price": 19.99,
-        "stock": 50,
-        "is_active": true
-      }
-    ]
+export async function createOrder(conn, items) {
+  for (const item of items) {
+    // Cross-module call through facade — NO direct SQL
+    const price = await getVariantPrice(item.variant_id, conn);
+    await deductInventory(item.variant_id, item.qty, conn);
+    // ... create order items
   }
-]
-```
-
-### 5.2 `POST /api/cart/add` — New Request
-
-```json
-{
-  "variantId": 10,
-  "qty": 1
 }
 ```
 
-### 5.3 `POST /api/cart/update` — New Request
-
-```json
-{
-  "variantId": 10,
-  "qty": 2
+```javascript
+// modules/catalog/service.js (facade-exposed functions)
+export async function getVariantPrice(variantId, conn = pool) {
+  const [rows] = await conn.execute(
+    `SELECT COALESCE(pv.price_override, p.base_price) AS price
+     FROM product_variants pv
+     JOIN products p ON pv.product_id = p.id
+     WHERE pv.id = ?`,
+    [variantId]
+  );
+  return rows.length > 0 ? Number(rows[0].price) : null;
 }
-```
 
-### 5.4 `GET /api/cart` — New Response
-
-```json
-{
-  "cartId": 5,
-  "items": [
-    {
-      "variant_id": 10,
-      "qty": 2,
-      "product_id": 1,
-      "product_name": "Vintage Washed Tee",
-      "sku": "T-VWT-DEF-S",
-      "color_name": "Default",
-      "size_name": "S",
-      "price": 19.99,
-      "image_url": "https://..."
-    }
-  ]
-}
-```
-
-### 5.5 `POST /api/products` — New Admin Creation Payload
-
-> **IMPORTANT**: This replaces the current flat `{name, description, price, stock, category_id}` + file upload. The new payload creates a product with all its variants, inventory, and images in a single transaction.
-
-**Request** (`multipart/form-data`):
-
-```
-Content-Type: multipart/form-data
-
-Fields:
-  data (JSON string):
-  {
-    "name": "Street Style Hoodie",
-    "description": "Premium heavyweight hoodie with embroidered logo",
-    "category_id": 2,
-    "base_price": 49.99,
-    "variants": [
-      {
-        "color_name": "Black",
-        "color_hex": "#000000",
-        "size_name": "M",
-        "price_override": null,
-        "stock": 100
-      },
-      {
-        "color_name": "Black",
-        "color_hex": "#000000",
-        "size_name": "L",
-        "price_override": 54.99,
-        "stock": 75
-      },
-      {
-        "color_name": "White",
-        "color_hex": "#FFFFFF",
-        "size_name": "M",
-        "price_override": null,
-        "stock": 80
-      }
-    ]
+export async function deductInventory(variantId, quantity, conn = pool) {
+  const [inv] = await conn.execute(
+    'SELECT quantity, reserved_quantity FROM inventory WHERE variant_id = ? FOR UPDATE',
+    [variantId]
+  );
+  if (inv.length === 0 || (inv[0].quantity - inv[0].reserved_quantity) < quantity) {
+    throw new Error('Insufficient stock');
   }
-
-Files:
-  images[] — array of product-level image files (first = primary)
-```
-
-**Backend Processing (in transaction):**
-1. Parse and validate the `data` JSON field.
-2. INSERT into `products` → get `product_id`.
-3. For each file in `images[]`, INSERT into `product_images` (first file → `is_primary = TRUE`).
-4. For each variant in `variants[]`:
-   a. INSERT OR GET `color_id` from `colors` (upsert by name).
-   b. Validate `size_name` exists in `sizes` table → get `size_id`.
-   c. Auto-generate `sku` via `generateSku(categoryName, productName, colorName, sizeName)`.
-   d. INSERT into `product_variants`.
-   e. INSERT into `inventory` with `{quantity: variant.stock, reserved_quantity: 0}`.
-5. COMMIT.
-6. Enqueue cache invalidation (`products:*`).
-7. Return the complete product object (same shape as `GET /api/products/:id`).
-
-**Response:** `201 Created` with the full product JSON (see §5.1 shape).
-
-### 5.6 `PUT /api/products/variants/:variantId/inventory` — Update Variant Stock
-
-Replaces the old `PUT /api/products/:id/stock`.
-
-**Request:**
-```json
-{
-  "quantity": 150
+  await conn.execute(
+    'UPDATE inventory SET quantity = quantity - ? WHERE variant_id = ?',
+    [quantity, variantId]
+  );
 }
 ```
 
-**Response:**
-```json
-{
-  "message": "Inventory updated",
-  "variantId": 10,
-  "sku": "T-VWT-DEF-S",
-  "quantity": 150
+### 5.2 Pattern: Async Side Effect via BullMQ Queue
+
+**Example: Order creation triggering a confirmation email**
+
+```
+┌──────────────┐     enqueue      ┌─────────────────┐     process     ┌─────────────────┐
+│   orders/    │ ───────────────► │ communication/   │ ─────────────► │ communication/   │
+│ controller.js│                  │ queues/emailQueue│                 │ workers/email    │
+│              │                  │                  │                 │   Worker.js      │
+│  (after      │                  │ { to, template,  │                 │ (builds HTML +   │
+│   commit)    │                  │   data }         │                 │   sends email)   │
+└──────────────┘                  └─────────────────┘                 └─────────────────┘
+```
+
+The communication module's `emailQueue` is imported via the facade:
+
+```javascript
+// modules/orders/controller.js
+import { emailQueue } from '../communication/index.js';
+
+// After successful order commit:
+await emailQueue.add('order-confirmation', {
+  type: 'email',
+  to: deliveryInfo.email,
+  template: 'order-confirmation',
+  data: { orderId, customerName: deliveryInfo.name, total: finalTotal },
+});
+```
+
+### 5.3 Pattern: Cross-Module Read for Profile Aggregation
+
+**Example: Auth profile fetching order statistics**
+
+```javascript
+// modules/auth_user/service.js
+import { getOrderStatsByUserId } from '../orders/index.js';
+
+export async function getProfile(userId) {
+  // ... fetch user data from auth_user/repository.js
+  const orderStats = await getOrderStatsByUserId(userId);
+  return { ...userData, orders: orderStats };
+}
+```
+
+```javascript
+// modules/orders/service.js (facade-exposed)
+export async function getOrderStatsByUserId(userId) {
+  const [counts] = await pool.execute(
+    `SELECT status, COUNT(*) as count FROM orders WHERE user_id = ? GROUP BY status`,
+    [userId]
+  );
+  const stats = { new: 0, confirmed: 0, shipping: 0, received: 0, cancelled: 0 };
+  counts.forEach(row => {
+    if (stats[row.status] !== undefined) stats[row.status] = row.count;
+  });
+  return stats;
+}
+```
+
+### 5.4 Pattern: AI Module Calling Catalog + Orders Facades
+
+**Example: Personalized recommendations**
+
+```javascript
+// modules/ai/service.js
+import { getProductsByIds, hydrateProducts } from '../catalog/index.js';
+import { getLastPurchasedProductId } from '../orders/index.js';
+
+export async function getUserRecommendations(userId) {
+  const lastProductId = await getLastPurchasedProductId(userId);
+  // ... call Python AI service with lastProductId
+  // ... hydrate returned IDs via catalog facade
+  const products = await getProductsByIds(similarIds);
+  return products;
 }
 ```
 
 ---
 
-## 6. Error Handling
+## 6. Module Communication Rules
 
-| Scenario | HTTP Code | Message |
+### 6.1 Rules
+
+| # | Rule | Enforcement |
 |---|---|---|
-| Variant not found | 404 | `"Variant not found"` |
-| Variant out of stock (available <= 0) | 400 | `"Variant is out of stock"` |
-| Insufficient stock during checkout | 400 | `"Insufficient stock for variant: {sku}"` |
-| Invalid variant ID | 400 | `"Invalid variant ID"` |
-| Duplicate variant (product + color + size) | 409 | `"Variant already exists for this color/size combination"` |
-| Duplicate SKU | 409 | `"SKU already exists: {sku}"` |
-| Invalid size name in admin payload | 400 | `"Unknown size: {name}. Valid sizes: XS, S, M, L, XL"` |
+| 1 | **No cross-module repository imports.** Module A must never import `moduleB/repository.js`. | Code review + ESLint `no-restricted-imports` (future) |
+| 2 | **All cross-module calls go through `index.js` facade.** | Each module's `index.js` is the only file other modules may import from. |
+| 3 | **No direct SQL to tables owned by another module.** | E.g., `orders/` must not contain `SELECT ... FROM products`. Use catalog facade. |
+| 4 | **Shared infrastructure (`shared/`) has no domain logic.** | `shared/` contains only connection pools, middleware, error classes, and generic utilities. |
+| 5 | **Workers may use their owning module's repository.** | E.g., `catalog/workers/cacheWorker.js` may use `catalog/repository.js`. |
+| 6 | **Queue definitions live with the producer; workers with the data owner.** | E.g., `reservationCleanupQueue` → `orders/queues/`, `reservationCleanupWorker` → `catalog/workers/`. |
+| 7 | **Transaction connections may be passed as parameters across facades.** | When a checkout transaction spans catalog (inventory deduction) and orders (order creation), the same `conn` is passed. |
+
+### 6.2 Exception: Checkout Transaction
+
+The order creation flow requires a **single database transaction** spanning both `orders` and `catalog` table operations (create order + deduct inventory). This is the one case where a transaction connection (`conn`) crosses module boundaries:
+
+```javascript
+// orders/service.js
+conn = await pool.getConnection();
+await conn.beginTransaction();
+
+// Cross-module: pass conn to catalog functions
+await deductInventory(item.variant_id, item.qty, conn);
+
+// Same transaction: insert order
+await insertOrder(conn, orderData);
+
+await conn.commit();
+```
+
+This is acceptable because:
+1. The transaction boundary is owned by the **calling module** (orders).
+2. The catalog functions accept an **optional connection parameter** — they don't create their own transactions.
+3. If microservice extraction happens later, this will become a Saga pattern, but for a monolith this is the correct approach.
 
 ---
 
-## 7. Security Considerations
+## 7. Worker & Queue Ownership Matrix
 
-- **SQL Injection:** All new queries use parameterized `?` placeholders — no string concatenation.
-- **Authorization:** Inventory updates require `verifyStaff` middleware (unchanged). Product creation requires `verifyAdmin`.
-- **Input Validation:** `variantId` must be validated as a positive integer. Admin payload JSON is validated for required fields. SKU generation sanitizes input (alphanumeric only).
-- **Race Conditions:** The `inventory` table uses `reserved_quantity` with CHECK constraints to prevent overselling. Stock decrements use `FOR UPDATE` row locks within transactions. The `inventory_reservations` table provides an audit trail.
-
----
-
-## 8. Redis Caching Impact
-
-- **Invalidation:** The existing `products:*` pattern invalidation via `cacheQueue` still works.
-- **New cache keys:** `product:{id}` responses will include the full variant tree — no separate variant cache needed initially.
-- **TTL:** No change (1 hour for product lists, 1 hour for single products).
+| Queue | Queue Location | Worker | Worker Location | Produced By | Domain Owner |
+|---|---|---|---|---|---|
+| `email` | `communication/queues/` | `emailWorker` | `communication/workers/` | `auth_user`, `orders` | communication |
+| `stripe-webhook` | `orders/queues/` | `stripeWorker` | `orders/workers/` | `orders/webhooks.js` | orders |
+| `cache-invalidate` | `catalog/queues/` | `cacheWorker` | `catalog/workers/` | `catalog/controller.js` | catalog |
+| `ai-refresh` | `ai/queues/` | `aiRefreshWorker` | `ai/workers/` | `ai/routes/recommendations.js` | ai |
+| `cart-cleanup` | `orders/queues/` | `cartCleanupWorker` | `orders/workers/` | `index.js` (cron schedule) | orders |
+| `reservation-cleanup` | `orders/queues/` | `reservationCleanupWorker` | `catalog/workers/` | `index.js` (cron schedule) | catalog (data) / orders (schedule) |
 
 ---
 
-## 9. Deployment Impact
+## 8. API Route Mapping (Zero Change Guarantee)
 
-- **Database migration required** before deploying new backend code.
-- **No new environment variables** needed for Node.js. Python AI service env vars unchanged.
-- **No Docker changes** needed.
-- **Pinecone re-sync required** after migration: trigger `POST /api/recommend/refresh` (admin) to rebuild vectors with variant-aware metadata.
-- **Rollback plan:** The migration is additive (new tables + new columns). Old columns preserved. Rolling back = revert code, no data loss.
+The following table proves that every existing route path maps identically after refactoring:
+
+| Current Route | Current File | New Module | New File | Path Unchanged |
+|---|---|---|---|---|
+| `POST /api/auth/register` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/login` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/refresh` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/logout` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `GET /api/auth/profile` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/upload-profile-picture` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `PUT /api/auth/profile` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/forgot-password` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/change-password` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/reset-password` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `POST /api/auth/google` | `routes/auth.js` | `auth_user` | `modules/auth_user/routes.js` | ✅ |
+| `GET /api/products` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `POST /api/products/batch` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `GET /api/products/categories` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `GET /api/products/colors` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `GET /api/products/:id` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `POST /api/products` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `PUT /api/products/variants/:variantId/inventory` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `PUT /api/products/variants/:variantId` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `POST /api/products/:id/variants` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `DELETE /api/products/variants/:variantId` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `PUT /api/products/:id/stock` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `DELETE /api/products/:id` | `routes/products.js` | `catalog` | `modules/catalog/routes.js` | ✅ |
+| `GET /api/cart` | `routes/cart.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `POST /api/cart/add` | `routes/cart.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `POST /api/cart/update` | `routes/cart.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `POST /api/orders` | `routes/orders.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `GET /api/orders` | `routes/orders.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `POST /api/orders/create-payment` | `routes/orders.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `PUT /api/orders/:id/cancel` | `routes/orders.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `GET /api/orders/admin/all` | `routes/orders.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `PUT /api/orders/:id/status` | `routes/orders.js` | `orders` | `modules/orders/routes.js` | ✅ |
+| `POST /api/webhooks/stripe` | `routes/webhooks.js` | `orders` | `modules/orders/webhooks.js` | ✅ |
+| `POST /api/feedback` | `routes/feedback.js` | `communication` | `modules/communication/routes.js` | ✅ |
+| `GET /api/recommend/product/:id` | `routes/recommendations.js` | `ai` | `modules/ai/routes/recommendations.js` | ✅ |
+| `GET /api/recommend/user` | `routes/recommendations.js` | `ai` | `modules/ai/routes/recommendations.js` | ✅ |
+| `POST /api/recommend/refresh` | `routes/recommendations.js` | `ai` | `modules/ai/routes/recommendations.js` | ✅ |
+| `POST /api/chat` | `routes/chat.js` | `ai` | `modules/ai/routes/chat.js` | ✅ |
+| `GET /api/health` | `index.js` (inline) | — | `index.js` (stays inline) | ✅ |
+| `GET /sitemap.xml` | `routes/sitemap.js` | `catalog` | `modules/catalog/sitemap.js` | ✅ |
 
 ---
 
-## 10. Acceptance Criteria
+## 9. Step-by-Step Implementation Roadmap
 
-- [ ] All 7 new tables created (`colors`, `sizes`, `product_variants`, `inventory`, `product_images`, `variant_images`, `inventory_reservations`)
-- [ ] `products.price` renamed to `products.base_price`
-- [ ] `cart_items` and `order_items` have `variant_id` column
-- [ ] SKU auto-generated in format `{CAT}-{NAME}-{COLOR}-{SIZE}` (e.g., `T-VWT-DEF-S`)
-- [ ] Migration script populates all variants from existing `sizes` CSV with auto-generated SKUs
-- [ ] Migration script sets `quantity = 50` per variant in `inventory`
-- [ ] Migration script copies `image_url` to `product_images` as primary
-- [ ] Existing cart items backfilled with correct `variant_id`
-- [ ] `POST /api/products` accepts nested JSON payload with variants + images
-- [ ] `GET /api/products` returns variant array with stock info
-- [ ] `GET /api/products/:id` returns full variant + image tree
-- [ ] Cart add/update uses `variantId` instead of `productId + size`
-- [ ] Cart add reserves inventory (creates `inventory_reservations` row)
-- [ ] Order creation uses `variant_id`, marks reservations as `fulfilled`
-- [ ] Order status changes update `inventory` (not `products.stock`)
-- [ ] `reservationCleanupWorker` runs every 5 min, releases expired reservations
-- [ ] `cartCleanupWorker` also releases reservations for abandoned carts
-- [ ] `vector_store.py` syncs aggregated variant data (sizes, colors, price range) to Pinecone
-- [ ] `recommender.py` chat path uses `min_price` filter and includes sizes/colors in RAG context
-- [ ] Admin ManageProducts UI redesigned with variant management
-- [ ] All SQL queries are parameterized (no concatenation)
-- [ ] Backend lint: Clean
-- [ ] Frontend lint: Clean
+### Phase 1: Extract `shared/` Infrastructure
+
+**Files to create/move:**
+
+| Action | Source | Destination |
+|---|---|---|
+| MOVE | `db.js` | `shared/db/pool.js` |
+| MOVE | `cache/redis.js` | `shared/cache/redis.js` |
+| MOVE | `middleware/csrf.js` | `shared/middleware/csrf.js` |
+| MOVE | `middleware/rateLimit.js` | `shared/middleware/rateLimit.js` |
+| MOVE | `middleware/requireAuth.js` | `shared/middleware/requireAuth.js` |
+| MOVE | `middleware/requireRole.js` | `shared/middleware/requireRole.js` |
+| MOVE | `middleware/upload.js` | `shared/middleware/upload.js` |
+| MOVE | `queues/connection.js` | `shared/queues/connection.js` |
+| MOVE | `utils/formatImageUrl.js` | `shared/utils/formatImageUrl.js` |
+| MOVE | `utils/generateSku.js` | `shared/utils/generateSku.js` |
+| MOVE | `utils/validatePassword.js` | `shared/utils/validatePassword.js` |
+| NEW | — | `shared/errors/AppError.js` |
+
+**Verification:** Update all import paths. Run `npm run lint`. Server starts without errors.
+
+### Phase 2: Extract `communication` Module
+
+**Rationale:** Smallest module, zero incoming cross-module dependencies. Safest first extraction.
+
+| Action | Source | Destination |
+|---|---|---|
+| MOVE | `routes/feedback.js` → split into | `modules/communication/routes.js` + `controller.js` + `service.js` + `repository.js` |
+| MOVE | `queues/emailQueue.js` | `modules/communication/queues/emailQueue.js` |
+| MOVE | `workers/emailWorker.js` | `modules/communication/workers/emailWorker.js` |
+| MOVE | `utils/mailer.js` | `modules/communication/mailer.js` |
+| NEW | — | `modules/communication/index.js` (facade) |
+
+### Phase 3: Extract `auth_user` Module
+
+| Action | Source | Destination |
+|---|---|---|
+| MOVE | `routes/auth.js` → split into | `modules/auth_user/routes.js` + `controller.js` + `service.js` + `repository.js` |
+| NEW | — | `modules/auth_user/index.js` (facade) |
+
+**Cross-module rewiring:**
+- `auth_user/service.js` imports `emailQueue` from `../communication/index.js`
+- `auth_user/service.js` imports `getOrderStatsByUserId` from `../orders/index.js` (temporary forward reference — will exist after Phase 5)
+
+### Phase 4: Extract `catalog` Module
+
+| Action | Source | Destination |
+|---|---|---|
+| MOVE | `routes/products.js` → split into | `modules/catalog/routes.js` + `controller.js` + `service.js` + `repository.js` |
+| MOVE | `routes/sitemap.js` | `modules/catalog/sitemap.js` |
+| MOVE | `queues/cacheQueue.js` | `modules/catalog/queues/cacheQueue.js` |
+| MOVE | `workers/cacheWorker.js` | `modules/catalog/workers/cacheWorker.js` |
+| MOVE | `workers/reservationCleanupWorker.js` | `modules/catalog/workers/reservationCleanupWorker.js` |
+| NEW | — | `modules/catalog/index.js` (facade with `hydrateProducts`, `getProductsByIds`, `deductInventory`, etc.) |
+
+### Phase 5: Extract `orders` Module
+
+| Action | Source | Destination |
+|---|---|---|
+| MOVE | `routes/orders.js` → split into | `modules/orders/routes.js` + `controller.js` + `service.js` + `repository.js` |
+| MOVE | `routes/cart.js` → merge into | `modules/orders/routes.js` (cart routes section) |
+| MOVE | `routes/webhooks.js` | `modules/orders/webhooks.js` |
+| MOVE | `queues/stripeQueue.js` | `modules/orders/queues/stripeQueue.js` |
+| MOVE | `queues/cartCleanupQueue.js` | `modules/orders/queues/cartCleanupQueue.js` |
+| MOVE | `queues/reservationCleanupQueue.js` | `modules/orders/queues/reservationCleanupQueue.js` |
+| MOVE | `workers/stripeWorker.js` | `modules/orders/workers/stripeWorker.js` |
+| MOVE | `workers/cartCleanupWorker.js` | `modules/orders/workers/cartCleanupWorker.js` |
+| NEW | — | `modules/orders/index.js` (facade with `getOrderStatsByUserId`, `getLastPurchasedProductId`) |
+
+**Cross-module rewiring:**
+- `orders/service.js` imports `getVariantPrice`, `deductInventory`, `restoreInventory`, `getAvailableStock` from `../catalog/index.js`
+- `orders/controller.js` imports `emailQueue` from `../communication/index.js`
+- `orders/workers/stripeWorker.js` uses `orders/repository.js` (same module — correct)
+
+### Phase 6: Extract `ai` Module
+
+| Action | Source | Destination |
+|---|---|---|
+| MOVE | `routes/recommendations.js` → split into | `modules/ai/routes/recommendations.js` + `service.js` |
+| MOVE | `routes/chat.js` | `modules/ai/routes/chat.js` |
+| MOVE | `queues/aiRefreshQueue.js` | `modules/ai/queues/aiRefreshQueue.js` |
+| MOVE | `workers/aiRefreshWorker.js` | `modules/ai/workers/aiRefreshWorker.js` |
+| NEW | — | `modules/ai/index.js` (facade) |
+
+**Cross-module rewiring:**
+- `ai/service.js` imports `hydrateProducts`, `getProductsByIds` from `../catalog/index.js`
+- `ai/service.js` imports `getLastPurchasedProductId` from `../orders/index.js`
+
+### Phase 7: Rewire `index.js` Entry Point
+
+Update `server/src/index.js` to:
+1. Import all routers from module facades instead of `routes/` directory
+2. Import all workers from module worker directories
+3. Import all queues from module queue directories
+4. Maintain identical route mounting paths
+5. Maintain identical Bull Board, graceful shutdown, and cron scheduling
+
+### Phase 8: Cleanup & Verification
+
+1. Delete the now-empty `routes/`, `queues/`, `workers/`, `utils/`, `cache/`, and `middleware/` directories
+2. Delete the old `db.js` file
+3. Run `npm run lint` in `server/`
+4. Verify all API endpoints respond correctly
+5. Verify Bull Board dashboard still loads
+6. Verify graceful shutdown works
+
+---
+
+## 10. Verification Checklist
+
+### 10.1 Structural Verification
+
+- [ ] All files in `server/src/routes/` have been moved to module directories
+- [ ] All files in `server/src/workers/` have been moved to module directories
+- [ ] All files in `server/src/queues/` (except `connection.js`) have been moved
+- [ ] All files in `server/src/utils/` have been moved to `shared/utils/`
+- [ ] `server/src/cache/redis.js` moved to `shared/cache/redis.js`
+- [ ] `server/src/db.js` moved to `shared/db/pool.js`
+- [ ] `server/src/middleware/` moved to `shared/middleware/`
+- [ ] Every module has an `index.js` facade
+- [ ] No module imports another module's `repository.js` directly
+- [ ] No module imports another module's internal files (only `index.js`)
+
+### 10.2 Functional Verification
+
+- [ ] `npm run lint` passes with zero errors in `server/`
+- [ ] Server starts without errors (`npm run dev`)
+- [ ] `GET /api/health` returns `{ ok: true }`
+- [ ] `POST /api/auth/register` — user registration works
+- [ ] `POST /api/auth/login` — login returns cookies
+- [ ] `GET /api/auth/profile` — returns user data with order stats
+- [ ] `GET /api/products` — returns product list with variants
+- [ ] `GET /api/products/:id` — returns single product
+- [ ] `POST /api/cart/add` — adds item to cart
+- [ ] `GET /api/cart` — returns cart items
+- [ ] `POST /api/orders` — creates order, deducts inventory
+- [ ] `PUT /api/orders/:id/cancel` — cancels order, restores inventory
+- [ ] `POST /api/orders/create-payment` — returns Stripe client secret
+- [ ] `POST /api/webhooks/stripe` — accepts webhook with raw body
+- [ ] `POST /api/feedback` — submits feedback
+- [ ] `GET /api/recommend/product/:id` — returns recommendations
+- [ ] `GET /api/recommend/user` — returns personalized recommendations
+- [ ] `POST /api/chat` — forwards to AI service
+- [ ] `GET /sitemap.xml` — returns valid XML sitemap
+- [ ] Bull Board dashboard loads at `/admin/queues` (non-production)
+- [ ] All BullMQ workers start and process jobs
+- [ ] Cart cleanup cron is scheduled
+- [ ] Reservation cleanup cron is scheduled
+- [ ] Graceful shutdown closes workers, queues, and HTTP server
+
+### 10.3 Regression Safety Nets
+
+- [ ] All route paths are identical (see Section 8 mapping table)
+- [ ] All HTTP methods are identical
+- [ ] All request body/query parameter parsing is identical
+- [ ] All response JSON shapes are identical
+- [ ] All HTTP status codes are identical
+- [ ] All middleware chains are identical (rate limiters, auth, role guards)
+- [ ] All error messages are identical
+- [ ] Redis caching behavior is identical (keys, TTLs, graceful degradation)
+- [ ] Webhook raw body parsing order is preserved (before `express.json()`)
+
+---
+
+## 11. Security Considerations
+
+- **No new attack surface:** This is a structural refactoring with zero new endpoints, dependencies, or external integrations.
+- **Middleware chain preserved:** All rate limiters, CSRF protection, auth guards, and role checks are moved as-is to `shared/middleware/` and applied identically.
+- **Transaction integrity preserved:** All existing `getConnection()` → `beginTransaction()` → `commit()`/`rollback()` → `release()` patterns are maintained verbatim.
+- **No secret changes:** No new environment variables are introduced.
+
+---
+
+## 12. Deployment Impact
+
+- **Zero Docker changes required:** The entry point is still `server/src/index.js`.
+- **Zero environment variable changes:** No new env vars.
+- **Zero migration changes:** No database schema changes.
+- **Zero client changes:** The React frontend continues to call the same API routes.
+- **Zero AI service changes:** The Python service receives the same HTTP requests.
+
+---
+
+## 13. Acceptance Criteria
+
+- [ ] All existing API routes return identical responses (path, method, status code, body shape)
+- [ ] Every module has a clean `index.js` facade exposing only public contracts
+- [ ] No module directly imports another module's `repository.js` or internal files
+- [ ] `npm run lint` passes with zero errors
+- [ ] Server boots and all workers start successfully
+- [ ] All BullMQ cron schedules (cart cleanup, reservation cleanup) are active
+- [ ] The `routes/`, `queues/`, `workers/`, `utils/`, `cache/`, and `middleware/` top-level directories are removed
+- [ ] The refactored code follows all patterns in `.agents/architecture.md`
