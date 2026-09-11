@@ -79,7 +79,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 6: Extract `ai` Module — [CURRENT]
+### Phase 6: Extract `ai` Module — [COMPLETED]
 - **Tasks:**
   - Split `routes/recommendations.js` and `routes/chat.js` into `modules/ai/` (`routes/`, `service.js`).
   - Move `queues/aiRefreshQueue.js` to `modules/ai/queues/aiRefreshQueue.js`.
@@ -91,7 +91,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 7: Server Entrypoint Final Rewire & Audit
+### Phase 7: Server Entrypoint Final Rewire & Audit — [CURRENT]
 - **Tasks:**
   - Audit `server/src/index.js` to guarantee 100% of dependencies come from `shared/` or `modules/*/index.js`.
   - Confirm route mounts, error handling, Bull Board setup, and graceful shutdown are intact.

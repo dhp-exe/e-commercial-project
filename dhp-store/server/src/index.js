@@ -13,8 +13,7 @@ import { authRouter } from './modules/auth_user/index.js';
 import { catalogRouter, sitemapRouter, cacheQueue, reservationCleanupQueue, scheduleReservationCleanup } from './modules/catalog/index.js';
 import { ordersRouter, cartRouter, webhooksRouter, stripeQueue, cartCleanupQueue, scheduleCartCleanup } from './modules/orders/index.js';
 import { feedbackRouter } from './modules/communication/index.js';
-import recommendations from './routes/recommendations.js';
-import chat from './routes/chat.js';
+import { recommendRouter, chatRouter, aiRefreshQueue } from './modules/ai/index.js';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import { csrfProtection } from './shared/middleware/csrf.js';
@@ -31,13 +30,12 @@ import { ExpressAdapter } from '@bull-board/express';
 
 // ── BullMQ Workers & Queues ─────────────────────────────────────────
 import emailWorker from './modules/communication/workers/emailWorker.js';
-import aiRefreshWorker from './workers/aiRefreshWorker.js';
+import aiRefreshWorker from './modules/ai/workers/aiRefreshWorker.js';
 import cacheWorker from './modules/catalog/workers/cacheWorker.js';
 import stripeWorker from './modules/orders/workers/stripeWorker.js';
 import cartCleanupWorker from './modules/orders/workers/cartCleanupWorker.js';
 import reservationCleanupWorker from './modules/catalog/workers/reservationCleanupWorker.js';
 import { emailQueue } from './modules/communication/index.js';
-import { aiRefreshQueue } from './queues/aiRefreshQueue.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -130,8 +128,8 @@ app.use('/api/products', catalogRouter);
 app.use('/api/cart', cartRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/feedback', feedbackRouter);
-app.use('/api/recommend', recommendations);
-app.use('/api/chat', chat);
+app.use('/api/recommend', recommendRouter);
+app.use('/api/chat', chatRouter);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 // ── SEO ────────────────────────────────────────────────────────────────────
