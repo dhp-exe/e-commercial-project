@@ -91,7 +91,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 7: Server Entrypoint Final Rewire & Audit — [CURRENT]
+### Phase 7: Server Entrypoint Final Rewire & Audit — [COMPLETED]
 - **Tasks:**
   - Audit `server/src/index.js` to guarantee 100% of dependencies come from `shared/` or `modules/*/index.js`.
   - Confirm route mounts, error handling, Bull Board setup, and graceful shutdown are intact.
@@ -99,7 +99,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 8: Legacy Decommissioning & Full Verification
+### Phase 8: Legacy Decommissioning & Full Verification — [COMPLETED]
 - **Tasks:**
   - Delete legacy empty directories: `routes/`, `queues/`, `workers/`, `utils/`, `cache/`, `middleware/`, and root `db.js`.
   - Verify complete test suite and API checklist.

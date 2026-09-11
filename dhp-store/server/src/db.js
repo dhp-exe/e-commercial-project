@@ -1,1 +1,0 @@
-export { pool, pool as default } from './shared/db/pool.js';

@@ -1,1 +1,0 @@
-export { feedbackRouter as default, feedbackRouter } from '../modules/communication/index.js';

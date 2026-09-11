@@ -1,1 +1,0 @@
-export { authRouter as default, authRouter } from '../modules/auth_user/index.js';
