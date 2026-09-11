@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { pool } from '../db.js';
-import { requireAuth } from '../middleware/requireAuth.js';
-import { formatImageUrl } from '../utils/formatImageUrl.js';
+import { pool } from '../shared/db/pool.js';
+import { requireAuth } from '../shared/middleware/requireAuth.js';
+import { formatImageUrl } from '../shared/utils/formatImageUrl.js';
 
 const router = Router();
 

@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { pool } from '../db.js';
+import { pool } from '../shared/db/pool.js';
 import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
 import * as Sentry from '@sentry/node';
-import { requireAuth } from '../middleware/requireAuth.js';
-import { apiLimiter } from '../middleware/rateLimit.js';
-import { verifyStaff } from '../middleware/requireRole.js';
+import { requireAuth } from '../shared/middleware/requireAuth.js';
+import { apiLimiter } from '../shared/middleware/rateLimit.js';
+import { verifyStaff } from '../shared/middleware/requireRole.js';
 import { emailQueue } from '../queues/emailQueue.js';
-import { formatImageUrl } from '../utils/formatImageUrl.js';
+import { formatImageUrl } from '../shared/utils/formatImageUrl.js';
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);

@@ -8,8 +8,8 @@
  */
 
 import { Router } from 'express';
-import { pool } from '../db.js';
-import redis from '../cache/redis.js';
+import { pool } from '../shared/db/pool.js';
+import redis from '../shared/cache/redis.js';
 
 const router = Router();
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import axios from 'axios';
-import { apiLimiter } from '../middleware/rateLimit.js';
+import { apiLimiter } from '../shared/middleware/rateLimit.js';
 
 const router = Router();
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';

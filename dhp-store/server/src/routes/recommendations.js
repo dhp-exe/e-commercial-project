@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { pool } from '../db.js';
-import redis from '../cache/redis.js';
+import { pool } from '../shared/db/pool.js';
+import redis from '../shared/cache/redis.js';
 import axios from 'axios';
 import * as Sentry from '@sentry/node';
-import { requireAuth } from '../middleware/requireAuth.js';
-import { verifyAdmin } from '../middleware/requireRole.js';
-import { apiLimiter } from '../middleware/rateLimit.js';
+import { requireAuth } from '../shared/middleware/requireAuth.js';
+import { verifyAdmin } from '../shared/middleware/requireRole.js';
+import { apiLimiter } from '../shared/middleware/rateLimit.js';
 import { aiRefreshQueue } from '../queues/aiRefreshQueue.js';
 import { hydrateProducts } from './products.js';
 

@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { pool } from '../db.js';
-import redis from '../cache/redis.js';
+import { pool } from '../shared/db/pool.js';
+import redis from '../shared/cache/redis.js';
 import * as Sentry from '@sentry/node';
-import { requireAuth } from '../middleware/requireAuth.js';
-import { verifyStaff, verifyAdmin } from '../middleware/requireRole.js';
-import upload from '../middleware/upload.js';
-import { formatImageUrl } from '../utils/formatImageUrl.js';
-import { generateSku } from '../utils/generateSku.js';
+import { requireAuth } from '../shared/middleware/requireAuth.js';
+import { verifyStaff, verifyAdmin } from '../shared/middleware/requireRole.js';
+import upload from '../shared/middleware/upload.js';
+import { formatImageUrl } from '../shared/utils/formatImageUrl.js';
+import { generateSku } from '../shared/utils/generateSku.js';
 import { cacheQueue } from '../queues/cacheQueue.js';
 
 const router = Router();

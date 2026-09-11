@@ -11,7 +11,7 @@
 
 import { Worker } from 'bullmq';
 import * as Sentry from '@sentry/node';
-import { connection } from '../queues/connection.js';
+import { connection } from '../shared/queues/connection.js';
 import transporter from '../utils/mailer.js';
 
 /**

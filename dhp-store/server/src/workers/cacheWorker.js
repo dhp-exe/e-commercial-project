@@ -12,8 +12,8 @@
 
 import { Worker } from 'bullmq';
 import * as Sentry from '@sentry/node';
-import { connection } from '../queues/connection.js';
-import redis from '../cache/redis.js';
+import { connection } from '../shared/queues/connection.js';
+import redis from '../shared/cache/redis.js';
 
 const cacheWorker = new Worker(
   'cache-invalidate',

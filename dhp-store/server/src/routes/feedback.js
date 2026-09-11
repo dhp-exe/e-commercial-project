@@ -1,6 +1,6 @@
 import {Router} from 'express';
-import {pool} from '../db.js';
-import {apiLimiter} from '../middleware/rateLimit.js';
+import {pool} from '../shared/db/pool.js';
+import {apiLimiter} from '../shared/middleware/rateLimit.js';
 import validator from 'validator';
 
 const router = Router();

@@ -13,7 +13,7 @@
  */
 
 import { Queue } from 'bullmq';
-import { connection } from './connection.js';
+import { connection } from '../shared/queues/connection.js';
 
 export const reservationCleanupQueue = new Queue('reservation-cleanup', {
   connection,

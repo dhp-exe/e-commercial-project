@@ -1,17 +1,17 @@
 import { Router } from 'express';
-import { pool } from '../db.js';
+import { pool } from '../shared/db/pool.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import * as Sentry from '@sentry/node';
 import { OAuth2Client } from 'google-auth-library';
-import { requireAuth } from '../middleware/requireAuth.js'; 
-import upload from '../middleware/upload.js';
-import { authLimiter } from '../middleware/rateLimit.js';
-import { formatImageUrl } from '../utils/formatImageUrl.js';
+import { requireAuth } from '../shared/middleware/requireAuth.js'; 
+import upload from '../shared/middleware/upload.js';
+import { authLimiter } from '../shared/middleware/rateLimit.js';
+import { formatImageUrl } from '../shared/utils/formatImageUrl.js';
 import { emailQueue } from '../queues/emailQueue.js';
-import { validatePassword } from '../utils/validatePassword.js';
+import { validatePassword } from '../shared/utils/validatePassword.js';
 
 dotenv.config();
 

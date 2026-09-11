@@ -313,7 +313,8 @@ server/src/
 │   │   ├── repository.js                  # Products, variants, colors, sizes, inventory SQL
 │   │   ├── sitemap.js                     # /sitemap.xml route (uses catalog service)
 │   │   ├── queues/
-│   │   │   └── cacheQueue.js              # Cache invalidation queue
+│   │   │   ├── cacheQueue.js              # Cache invalidation queue
+│   │   │   └── reservationCleanupQueue.js # Expired reservation cleanup queue (cron)
 │   │   └── workers/
 │   │       ├── cacheWorker.js             # Redis SCAN cache invalidation worker
 │   │       └── reservationCleanupWorker.js # Expired reservation cleanup worker
@@ -327,8 +328,7 @@ server/src/
 │   │   ├── webhooks.js                    # /api/webhooks/stripe route
 │   │   ├── queues/
 │   │   │   ├── stripeQueue.js             # Stripe webhook processing queue
-│   │   │   ├── cartCleanupQueue.js        # Abandoned cart cleanup queue (cron)
-│   │   │   └── reservationCleanupQueue.js # Reservation cleanup queue (cron)
+│   │   │   └── cartCleanupQueue.js        # Abandoned cart cleanup queue (cron)
 │   │   └── workers/
 │   │       ├── stripeWorker.js            # Stripe event reconciliation worker
 │   │       └── cartCleanupWorker.js       # Abandoned cart cleanup worker
@@ -365,7 +365,7 @@ server/src/
 |---|---|
 | **Cart routes live in `orders/`** | Cart is a pre-order concept. Cart → Checkout → Order is a single domain lifecycle. Keeping them together avoids facade overhead for the tight cart↔order data flow. |
 | **Webhooks live in `orders/`** | Stripe webhooks exclusively update order status. This keeps payment processing colocated with order lifecycle management. |
-| **`reservationCleanupQueue` in `orders/`, worker in `catalog/`** | The queue is scheduled by the order lifecycle (reservations are created during checkout). The worker operates on `inventory` tables owned by catalog. The queue definition lives in orders (the producer), and the worker lives in catalog (the data owner). |
+| **`reservationCleanupQueue` and `reservationCleanupWorker` in `catalog/`** | Both the reservation cleanup queue and its worker belong to the `catalog` module because they manage inventory reservations (`inventory_reservations` and `inventory` tables). Colocating the queue, worker, and data owner within `catalog` ensures domain cohesion and prevents cross-boundary queue coupling. |
 | **Sitemap lives in `catalog/`** | Sitemap queries product data exclusively. It's a read-only view of the catalog domain. |
 | **`communication/` owns `feedback`** | Feedback is a write-only contact form that may later trigger email notifications. It's too small for its own module but naturally fits with communication. |
 | **Shared `queues/connection.js`** | All BullMQ queues and workers share the same IORedis connection config. This stays in `shared/` since it's infrastructure, not domain logic. |
@@ -473,6 +473,8 @@ await emailQueue.add('order-confirmation', {
 
 ```javascript
 // modules/auth_user/service.js
+// Note: In Phase 3, auth_user temporarily imports getOrderStatsByUserId from legacy ../../routes/orders.js
+// to prevent ESM startup crashes. In Phase 5, this is rewired to ../orders/index.js once orders is extracted.
 import { getOrderStatsByUserId } from '../orders/index.js';
 
 export async function getProfile(userId) {
@@ -528,7 +530,7 @@ export async function getUserRecommendations(userId) {
 | 3 | **No direct SQL to tables owned by another module.** | E.g., `orders/` must not contain `SELECT ... FROM products`. Use catalog facade. |
 | 4 | **Shared infrastructure (`shared/`) has no domain logic.** | `shared/` contains only connection pools, middleware, error classes, and generic utilities. |
 | 5 | **Workers may use their owning module's repository.** | E.g., `catalog/workers/cacheWorker.js` may use `catalog/repository.js`. |
-| 6 | **Queue definitions live with the producer; workers with the data owner.** | E.g., `reservationCleanupQueue` → `orders/queues/`, `reservationCleanupWorker` → `catalog/workers/`. |
+| 6 | **Queue definitions and workers live with the domain data owner.** | E.g., `reservationCleanupQueue` and `reservationCleanupWorker` live in `catalog/` (managing catalog inventory); `emailQueue` and `emailWorker` live in `communication/`; `stripeQueue` and `cartCleanupQueue` live in `orders/`. |
 | 7 | **Transaction connections may be passed as parameters across facades.** | When a checkout transaction spans catalog (inventory deduction) and orders (order creation), the same `conn` is passed. |
 
 ### 6.2 Exception: Checkout Transaction
@@ -565,7 +567,7 @@ This is acceptable because:
 | `cache-invalidate` | `catalog/queues/` | `cacheWorker` | `catalog/workers/` | `catalog/controller.js` | catalog |
 | `ai-refresh` | `ai/queues/` | `aiRefreshWorker` | `ai/workers/` | `ai/routes/recommendations.js` | ai |
 | `cart-cleanup` | `orders/queues/` | `cartCleanupWorker` | `orders/workers/` | `index.js` (cron schedule) | orders |
-| `reservation-cleanup` | `orders/queues/` | `reservationCleanupWorker` | `catalog/workers/` | `index.js` (cron schedule) | catalog (data) / orders (schedule) |
+| `reservation-cleanup` | `catalog/queues/` | `reservationCleanupWorker` | `catalog/workers/` | `index.js` (cron schedule) | catalog |
 
 ---
 
@@ -639,11 +641,31 @@ The following table proves that every existing route path maps identically after
 | MOVE | `utils/validatePassword.js` | `shared/utils/validatePassword.js` |
 | NEW | — | `shared/errors/AppError.js` |
 
-**Verification:** Update all import paths. Run `npm run lint`. Server starts without errors.
+**Legacy Import Updates (Critical):**
+Immediately update import paths in all legacy files to prevent broken references:
+1. `shared/middleware/requireAuth.js`: update imports to `../db/pool.js` and `../cache/redis.js`.
+2. `server/src/index.js`: update imports for middleware (`./shared/middleware/*`).
+3. Legacy `routes/*.js` (`auth.js`, `products.js`, `cart.js`, `orders.js`, `feedback.js`, `recommendations.js`, `chat.js`, `webhooks.js`, `sitemap.js`):
+   - Update `../db.js` → `../shared/db/pool.js`
+   - Update `../cache/redis.js` → `../shared/cache/redis.js`
+   - Update `../middleware/*` → `../shared/middleware/*`
+   - Update `../utils/*` → `../shared/utils/*`
+4. Legacy `workers/*.js`:
+   - Update `../db.js` → `../shared/db/pool.js`
+   - Update `../cache/redis.js` → `../shared/cache/redis.js`
+   - Update `../queues/connection.js` → `../shared/queues/connection.js`
+5. Legacy `queues/*.js`:
+   - Update `../queues/connection.js` or `./connection.js` → `../shared/queues/connection.js`
+6. `server/migrations/004_catalog_schema_enhance.js`:
+   - Update `../src/db.js` → `../src/shared/db/pool.js`
+
+**Verification:** Run `npm run lint`. Verify server starts cleanly with `node src/index.js` (or `npm run dev`).
+
+---
 
 ### Phase 2: Extract `communication` Module
 
-**Rationale:** Smallest module, zero incoming cross-module dependencies. Safest first extraction.
+**Rationale:** Smallest module with zero incoming domain dependencies. Safest first module extraction.
 
 | Action | Source | Destination |
 |---|---|---|
@@ -653,6 +675,22 @@ The following table proves that every existing route path maps identically after
 | MOVE | `utils/mailer.js` | `modules/communication/mailer.js` |
 | NEW | — | `modules/communication/index.js` (facade) |
 
+**Facade Definition (`modules/communication/index.js`):**
+- Export `{ emailQueue }` from `./queues/emailQueue.js`
+- Export `default` (or `{ feedbackRouter }`) from `./routes.js`
+
+**Legacy Import Updates (Critical):**
+1. `routes/auth.js`: Update `import { emailQueue } from '../queues/emailQueue.js'` → `import { emailQueue } from '../modules/communication/index.js'`
+2. `routes/orders.js`: Update `import { emailQueue } from '../queues/emailQueue.js'` → `import { emailQueue } from '../modules/communication/index.js'`
+3. `server/src/index.js`:
+   - Update `import feedbackRouter from './routes/feedback.js'` → `import { feedbackRouter } from './modules/communication/index.js'`
+   - Update `import { emailQueue } from './queues/emailQueue.js'` → `import { emailQueue } from './modules/communication/index.js'`
+   - Update `import './workers/emailWorker.js'` → `import './modules/communication/workers/emailWorker.js'`
+
+**Verification:** Run `npm run lint`. Server boots without errors.
+
+---
+
 ### Phase 3: Extract `auth_user` Module
 
 | Action | Source | Destination |
@@ -660,9 +698,22 @@ The following table proves that every existing route path maps identically after
 | MOVE | `routes/auth.js` → split into | `modules/auth_user/routes.js` + `controller.js` + `service.js` + `repository.js` |
 | NEW | — | `modules/auth_user/index.js` (facade) |
 
-**Cross-module rewiring:**
-- `auth_user/service.js` imports `emailQueue` from `../communication/index.js`
-- `auth_user/service.js` imports `getOrderStatsByUserId` from `../orders/index.js` (temporary forward reference — will exist after Phase 5)
+**Facade Definition (`modules/auth_user/index.js`):**
+- Export `default` (or `{ authRouter }`) from `./routes.js`
+
+**Preventing ESM Startup Crash (Fix 1):**
+In native Node.js ES Modules, static imports must resolve to existing files at boot time. Because `modules/orders/index.js` is not created until Phase 5:
+- Export `getOrderStatsByUserId` from legacy `routes/orders.js`.
+- In `modules/auth_user/service.js`, import `getOrderStatsByUserId` temporarily from legacy `../../routes/orders.js` (instead of a forward reference to non-existent `../orders/index.js`).
+- Import `emailQueue` from `../communication/index.js`.
+
+**Legacy Import Updates (Critical):**
+1. `server/src/index.js`:
+   - Update `import authRouter from './routes/auth.js'` → `import { authRouter } from './modules/auth_user/index.js'`
+
+**Verification:** Run `npm run lint`. Server boots without errors.
+
+---
 
 ### Phase 4: Extract `catalog` Module
 
@@ -671,28 +722,75 @@ The following table proves that every existing route path maps identically after
 | MOVE | `routes/products.js` → split into | `modules/catalog/routes.js` + `controller.js` + `service.js` + `repository.js` |
 | MOVE | `routes/sitemap.js` | `modules/catalog/sitemap.js` |
 | MOVE | `queues/cacheQueue.js` | `modules/catalog/queues/cacheQueue.js` |
+| MOVE | `queues/reservationCleanupQueue.js` | `modules/catalog/queues/reservationCleanupQueue.js` |
 | MOVE | `workers/cacheWorker.js` | `modules/catalog/workers/cacheWorker.js` |
 | MOVE | `workers/reservationCleanupWorker.js` | `modules/catalog/workers/reservationCleanupWorker.js` |
-| NEW | — | `modules/catalog/index.js` (facade with `hydrateProducts`, `getProductsByIds`, `deductInventory`, etc.) |
+| NEW | — | `modules/catalog/index.js` (facade) |
+
+**Queue Boundary Correction (Fix 2):**
+`reservationCleanupQueue.js` is placed in `modules/catalog/queues/` directly alongside `reservationCleanupWorker.js` in `modules/catalog/workers/` because they manage `inventory_reservations` and `inventory` tables owned by `catalog`.
+
+**Facade Definition (`modules/catalog/index.js`):**
+- Export `{ default as catalogRouter }` from `./routes.js`
+- Export `{ default as sitemapRouter }` from `./sitemap.js`
+- Export `{ cacheQueue }` from `./queues/cacheQueue.js`
+- Export `{ reservationCleanupQueue, scheduleReservationCleanup }` from `./queues/reservationCleanupQueue.js`
+- Export `{ hydrateProducts, getProductsByIds, getVariantPrice, getProductBasePrice, deductInventory, restoreInventory, getAvailableStock, getActiveProductSummaries }` from `./service.js`
+
+**Legacy Import Updates (Critical):**
+1. `routes/recommendations.js`:
+   - Replace `import { hydrateProducts } from './products.js'` → `import { hydrateProducts } from '../modules/catalog/index.js'`
+2. `routes/cart.js`:
+   - Update stock/price validation helpers to import from `../modules/catalog/index.js`
+3. `routes/orders.js`:
+   - Update product price and inventory deduction calls to import from `../modules/catalog/index.js`
+4. `server/src/index.js`:
+   - Update `import productsRouter from './routes/products.js'` → `import { catalogRouter } from './modules/catalog/index.js'`
+   - Update `import sitemapRouter from './routes/sitemap.js'` → `import { sitemapRouter } from './modules/catalog/index.js'`
+   - Update `import { cacheQueue }` → from `./modules/catalog/index.js`
+   - Update `import { reservationCleanupQueue, scheduleReservationCleanup }` → from `./modules/catalog/index.js`
+   - Update worker imports for `cacheWorker.js` and `reservationCleanupWorker.js` to `./modules/catalog/workers/*`
+
+**Verification:** Run `npm run lint`. Server boots without errors.
+
+---
 
 ### Phase 5: Extract `orders` Module
 
 | Action | Source | Destination |
 |---|---|---|
 | MOVE | `routes/orders.js` → split into | `modules/orders/routes.js` + `controller.js` + `service.js` + `repository.js` |
-| MOVE | `routes/cart.js` → merge into | `modules/orders/routes.js` (cart routes section) |
+| MOVE | `routes/cart.js` → merge into | `modules/orders/routes.js` (cart endpoints) |
 | MOVE | `routes/webhooks.js` | `modules/orders/webhooks.js` |
 | MOVE | `queues/stripeQueue.js` | `modules/orders/queues/stripeQueue.js` |
 | MOVE | `queues/cartCleanupQueue.js` | `modules/orders/queues/cartCleanupQueue.js` |
-| MOVE | `queues/reservationCleanupQueue.js` | `modules/orders/queues/reservationCleanupQueue.js` |
 | MOVE | `workers/stripeWorker.js` | `modules/orders/workers/stripeWorker.js` |
 | MOVE | `workers/cartCleanupWorker.js` | `modules/orders/workers/cartCleanupWorker.js` |
-| NEW | — | `modules/orders/index.js` (facade with `getOrderStatsByUserId`, `getLastPurchasedProductId`) |
+| NEW | — | `modules/orders/index.js` (facade) |
 
-**Cross-module rewiring:**
-- `orders/service.js` imports `getVariantPrice`, `deductInventory`, `restoreInventory`, `getAvailableStock` from `../catalog/index.js`
-- `orders/controller.js` imports `emailQueue` from `../communication/index.js`
-- `orders/workers/stripeWorker.js` uses `orders/repository.js` (same module — correct)
+**Facade Definition (`modules/orders/index.js`):**
+- Export `{ default as ordersRouter, cartRouter }` from `./routes.js`
+- Export `{ default as webhooksRouter }` from `./webhooks.js`
+- Export `{ stripeQueue }` from `./queues/stripeQueue.js`
+- Export `{ cartCleanupQueue, scheduleCartCleanup }` from `./queues/cartCleanupQueue.js`
+- Export `{ getOrderStatsByUserId, getLastPurchasedProductId }` from `./service.js`
+
+**Rewiring & Legacy Import Updates (Critical):**
+1. `modules/auth_user/service.js`:
+   - Rewire `getOrderStatsByUserId`: Replace temporary import `from '../../routes/orders.js'` with `import { getOrderStatsByUserId } from '../orders/index.js'`.
+2. `modules/orders/service.js`:
+   - Import catalog functions (`getVariantPrice`, `deductInventory`, etc.) from `../catalog/index.js`.
+   - Import `emailQueue` from `../communication/index.js`.
+3. `server/src/index.js`:
+   - Update `import ordersRouter from './routes/orders.js'` → `import { ordersRouter } from './modules/orders/index.js'`
+   - Update `import cartRouter from './routes/cart.js'` → `import { cartRouter } from './modules/orders/index.js'`
+   - Update `import webhooksRouter from './routes/webhooks.js'` → `import { webhooksRouter } from './modules/orders/index.js'`
+   - Update `import { stripeQueue }` and `import { cartCleanupQueue, scheduleCartCleanup }` → from `./modules/orders/index.js`
+   - Update worker imports for `stripeWorker.js` and `cartCleanupWorker.js` to `./modules/orders/workers/*`
+
+**Verification:** Run `npm run lint`. Server boots without errors.
+
+---
 
 ### Phase 6: Extract `ai` Module
 
@@ -704,27 +802,40 @@ The following table proves that every existing route path maps identically after
 | MOVE | `workers/aiRefreshWorker.js` | `modules/ai/workers/aiRefreshWorker.js` |
 | NEW | — | `modules/ai/index.js` (facade) |
 
-**Cross-module rewiring:**
-- `ai/service.js` imports `hydrateProducts`, `getProductsByIds` from `../catalog/index.js`
-- `ai/service.js` imports `getLastPurchasedProductId` from `../orders/index.js`
+**Facade Definition (`modules/ai/index.js`):**
+- Export `{ default as recommendRouter }` from `./routes/recommendations.js`
+- Export `{ default as chatRouter }` from `./routes/chat.js`
+- Export `{ aiRefreshQueue }` from `./queues/aiRefreshQueue.js`
 
-### Phase 7: Rewire `index.js` Entry Point
+**Cross-module Imports:**
+- `modules/ai/service.js` imports `hydrateProducts`, `getProductsByIds` from `../catalog/index.js`
+- `modules/ai/service.js` imports `getLastPurchasedProductId` from `../orders/index.js`
 
-Update `server/src/index.js` to:
-1. Import all routers from module facades instead of `routes/` directory
-2. Import all workers from module worker directories
-3. Import all queues from module queue directories
-4. Maintain identical route mounting paths
-5. Maintain identical Bull Board, graceful shutdown, and cron scheduling
+**Legacy Import Updates (Critical):**
+1. `server/src/index.js`:
+   - Update `import recommendRouter from './routes/recommendations.js'` → `import { recommendRouter } from './modules/ai/index.js'`
+   - Update `import chatRouter from './routes/chat.js'` → `import { chatRouter } from './modules/ai/index.js'`
+   - Update `import { aiRefreshQueue }` → from `./modules/ai/index.js`
+   - Update `import './workers/aiRefreshWorker.js'` → `import './modules/ai/workers/aiRefreshWorker.js'`
+
+**Verification:** Run `npm run lint`. Server boots without errors.
+
+---
+
+### Phase 7: Rewire `index.js` Entry Point & Audit
+
+1. Audit `server/src/index.js`:
+   - 100% of routers, middleware, queues, and workers are imported from `shared/` or `modules/*/index.js`.
+   - Zero imports remain pointing to legacy `routes/`, `queues/`, `workers/`, `utils/`, or `middleware/`.
+2. Confirm identical middleware mount order, route prefixes, Bull Board queue bindings, and graceful shutdown handlers.
+
+---
 
 ### Phase 8: Cleanup & Verification
 
-1. Delete the now-empty `routes/`, `queues/`, `workers/`, `utils/`, `cache/`, and `middleware/` directories
-2. Delete the old `db.js` file
-3. Run `npm run lint` in `server/`
-4. Verify all API endpoints respond correctly
-5. Verify Bull Board dashboard still loads
-6. Verify graceful shutdown works
+1. Remove legacy empty directories: `server/src/routes/`, `server/src/queues/`, `server/src/workers/`, `server/src/utils/`, `server/src/cache/`, `server/src/middleware/`, and root `server/src/db.js`.
+2. Run full linter: `npm run lint` in `server/`.
+3. Perform end-to-end verification checklist (Section 10).
 
 ---
 

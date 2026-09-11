@@ -20,10 +20,10 @@ import webhooks from './routes/webhooks.js';
 import sitemap from './routes/sitemap.js';
 import path from 'path';
 import cookieParser from 'cookie-parser';
-import { csrfProtection } from './middleware/csrf.js';
-import { globalLimiter } from './middleware/rateLimit.js';
-import { requireAuth } from './middleware/requireAuth.js';
-import { verifyAdmin } from './middleware/requireRole.js';
+import { csrfProtection } from './shared/middleware/csrf.js';
+import { globalLimiter } from './shared/middleware/rateLimit.js';
+import { requireAuth } from './shared/middleware/requireAuth.js';
+import { verifyAdmin } from './shared/middleware/requireRole.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 

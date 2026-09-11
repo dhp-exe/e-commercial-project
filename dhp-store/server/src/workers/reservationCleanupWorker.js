@@ -8,8 +8,8 @@
 
 import { Worker } from 'bullmq';
 import * as Sentry from '@sentry/node';
-import { connection } from '../queues/connection.js';
-import { pool } from '../db.js';
+import { connection } from '../shared/queues/connection.js';
+import { pool } from '../shared/db/pool.js';
 
 const reservationCleanupWorker = new Worker(
   'reservation-cleanup',

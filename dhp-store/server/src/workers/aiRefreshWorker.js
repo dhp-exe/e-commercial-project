@@ -11,7 +11,7 @@
 import { Worker } from 'bullmq';
 import * as Sentry from '@sentry/node';
 import axios from 'axios';
-import { connection } from '../queues/connection.js';
+import { connection } from '../shared/queues/connection.js';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';
 

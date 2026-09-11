@@ -16,11 +16,11 @@
  * Run:  node migrations/004_catalog_schema_enhance.js
  */
 
-import { pool } from '../src/db.js';
+import { pool } from '../src/shared/db/pool.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateSku } from '../src/utils/generateSku.js';
+import { generateSku } from '../src/shared/utils/generateSku.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
