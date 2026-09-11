@@ -1,23 +1,6 @@
 /**
- * Stripe webhook processing job queue.
- *
- * Receives verified Stripe event payloads and processes them asynchronously.
- * The webhook route immediately returns 200 OK to Stripe and enqueues the
- * payload for background reconciliation by stripeWorker.js.
- *
- * Job Schema:
- *   { type: 'stripe-webhook', eventType: string, payload: object }
+ * Legacy forwarder for backward compatibility during Modular Monolith migration.
+ * @deprecated Import from 'modules/orders/index.js' instead.
  */
 
-import { Queue } from 'bullmq';
-import { connection } from '../shared/queues/connection.js';
-
-export const stripeQueue = new Queue('stripe-webhook', {
-  connection,
-  defaultJobOptions: {
-    attempts: 5,
-    backoff: { type: 'exponential', delay: 3000 },
-    removeOnComplete: { count: 1000 },
-    removeOnFail: { count: 2000 },
-  },
-});
+export { stripeQueue, stripeQueue as default } from '../modules/orders/index.js';

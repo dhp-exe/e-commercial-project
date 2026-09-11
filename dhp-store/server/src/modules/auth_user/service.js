@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/node';
 import { OAuth2Client } from 'google-auth-library';
 import { formatImageUrl } from '../../shared/utils/formatImageUrl.js';
 import { emailQueue } from '../communication/index.js';
-import { getOrderStatsByUserId } from '../../routes/orders.js';
+import { getOrderStatsByUserId } from '../orders/index.js';
 import * as authRepository from './repository.js';
 
 // ── Cookie Configuration ────────────────────────────────────────────

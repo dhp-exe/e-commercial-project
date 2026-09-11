@@ -64,7 +64,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 5: Extract `orders` Module — [CURRENT]
+### Phase 5: Extract `orders` Module — [COMPLETED]
 - **Tasks:**
   - Split `routes/orders.js` and `routes/cart.js` into `modules/orders/` (`routes.js`, `controller.js`, `service.js`, `repository.js`).
   - Move `routes/webhooks.js` to `modules/orders/webhooks.js`.
@@ -79,7 +79,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 6: Extract `ai` Module
+### Phase 6: Extract `ai` Module — [CURRENT]
 - **Tasks:**
   - Split `routes/recommendations.js` and `routes/chat.js` into `modules/ai/` (`routes/`, `service.js`).
   - Move `queues/aiRefreshQueue.js` to `modules/ai/queues/aiRefreshQueue.js`.
