@@ -87,7 +87,7 @@ Each module is a vertical slice owning its routes, controllers, services, reposi
 | Module | Domain Responsibility | Owned Database Tables | Key Facade Exports |
 |---|---|---|---|
 | **`auth_user`** | Authentication, sessions, JWT, OAuth, password management, profile CRUD, user roles | `users`, `refresh_tokens`, `password_resets` | `authRouter` |
-| **`catalog`** | Products, categories, variants, colors, sizes, inventory, product images, SKU generation, sitemap, cache invalidation | `products`, `categories`, `product_variants`, `colors`, `sizes`, `inventory`, `product_images`, `inventory_reservations` | `catalogRouter`, `sitemapRouter`, `hydrateProducts`, `getProductsByIds`, `getVariantPrice`, `getProductBasePrice`, `deductInventory`, `restoreInventory`, `getAvailableStock`, `getActiveProductSummaries`, `cacheQueue`, `reservationCleanupQueue`, `scheduleReservationCleanup` |
+| **`catalog`** | Products, categories, variants, colors, sizes, inventory, product images, SKU generation, sitemap, cache invalidation | `products`, `categories`, `product_variants`, `colors`, `sizes`, `inventory`, `product_images`, `inventory_reservations` | `catalogRouter`, `sitemapRouter`, `hydrateProducts`, `getProductsByIds`, `getProductById`, `getProducts`, `getVariantPrice`, `getProductBasePrice`, `deductInventory`, `restoreInventory`, `getAvailableStock`, `getActiveProductSummaries`, `cacheQueue`, `reservationCleanupQueue`, `scheduleReservationCleanup` |
 | **`orders`** | Shopping cart, order lifecycle, checkout, payment intents, Stripe webhooks, order items | `carts`, `cart_items`, `orders`, `order_items` | `ordersRouter`, `cartRouter`, `webhooksRouter`, `stripeQueue`, `cartCleanupQueue`, `scheduleCartCleanup`, `getOrderStatsByUserId`, `getLastPurchasedProductId` |
 | **`ai`** | AI recommendation proxy, chat proxy, AI model refresh triggers | None (stateless proxy to Python service) | `recommendRouter`, `chatRouter`, `aiRefreshQueue` |
 | **`communication`** | Email transporter, email templates, email sending, user feedback | `feedback` | `emailQueue`, `feedbackRouter` |
@@ -147,7 +147,7 @@ graph TD
 | `orders/service.js` | `catalog/index.js` | `getVariantPrice()`, `deductInventory()`, `restoreInventory()`, `getAvailableStock()` | Checkout price verification and inventory management |
 | `orders/controller.js` | `communication/index.js` | `emailQueue.add()` | Order confirmation emails |
 | `auth_user/service.js` | `communication/index.js` | `emailQueue.add()` | Password reset emails |
-| `ai/service.js` | `catalog/index.js` | `getProductsByIds()`, `hydrateProducts()` | Recommendation hydration |
+| `ai/service.js` | `catalog/index.js` | `getProductsByIds()`, `getProductById()`, `getProducts()` | Recommendation hydration and relational category fallback |
 | `ai/service.js` | `orders/index.js` | `getLastPurchasedProductId()` | Personalized recommendations |
 
 ---

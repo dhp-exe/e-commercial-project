@@ -13,7 +13,12 @@ router.get('/product/:id', async (req, res) => {
     const products = await aiService.getSimilarProducts(req.params.id);
     res.json(products);
   } catch (error) {
-    console.error('AI Service Error:', error.message);
+    console.error(`[AI Recommendations] Error for product ${req.params.id}:`, error.message);
+    Sentry.captureException(error, {
+      tags: { route: 'recommend-product', productId: req.params.id },
+      extra: { params: req.params },
+    });
+    // Graceful degradation: return empty array instead of crashing client
     res.json([]);
   }
 });
@@ -24,7 +29,10 @@ router.get('/user', requireAuth, async (req, res) => {
     const products = await aiService.getUserRecommendations(req.user.id);
     res.json(products);
   } catch (error) {
-    console.error('Recommendation error:', error.message);
+    console.error(`[AI Recommendations] Error for user ${req.user?.id}:`, error.message);
+    Sentry.captureException(error, {
+      tags: { route: 'recommend-user', userId: req.user?.id },
+    });
     // Graceful degradation: return empty array instead of 500
     res.json([]);
   }

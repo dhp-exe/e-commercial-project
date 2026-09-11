@@ -1,8 +1,9 @@
 import axios from 'axios';
+import * as Sentry from '@sentry/node';
 import { pool } from '../../shared/db/pool.js';
 import redis from '../../shared/cache/redis.js';
 import { AppError } from '../../shared/errors/AppError.js';
-import { getProductsByIds } from '../catalog/index.js';
+import { getProductById, getProducts, getProductsByIds } from '../catalog/index.js';
 import { getLastPurchasedProductId } from '../orders/index.js';
 import { aiRefreshQueue } from './queues/aiRefreshQueue.js';
 
@@ -18,29 +19,83 @@ const MAX_MESSAGE_LENGTH = 2000;
 
 /**
  * Get similar products for a given product ID.
+ *
+ * Tier 1: Query Python AI microservice (Pinecone semantic similarity).
+ * Tier 2: Relational fallback to active products in the same category (excluding current product).
+ * Tier 3: Top active products from catalog if category has insufficient items.
  */
 export async function getSimilarProducts(id) {
-  const cacheKey = `recs:product:${id}`;
+  const productId = parseInt(id, 10);
+  if (isNaN(productId) || productId <= 0) {
+    return [];
+  }
+
+  const cacheKey = `recs:product:${productId}`;
 
   try {
     const cached = await redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
   } catch (redisErr) {
-    console.warn('Redis cache error, falling back to AI service', redisErr.message);
+    console.warn('Redis cache error, falling back to AI/DB:', redisErr.message);
   }
 
-  // Ask Python AI service: "What is similar to product X?"
-  const aiResponse = await aiClient.get(`/recommend/${id}`);
-  const similarIds = aiResponse.data?.recommendations;
+  let products = [];
 
-  if (!Array.isArray(similarIds) || similarIds.length === 0) return [];
-
-  const products = await getProductsByIds(similarIds);
-
+  // Step 1: Query Python AI service for Pinecone semantic similarity
   try {
-    await redis.set(cacheKey, JSON.stringify(products), { EX: 300 });
-  } catch (redisErr) {
-    console.warn('Redis set error', redisErr.message);
+    const aiResponse = await aiClient.get(`/recommend/${productId}`);
+    const similarIds = aiResponse.data?.recommendations;
+
+    if (Array.isArray(similarIds) && similarIds.length > 0) {
+      products = await getProductsByIds(similarIds);
+    }
+  } catch (aiErr) {
+    console.warn(`[AI Service] Microservice unavailable for product ${productId}:`, aiErr.message);
+    Sentry.addBreadcrumb({
+      category: 'ai-service',
+      message: `Failed to fetch similar products from Python microservice: ${aiErr.message}`,
+      level: 'warning',
+      data: { productId },
+    });
+  }
+
+  // Step 2: Relational fallback to active products in same category
+  if (products.length === 0) {
+    try {
+      const currentProduct = await getProductById(productId);
+      let fallbackProducts = [];
+
+      if (currentProduct?.category_id) {
+        const categoryProducts = await getProducts({ categoryId: currentProduct.category_id });
+        fallbackProducts = categoryProducts.filter((p) => p.id !== productId);
+      }
+
+      // Step 3: If category has fewer than 4 products, top up with other active products
+      if (fallbackProducts.length < 4) {
+        const allProducts = await getProducts();
+        const existingIds = new Set([productId, ...fallbackProducts.map((p) => p.id)]);
+        const additional = allProducts.filter((p) => !existingIds.has(p.id));
+        fallbackProducts = [...fallbackProducts, ...additional].slice(0, 4);
+      } else {
+        fallbackProducts = fallbackProducts.slice(0, 4);
+      }
+
+      products = fallbackProducts;
+    } catch (fallbackErr) {
+      console.error('[AI Service] Relational fallback error:', fallbackErr.message);
+      Sentry.captureException(fallbackErr, {
+        tags: { module: 'ai', operation: 'getSimilarProducts-fallback' },
+        extra: { productId },
+      });
+    }
+  }
+
+  if (products.length > 0) {
+    try {
+      await redis.set(cacheKey, JSON.stringify(products), { EX: 300 });
+    } catch (redisErr) {
+      console.warn('Redis set error:', redisErr.message);
+    }
   }
 
   return products;

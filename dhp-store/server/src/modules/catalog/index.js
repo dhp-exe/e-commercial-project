@@ -18,6 +18,8 @@ export {
 export {
   hydrateProducts,
   getProductsByIds,
+  getProductById,
+  getProducts,
   getVariantPrice,
   getProductBasePrice,
   deductInventory,
