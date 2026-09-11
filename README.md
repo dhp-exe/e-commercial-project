@@ -46,14 +46,15 @@ DHP Store is a production-grade, full-stack e-commerce platform built with a **M
 - **Sentry Integration:** Full-stack error tracking and performance monitoring across both the React frontend (`@sentry/react`) and Node.js backend (`@sentry/node`), including automated Express error handler middleware.
 
 ### ⚙️ Technical
-- **Event-Driven Architecture (BullMQ):** All heavy or side-effect operations are processed asynchronously through Redis-backed job queues and dedicated workers:
-  | Queue | Worker | Purpose |
-  |:---|:---|:---|
-  | `email` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
-  | `stripe-webhook` | `stripeWorker` | Idempotent Stripe payment event processing |
-  | `ai-refresh` | `aiRefreshWorker` | Re-syncs product vectors to Pinecone |
-  | `cache` | `cacheWorker` | Invalidates and warms Redis cache entries |
-  | `cart-cleanup` | `cartCleanupWorker` | Weekly cron to purge abandoned guest carts |
+- **Event-Driven Architecture (BullMQ):** All heavy or side-effect operations are processed asynchronously through Redis-backed job queues and dedicated workers, co-located within their owning domain module:
+  | Queue | Module | Worker | Purpose |
+  |:---|:---|:---|:---|
+  | `email` | `communication` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
+  | `stripe-webhook` | `orders` | `stripeWorker` | Idempotent Stripe payment event processing |
+  | `ai-refresh` | `ai` | `aiRefreshWorker` | Re-syncs product vectors to Pinecone |
+  | `cache-invalidate` | `catalog` | `cacheWorker` | Invalidates and warms Redis cache entries |
+  | `cart-cleanup` | `orders` | `cartCleanupWorker` | Weekly cron to purge abandoned guest carts |
+  | `reservation-cleanup` | `catalog` | `reservationCleanupWorker` | 5-minute cron to release expired inventory reservations |
 
 - **Graceful Shutdown:** On SIGTERM/SIGINT, all BullMQ workers drain in-progress jobs, queues close, and the HTTP server shuts down cleanly.
 - **Database:** Optimized MySQL queries with connection pooling against TiDB Serverless (cloud).
@@ -79,74 +80,111 @@ DHP Store is a production-grade, full-stack e-commerce platform built with a **M
 
 **Architecture overview:**
 
-The system follows a **Modular Monolith** pattern: the Node.js backend is organized into distinct modules (routes, middleware, queues, workers) that communicate through well-defined interfaces and an event-driven message bus (BullMQ/Redis), while deploying as a single service for operational simplicity.
+The system follows a **Modular Monolith** pattern: the Node.js backend is organized into five **domain modules** (`auth_user`, `catalog`, `orders`, `communication`, `ai`) with a **shared infrastructure layer** (`shared/`). Each module encapsulates its own routes, controllers, services, repositories, queues, and workers behind a public facade (`index.js`). Cross-module communication is restricted to facade-exposed functions and BullMQ queues — no module may directly access another module's repository or database tables.
 
 - **Frontend (React/Vite):** Single-page application with client-side routing, TanStack Query for server-state management, and Sentry for error tracking. Google Identity Services provides one-click OAuth login.
 
-- **Backend (Node.js/Express):** The API server handles authentication, routing, rate limiting, and business logic. Instead of processing heavy side-effects synchronously, it **enqueues jobs** to BullMQ queues — dedicated workers then process emails, payment webhooks, cache invalidation, and AI refreshes asynchronously.
+- **Backend (Node.js/Express):** The API server's `index.js` serves as the **composition root**, importing exclusively from `shared/` and `modules/*/index.js`. Each domain module owns its business logic, data access, and background jobs. Heavy side-effects are processed asynchronously through BullMQ queues — dedicated workers co-located within their owning modules handle emails, payment webhooks, cache invalidation, cart cleanup, inventory reservation cleanup, and AI refreshes.
 
 - **Caching Layer (Redis):** Serves dual roles — both as a high-speed cache for product listings, categories, and the sitemap XML, and as the **message broker** for BullMQ job queues.
 
-- **Database (TiDB/MySQL):** The primary source of truth for users, products, orders, and transactional data. Connection pooling ensures efficient resource usage.
+- **Database (TiDB/MySQL):** The primary source of truth for users, products, orders, and transactional data. Each module encapsulates its SQL access in a dedicated `repository.js` using the shared connection pool.
 
 - **AI Microservice (Python/FastAPI):** An independent service that powers the Hybrid RAG pipeline — embedding product catalogs into Pinecone, performing semantic vector search, and using Gemini for conversational synthesis with strict grounding guardrails.
 
 **System Flow:**
 ```mermaid
 graph TD
-    %% Define Nodes
+    %% External Actors
     User([User / Browser])
+    Sentry(Sentry Error Tracking)
+
+    %% Frontend
     Frontend(React + Vite Frontend)
-    Backend(Node.js + Express Backend)
-    Redis[(Redis)]
-    TiDB[(TiDB / MySQL)]
+
+    %% External Services
+    Payments(Stripe / VNPay / PayPal)
+    EmailSMTP(Nodemailer / SMTP)
     AIService(Python AI Microservice)
     Pinecone[(Pinecone Vector DB)]
     Gemini(Google Gemini API)
-    Payments(Stripe / VNPay / PayPal)
-    Email(Nodemailer / SMTP)
-    Sentry(Sentry Error Tracking)
 
-    %% BullMQ Workers
-    Workers[BullMQ Workers]
+    %% Infrastructure
+    Redis[(Redis)]
+    TiDB[(TiDB / MySQL)]
 
     %% Define Connections
     User <-->|HTTPS / React Router| Frontend
-    Frontend <-->|REST API / JSON| Backend
+    Frontend <-->|REST API / JSON| CompositionRoot
     Frontend -.->|Error Reports| Sentry
-    
-    subgraph Core Infrastructure
-        Backend <-->|Cache Get/Set| Redis
-        Backend -->|Enqueue Jobs| Redis
-        Redis -->|Dequeue Jobs| Workers
-        Backend <-->|SQL Queries / Transactions| TiDB
-        Backend <-->|Internal HTTP| AIService
+
+    subgraph "Node.js Backend (Modular Monolith)"
+        CompositionRoot["index.js (Composition Root)"]
+
+        subgraph "shared/"
+            Pool["db/pool.js"]
+            RedisClient["cache/redis.js"]
+            MW["middleware/"]
+            QConn["queues/connection.js"]
+        end
+
+        subgraph "modules/"
+            AuthUser["auth_user"]
+            Catalog["catalog"]
+            Orders["orders"]
+            Comm["communication"]
+            AI["ai"]
+        end
+
+        CompositionRoot --> AuthUser
+        CompositionRoot --> Catalog
+        CompositionRoot --> Orders
+        CompositionRoot --> Comm
+        CompositionRoot --> AI
+
+        AuthUser -->|facade call| Orders
+        Orders -->|facade call| Catalog
+        Orders -->|enqueue email| Comm
+        AuthUser -->|enqueue email| Comm
+        AI -->|facade call| Catalog
+        AI -->|facade call| Orders
     end
 
-    subgraph AI Pipeline
-        AIService <-->|Embeddings & Chat| Gemini
+    %% Infrastructure Connections
+    Pool <-->|SQL Queries| TiDB
+    RedisClient <-->|Cache Get/Set| Redis
+    QConn -->|BullMQ Jobs| Redis
+    AI -->|Internal HTTP| AIService
+    Comm -->|Send Emails| EmailSMTP
+    Orders -->|Process Payments| Payments
+    CompositionRoot -.->|Error Reports| Sentry
+
+    subgraph "AI Pipeline"
+        AIService <-->|Embeddings and Chat| Gemini
         AIService <-->|Vector Search| Pinecone
-    end
-
-    subgraph External Integrations
-        Workers -->|Send Emails| Email
-        Workers -->|Process Payments| Payments
-        Backend -.->|Error Reports| Sentry
     end
 
     %% Styling
     style User fill:#f9f9f9,stroke:#333,stroke-width:2px
     style Frontend fill:#61dafb,stroke:#333,color:#000
-    style Backend fill:#68a063,stroke:#333,color:#fff
+    style CompositionRoot fill:#68a063,stroke:#333,color:#fff
+    style AuthUser fill:#4a90d9,stroke:#333,color:#fff
+    style Catalog fill:#7cb342,stroke:#333,color:#fff
+    style Orders fill:#ef6c00,stroke:#333,color:#fff
+    style Comm fill:#26a69a,stroke:#333,color:#fff
+    style AI fill:#ab47bc,stroke:#333,color:#fff
     style Redis fill:#dc382d,stroke:#333,color:#fff
     style TiDB fill:#4479a1,stroke:#333,color:#fff
     style AIService fill:#3776ab,stroke:#333,color:#fff
     style Pinecone fill:#000000,stroke:#333,color:#fff
     style Gemini fill:#ea4335,stroke:#333,color:#fff
     style Payments fill:#6772e5,stroke:#333,color:#fff
-    style Email fill:#fbbc04,stroke:#333,color:#000
-    style Workers fill:#ff6b35,stroke:#333,color:#fff
+    style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
     style Sentry fill:#362d59,stroke:#333,color:#fff
+    style Pool fill:#4479a1,stroke:#333,color:#fff
+    style RedisClient fill:#dc382d,stroke:#333,color:#fff
+    style MW fill:#78909c,stroke:#333,color:#fff
+    style QConn fill:#ff6b35,stroke:#333,color:#fff
 ```
 
 **Hybrid RAG AI Pipeline:**
@@ -176,6 +214,16 @@ flowchart LR
 ```
 
 **Event-Driven Job Processing (BullMQ):**
+
+  | Queue | Module Owner | Worker | Purpose |
+  |:---|:---|:---|:---|
+  | `email` | `communication` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
+  | `stripe-webhook` | `orders` | `stripeWorker` | Idempotent Stripe payment event processing |
+  | `ai-refresh` | `ai` | `aiRefreshWorker` | Re-syncs product vectors to Pinecone |
+  | `cache-invalidate` | `catalog` | `cacheWorker` | Invalidates and warms Redis cache entries |
+  | `cart-cleanup` | `orders` | `cartCleanupWorker` | Weekly cron to purge abandoned guest carts |
+  | `reservation-cleanup` | `catalog` | `reservationCleanupWorker` | 5-minute cron to release expired inventory reservations |
+
 ```mermaid
 flowchart LR
     subgraph Producers
@@ -184,6 +232,7 @@ flowchart LR
         C[Admin Refresh] -->|enqueue| Q3[ai-refresh queue]
         D[Product Mutation] -->|enqueue| Q4[cache queue]
         E[Weekly Cron] -->|enqueue| Q5[cart-cleanup queue]
+        F[5-min Cron] -->|enqueue| Q6[reservation-cleanup queue]
     end
 
     subgraph "Redis (Message Broker)"
@@ -192,14 +241,16 @@ flowchart LR
         Q3
         Q4
         Q5
+        Q6
     end
 
-    subgraph Workers
-        Q1 --> W1[emailWorker]
-        Q2 --> W2[stripeWorker]
-        Q3 --> W3[aiRefreshWorker]
-        Q4 --> W4[cacheWorker]
-        Q5 --> W5[cartCleanupWorker]
+    subgraph "Module Workers"
+        Q1 --> W1["communication/emailWorker"]
+        Q2 --> W2["orders/stripeWorker"]
+        Q3 --> W3["ai/aiRefreshWorker"]
+        Q4 --> W4["catalog/cacheWorker"]
+        Q5 --> W5["orders/cartCleanupWorker"]
+        Q6 --> W6["catalog/reservationCleanupWorker"]
     end
 
     W1 -->|SMTP| F1[Send Email]
@@ -207,12 +258,14 @@ flowchart LR
     W3 -->|HTTP| F3[Sync Pinecone]
     W4 -->|Redis DEL| F4[Invalidate Cache]
     W5 -->|SQL| F5[Purge Stale Carts]
+    W6 -->|SQL| F6[Release Reservations]
 
     style Q1 fill:#dc382d,stroke:#333,color:#fff
     style Q2 fill:#dc382d,stroke:#333,color:#fff
     style Q3 fill:#dc382d,stroke:#333,color:#fff
     style Q4 fill:#dc382d,stroke:#333,color:#fff
     style Q5 fill:#dc382d,stroke:#333,color:#fff
+    style Q6 fill:#dc382d,stroke:#333,color:#fff
 ```
 
 ## 🌐 API Documentation
@@ -278,39 +331,39 @@ Below is a summary of the core REST API endpoints available in the Node.js backe
 dhp-store/
 ├── docker-compose.yml
 ├── package.json
-├── client/                         # Frontend (React + Vite)
+├── client/                                  # Frontend (React + Vite)
 │   ├── Dockerfile
-│   ├── index.html                  # SEO meta tags, Google Identity Services
+│   ├── index.html                           # SEO meta tags, Google Identity Services
 │   ├── nginx.conf
 │   ├── package.json
 │   ├── vite.config.js
 │   └── src/
 │       ├── api.js
-│       ├── main.jsx                # Sentry init, TanStack Query, HelmetProvider
+│       ├── main.jsx                         # Sentry init, TanStack Query, HelmetProvider
 │       ├── App.jsx
 │       ├── styles.css
 │       ├── assets/
 │       ├── components/
 │       │   ├── Navbar.jsx
 │       │   ├── CartDrawer.jsx
-│       │   ├── ChatBot.jsx         # AI chatbot widget
+│       │   ├── ChatBot.jsx                  # AI chatbot widget
 │       │   ├── GoogleLoginButton.jsx
 │       │   ├── LoadingScreen.jsx
 │       │   ├── RecommendRow.jsx
 │       │   └── ProtectedRoute.jsx
 │       ├── context/
-│       │   ├── AuthContext.jsx      # JWT + Google OAuth state
+│       │   ├── AuthContext.jsx               # JWT + Google OAuth state
 │       │   ├── CartContext.jsx
 │       │   └── SearchContext.jsx
 │       ├── hooks/
-│       │   └── useProducts.js       # TanStack Query hook factory
+│       │   └── useProducts.js                # TanStack Query hook factory
 │       └── pages/
 │           ├── Home.jsx
 │           ├── Products.jsx
 │           ├── ProductDetails.jsx
 │           ├── Cart.jsx
 │           ├── Checkout.jsx
-│           ├── Login.jsx            # Local + Google OAuth login
+│           ├── Login.jsx                     # Local + Google OAuth login
 │           ├── Account.jsx
 │           ├── About.jsx
 │           ├── Contact.jsx
@@ -322,54 +375,100 @@ dhp-store/
 │               ├── AdminDashboard.jsx
 │               ├── ManageProducts.jsx
 │               └── ManageOrders.jsx
-├── server/                          # Backend (Node.js + Express)
+├── server/                                   # Backend (Node.js + Express — Modular Monolith)
 │   ├── Dockerfile
 │   ├── package.json
 │   └── src/
-│       ├── index.js                 # Express app entry, Bull Board, Sentry, graceful shutdown
-│       ├── config.js                # Environment variable validation
-│       ├── db.js                    # MySQL connection pool
-│       ├── cache/
-│       │   └── redis.js             # Redis client instance
-│       ├── middleware/
-│       │   ├── requireAuth.js       # JWT cookie verification
-│       │   ├── requireRole.js       # RBAC (Admin/Staff)
-│       │   ├── rateLimit.js         # IP-based rate limiters
-│       │   └── upload.js            # Multer file upload config
-│       ├── queues/                  # BullMQ job queue definitions
-│       │   ├── connection.js        # Shared Redis connection for BullMQ
-│       │   ├── emailQueue.js
-│       │   ├── aiRefreshQueue.js
-│       │   ├── cacheQueue.js
-│       │   ├── stripeQueue.js
-│       │   └── cartCleanupQueue.js
-│       ├── workers/                 # BullMQ job processors
-│       │   ├── emailWorker.js       # Order confirmation & password-reset emails
-│       │   ├── stripeWorker.js      # Stripe payment event processing
-│       │   ├── aiRefreshWorker.js   # Pinecone vector re-sync trigger
-│       │   ├── cacheWorker.js       # Redis cache invalidation
-│       │   └── cartCleanupWorker.js # Weekly abandoned cart purge
-│       ├── routes/
-│       │   ├── auth.js              # Registration, login, Google OAuth, password flows
-│       │   ├── products.js
-│       │   ├── cart.js
-│       │   ├── orders.js
-│       │   ├── feedback.js
-│       │   ├── recommendations.js   # AI product recommendations (proxied to AI service)
-│       │   ├── chat.js              # AI chatbot (proxied to AI service)
-│       │   ├── sitemap.js           # Dynamic XML sitemap generation
-│       │   └── webhooks.js          # Stripe webhook receiver
-│       ├── utils/
-│       │   ├── mailer.js            # Nodemailer transporter
-│       │   └── formatImageUrl.js
-│       └── uploads/                 # Uploaded images/files
-├── ai-service/                      # AI Microservice (Python / FastAPI)
+│       ├── index.js                          # Composition root: route mounting, Bull Board, Sentry, graceful shutdown
+│       ├── config.js                         # Environment variable validation
+│       │
+│       ├── shared/                           # Cross-cutting infrastructure (no domain logic)
+│       │   ├── db/
+│       │   │   └── pool.js                   # MySQL2 connection pool
+│       │   ├── cache/
+│       │   │   └── redis.js                  # node-redis client (graceful degradation)
+│       │   ├── middleware/
+│       │   │   ├── csrf.js                   # Custom CSRF header check
+│       │   │   ├── rateLimit.js              # Global, API, and Auth rate limiters
+│       │   │   ├── requireAuth.js            # JWT cookie verification + Redis user cache
+│       │   │   ├── requireRole.js            # Admin/Staff role guards
+│       │   │   └── upload.js                 # Multer disk storage configuration
+│       │   ├── queues/
+│       │   │   └── connection.js             # Shared IORedis connection config for BullMQ
+│       │   ├── errors/
+│       │   │   └── AppError.js               # Custom error class
+│       │   └── utils/
+│       │       ├── formatImageUrl.js         # Image URL constructor
+│       │       ├── generateSku.js            # Deterministic SKU generation
+│       │       └── validatePassword.js       # Password complexity validator
+│       │
+│       ├── modules/                          # Domain modules (vertical slices)
+│       │   ├── auth_user/                    # Authentication, sessions, JWT, OAuth, profiles
+│       │   │   ├── index.js                  # Public facade: { authRouter }
+│       │   │   ├── routes.js
+│       │   │   ├── controller.js
+│       │   │   ├── service.js
+│       │   │   └── repository.js
+│       │   │
+│       │   ├── catalog/                      # Products, variants, inventory, sitemap, cache
+│       │   │   ├── index.js                  # Public facade: { catalogRouter, sitemapRouter, hydrateProducts, ... }
+│       │   │   ├── routes.js
+│       │   │   ├── controller.js
+│       │   │   ├── service.js
+│       │   │   ├── repository.js
+│       │   │   ├── sitemap.js                # Dynamic XML sitemap generation
+│       │   │   ├── queues/
+│       │   │   │   ├── cacheQueue.js
+│       │   │   │   └── reservationCleanupQueue.js
+│       │   │   └── workers/
+│       │   │       ├── cacheWorker.js
+│       │   │       └── reservationCleanupWorker.js
+│       │   │
+│       │   ├── orders/                       # Cart, orders, checkout, Stripe webhooks
+│       │   │   ├── index.js                  # Public facade: { ordersRouter, cartRouter, getOrderStatsByUserId, ... }
+│       │   │   ├── routes.js
+│       │   │   ├── controller.js
+│       │   │   ├── service.js
+│       │   │   ├── repository.js
+│       │   │   ├── webhooks.js               # Stripe webhook receiver
+│       │   │   ├── queues/
+│       │   │   │   ├── stripeQueue.js
+│       │   │   │   └── cartCleanupQueue.js
+│       │   │   └── workers/
+│       │   │       ├── stripeWorker.js
+│       │   │       └── cartCleanupWorker.js
+│       │   │
+│       │   ├── ai/                           # AI recommendations, chatbot, model refresh
+│       │   │   ├── index.js                  # Public facade: { recommendRouter, chatRouter, aiRefreshQueue }
+│       │   │   ├── service.js
+│       │   │   ├── routes/
+│       │   │   │   ├── recommendations.js
+│       │   │   │   └── chat.js
+│       │   │   ├── queues/
+│       │   │   │   └── aiRefreshQueue.js
+│       │   │   └── workers/
+│       │   │       └── aiRefreshWorker.js
+│       │   │
+│       │   └── communication/                # Feedback, emails, mailer
+│       │       ├── index.js                  # Public facade: { emailQueue, feedbackRouter }
+│       │       ├── routes.js
+│       │       ├── controller.js
+│       │       ├── service.js
+│       │       ├── repository.js
+│       │       ├── mailer.js                 # Nodemailer SMTP transporter
+│       │       ├── queues/
+│       │       │   └── emailQueue.js
+│       │       └── workers/
+│       │           └── emailWorker.js
+│       │
+│       └── uploads/                          # User-uploaded images/files
+├── ai-service/                               # AI Microservice (Python / FastAPI)
 │   ├── Dockerfile
-│   ├── main.py                      # FastAPI app (recommend, chat, refresh endpoints)
-│   ├── recommender.py               # Hybrid RAG: Pydantic schemas, Pinecone search, Gemini chat
+│   ├── main.py                               # FastAPI app (recommend, chat, refresh endpoints)
+│   ├── recommender.py                        # Hybrid RAG: Pydantic schemas, Pinecone search, Gemini chat
 │   ├── requirements.txt
 │   └── app/
-│       └── vector_store.py          # Pinecone ingestion & embedding generation
+│       └── vector_store.py                   # Pinecone ingestion & embedding generation
 └── README.md
 ```
 
