@@ -1,22 +1,6 @@
 /**
- * Cache invalidation job queue.
- *
- * Offloads Redis SCAN-based cache clearing from the request path.
- * Jobs are enqueued from product mutation routes and processed by cacheWorker.js.
- *
- * Job Schema:
- *   { type: 'cache-invalidate', pattern: string, productId?: number }
+ * Legacy forwarder for backward compatibility during Modular Monolith migration.
+ * @deprecated Import from 'modules/catalog/index.js' instead.
  */
 
-import { Queue } from 'bullmq';
-import { connection } from '../shared/queues/connection.js';
-
-export const cacheQueue = new Queue('cache-invalidate', {
-  connection,
-  defaultJobOptions: {
-    attempts: 2,
-    backoff: { type: 'fixed', delay: 2000 },
-    removeOnComplete: { count: 200 },
-    removeOnFail: { count: 200 },
-  },
-});
+export { cacheQueue, cacheQueue as default } from '../modules/catalog/index.js';

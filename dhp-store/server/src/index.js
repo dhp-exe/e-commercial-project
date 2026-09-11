@@ -10,14 +10,13 @@ if (process.env.SENTRY_DSN) {
 import express from 'express';
 import cors from 'cors';
 import { authRouter } from './modules/auth_user/index.js';
-import products from './routes/products.js';
+import { catalogRouter, sitemapRouter, cacheQueue, reservationCleanupQueue, scheduleReservationCleanup } from './modules/catalog/index.js';
 import cart from './routes/cart.js';
 import orders from './routes/orders.js';
 import { feedbackRouter } from './modules/communication/index.js';
 import recommendations from './routes/recommendations.js';
 import chat from './routes/chat.js';
 import webhooks from './routes/webhooks.js';
-import sitemap from './routes/sitemap.js';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import { csrfProtection } from './shared/middleware/csrf.js';
@@ -35,16 +34,14 @@ import { ExpressAdapter } from '@bull-board/express';
 // ── BullMQ Workers & Queues ─────────────────────────────────────────
 import emailWorker from './modules/communication/workers/emailWorker.js';
 import aiRefreshWorker from './workers/aiRefreshWorker.js';
-import cacheWorker from './workers/cacheWorker.js';
+import cacheWorker from './modules/catalog/workers/cacheWorker.js';
 import stripeWorker from './workers/stripeWorker.js';
 import cartCleanupWorker from './workers/cartCleanupWorker.js';
-import reservationCleanupWorker from './workers/reservationCleanupWorker.js';
+import reservationCleanupWorker from './modules/catalog/workers/reservationCleanupWorker.js';
 import { emailQueue } from './modules/communication/index.js';
 import { aiRefreshQueue } from './queues/aiRefreshQueue.js';
-import { cacheQueue } from './queues/cacheQueue.js';
 import { stripeQueue } from './queues/stripeQueue.js';
 import { cartCleanupQueue, scheduleCartCleanup } from './queues/cartCleanupQueue.js';
-import { reservationCleanupQueue, scheduleReservationCleanup } from './queues/reservationCleanupQueue.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -133,7 +130,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
 
 // ── API Routes ──────────────────────────────────────────────────────
 app.use('/api/auth', authRouter);
-app.use('/api/products', products);
+app.use('/api/products', catalogRouter);
 app.use('/api/cart', cart);
 app.use('/api/orders', orders);
 app.use('/api/feedback', feedbackRouter);
@@ -142,13 +139,13 @@ app.use('/api/chat', chat);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 // ── SEO ────────────────────────────────────────────────────────────────────
-app.use('/sitemap.xml', sitemap);
+app.use('/sitemap.xml', sitemapRouter);
 
 // ── Admin Dashboard (disabled in production for security) ───────────
 if (process.env.NODE_ENV !== 'production') {
   app.use('/admin/queues', requireAuth, verifyAdmin, serverAdapter.getRouter());
 
-  app.get("/debug-sentry", function triggerError(req, res) {
+  app.get("/debug-sentry", function triggerError(_req, _res) {
     throw new Error("Sentry verification test error!");
   });
 }

@@ -7,7 +7,7 @@ import { requireAuth } from '../shared/middleware/requireAuth.js';
 import { verifyAdmin } from '../shared/middleware/requireRole.js';
 import { apiLimiter } from '../shared/middleware/rateLimit.js';
 import { aiRefreshQueue } from '../queues/aiRefreshQueue.js';
-import { hydrateProducts } from './products.js';
+import { hydrateProducts } from '../modules/catalog/index.js';
 
 const router = Router();
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';

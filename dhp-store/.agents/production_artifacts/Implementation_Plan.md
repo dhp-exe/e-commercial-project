@@ -50,7 +50,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 4: Extract `catalog` Module — [CURRENT]
+### Phase 4: Extract `catalog` Module — [COMPLETED]
 - **Tasks:**
   - Split `routes/products.js` into `modules/catalog/` (`routes.js`, `controller.js`, `service.js`, `repository.js`).
   - Move `routes/sitemap.js` to `modules/catalog/sitemap.js`.
@@ -64,7 +64,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 5: Extract `orders` Module
+### Phase 5: Extract `orders` Module — [CURRENT]
 - **Tasks:**
   - Split `routes/orders.js` and `routes/cart.js` into `modules/orders/` (`routes.js`, `controller.js`, `service.js`, `repository.js`).
   - Move `routes/webhooks.js` to `modules/orders/webhooks.js`.
