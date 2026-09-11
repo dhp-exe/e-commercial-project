@@ -6,7 +6,7 @@ import * as Sentry from '@sentry/node';
 import { requireAuth } from '../shared/middleware/requireAuth.js';
 import { apiLimiter } from '../shared/middleware/rateLimit.js';
 import { verifyStaff } from '../shared/middleware/requireRole.js';
-import { emailQueue } from '../queues/emailQueue.js';
+import { emailQueue } from '../modules/communication/index.js';
 import { formatImageUrl } from '../shared/utils/formatImageUrl.js';
 
 const router = Router();

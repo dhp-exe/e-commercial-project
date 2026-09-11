@@ -10,7 +10,7 @@ import { requireAuth } from '../shared/middleware/requireAuth.js';
 import upload from '../shared/middleware/upload.js';
 import { authLimiter } from '../shared/middleware/rateLimit.js';
 import { formatImageUrl } from '../shared/utils/formatImageUrl.js';
-import { emailQueue } from '../queues/emailQueue.js';
+import { emailQueue } from '../modules/communication/index.js';
 import { validatePassword } from '../shared/utils/validatePassword.js';
 
 dotenv.config();

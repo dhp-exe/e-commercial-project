@@ -12,7 +12,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ## Phase Breakdown
 
-### Phase 1: Extract `shared/` Infrastructure — [CURRENT]
+### Phase 1: Extract `shared/` Infrastructure — [COMPLETED]
 - **Tasks:**
   - Create directory hierarchy `server/src/shared/`: `db/`, `cache/`, `middleware/`, `queues/`, `utils/`, `errors/`.
   - Move database pool from `server/src/db.js` to `server/src/shared/db/pool.js`.
@@ -26,7 +26,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 2: Extract `communication` Module
+### Phase 2: Extract `communication` Module — [COMPLETED]
 - **Tasks:**
   - Split `routes/feedback.js` into `modules/communication/` (`routes.js`, `controller.js`, `service.js`, `repository.js`).
   - Move `queues/emailQueue.js` to `modules/communication/queues/emailQueue.js`.
@@ -38,7 +38,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 3: Extract `auth_user` Module
+### Phase 3: Extract `auth_user` Module — [CURRENT]
 - **Tasks:**
   - Split `routes/auth.js` into `modules/auth_user/` (`routes.js`, `controller.js`, `service.js`, `repository.js`).
   - Create `modules/auth_user/index.js` exporting `{ authRouter }`.
