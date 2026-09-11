@@ -38,7 +38,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 3: Extract `auth_user` Module — [CURRENT]
+### Phase 3: Extract `auth_user` Module — [COMPLETED]
 - **Tasks:**
   - Split `routes/auth.js` into `modules/auth_user/` (`routes.js`, `controller.js`, `service.js`, `repository.js`).
   - Create `modules/auth_user/index.js` exporting `{ authRouter }`.
@@ -50,7 +50,7 @@ Based on the updated and approved [Technical_Specification.md](file:///Users/doh
 
 ---
 
-### Phase 4: Extract `catalog` Module
+### Phase 4: Extract `catalog` Module — [CURRENT]
 - **Tasks:**
   - Split `routes/products.js` into `modules/catalog/` (`routes.js`, `controller.js`, `service.js`, `repository.js`).
   - Move `routes/sitemap.js` to `modules/catalog/sitemap.js`.

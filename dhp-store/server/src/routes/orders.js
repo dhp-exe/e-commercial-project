@@ -507,4 +507,23 @@ router.put('/:id/status', requireAuth, verifyStaff, async (req, res) => {
   }
 });
 
+/**
+ * Get order status counts for a given user.
+ * Exposed for cross-module calls (auth_user profile stats).
+ *
+ * @param {number|string} userId
+ * @returns {Promise<Object>} Object mapping status to count
+ */
+export async function getOrderStatsByUserId(userId) {
+  const [counts] = await pool.execute(
+    'SELECT status, COUNT(*) as count FROM orders WHERE user_id = ? GROUP BY status',
+    [userId]
+  );
+  const orderStats = { new: 0, confirmed: 0, shipping: 0, received: 0, cancelled: 0 };
+  counts.forEach((row) => {
+    if (orderStats[row.status] !== undefined) orderStats[row.status] = row.count;
+  });
+  return orderStats;
+}
+
 export default router;

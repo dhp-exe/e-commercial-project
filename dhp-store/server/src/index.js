@@ -9,7 +9,7 @@ if (process.env.SENTRY_DSN) {
 
 import express from 'express';
 import cors from 'cors';
-import auth from './routes/auth.js';
+import { authRouter } from './modules/auth_user/index.js';
 import products from './routes/products.js';
 import cart from './routes/cart.js';
 import orders from './routes/orders.js';
@@ -132,7 +132,7 @@ app.use(csrfProtection);
 app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
 
 // ── API Routes ──────────────────────────────────────────────────────
-app.use('/api/auth', auth);
+app.use('/api/auth', authRouter);
 app.use('/api/products', products);
 app.use('/api/cart', cart);
 app.use('/api/orders', orders);
