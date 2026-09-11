@@ -225,47 +225,73 @@ flowchart LR
   | `reservation-cleanup` | `catalog` | `reservationCleanupWorker` | 5-minute cron to release expired inventory reservations |
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 flowchart LR
-    subgraph Producers
-        A[Order Placed] -->|enqueue| Q1[email queue]
-        B[Stripe Webhook] -->|enqueue| Q2[stripe-webhook queue]
-        C[Admin Refresh] -->|enqueue| Q3[ai-refresh queue]
-        D[Product Mutation] -->|enqueue| Q4[cache queue]
-        E[Weekly Cron] -->|enqueue| Q5[cart-cleanup queue]
-        F[5-min Cron] -->|enqueue| Q6[reservation-cleanup queue]
-    end
+ subgraph s1["shared/"]
+        Pool["db/pool.js"]
+        RedisClient["cache/redis.js"]
+        MW["middleware/"]
+        QConn["queues/connection.js"]
+  end
+ subgraph s2["modules/"]
+        AuthUser["auth_user"]
+        Catalog["catalog"]
+        Orders["orders"]
+        Comm["communication"]
+        AI["ai"]
+  end
+ subgraph subGraph2["Node.js Backend (Modular Monolith)"]
+        CompositionRoot["index.js (Composition Root)"]
+        s1
+        s2
+  end
+ subgraph subGraph3["AI Pipeline"]
+        Gemini("Google Gemini API")
+        AIService("Python AI Microservice")
+        Pinecone[("Pinecone Vector DB")]
+  end
+    User(["User / Browser"]) <-- HTTPS / React Router --> Frontend("React + Vite Frontend")
+    Frontend <-- REST API / JSON --> CompositionRoot
+    Frontend -. Error Reports .-> Sentry("Sentry Error Tracking")
+    CompositionRoot --> AuthUser & Catalog & Orders & Comm & AI
+    AuthUser -- facade call --> Orders
+    Orders -- facade call --> Catalog
+    Orders -- enqueue email --> Comm
+    AuthUser -- enqueue email --> Comm
+    AI -- facade call --> Catalog & Orders
+    Pool <-- SQL Queries --> TiDB[("TiDB / MySQL")]
+    RedisClient <-- Cache Get/Set --> Redis[("Redis")]
+    AI -- Internal HTTP --> AIService
+    Comm -- Send Emails --> EmailSMTP("Nodemailer / SMTP")
+    Orders -- Process Payments --> Payments("Stripe / VNPay / PayPal")
+    CompositionRoot -. Error Reports .-> Sentry
+    AIService <-- Embeddings and Chat --> Gemini
+    AIService <-- Vector Search --> Pinecone
+    QConn -- BullMQ Jobs --> Redis
 
-    subgraph "Redis (Message Broker)"
-        Q1
-        Q2
-        Q3
-        Q4
-        Q5
-        Q6
-    end
-
-    subgraph "Module Workers"
-        Q1 --> W1["communication/emailWorker"]
-        Q2 --> W2["orders/stripeWorker"]
-        Q3 --> W3["ai/aiRefreshWorker"]
-        Q4 --> W4["catalog/cacheWorker"]
-        Q5 --> W5["orders/cartCleanupWorker"]
-        Q6 --> W6["catalog/reservationCleanupWorker"]
-    end
-
-    W1 -->|SMTP| F1[Send Email]
-    W2 -->|SQL| F2[Confirm Payment]
-    W3 -->|HTTP| F3[Sync Pinecone]
-    W4 -->|Redis DEL| F4[Invalidate Cache]
-    W5 -->|SQL| F5[Purge Stale Carts]
-    W6 -->|SQL| F6[Release Reservations]
-
-    style Q1 fill:#dc382d,stroke:#333,color:#fff
-    style Q2 fill:#dc382d,stroke:#333,color:#fff
-    style Q3 fill:#dc382d,stroke:#333,color:#fff
-    style Q4 fill:#dc382d,stroke:#333,color:#fff
-    style Q5 fill:#dc382d,stroke:#333,color:#fff
-    style Q6 fill:#dc382d,stroke:#333,color:#fff
+    style Pool fill:#4479a1,stroke:#333,color:#fff
+    style RedisClient fill:#dc382d,stroke:#333,color:#fff
+    style MW fill:#78909c,stroke:#333,color:#fff
+    style QConn fill:#ff6b35,stroke:#333,color:#fff
+    style AuthUser fill:#4a90d9,stroke:#333,color:#fff
+    style Catalog fill:#7cb342,stroke:#333,color:#fff
+    style Orders fill:#ef6c00,stroke:#333,color:#fff
+    style Comm fill:#26a69a,stroke:#333,color:#fff
+    style AI fill:#ab47bc,stroke:#333,color:#fff
+    style CompositionRoot fill:#68a063,stroke:#333,color:#fff
+    style Gemini fill:#ea4335,stroke:#333,color:#fff
+    style AIService fill:#3776ab,stroke:#333,color:#fff
+    style Pinecone fill:#000000,stroke:#333,color:#fff
+    style User fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style Frontend fill:#61dafb,stroke:#333,color:#000
+    style Sentry fill:#362d59,stroke:#333,color:#fff
+    style TiDB fill:#4479a1,stroke:#333,color:#fff
+    style Redis fill:#dc382d,stroke:#333,color:#fff
+    style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
+    style Payments fill:#6772e5,stroke:#333,color:#fff
 ```
 
 ## 🌐 API Documentation
