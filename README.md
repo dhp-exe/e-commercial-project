@@ -94,137 +94,6 @@ The system follows a **Modular Monolith** pattern: the Node.js backend is organi
 
 **System Flow:**
 ```mermaid
-graph TD
-    %% External Actors
-    User([User / Browser])
-    Sentry(Sentry Error Tracking)
-
-    %% Frontend
-    Frontend(React + Vite Frontend)
-
-    %% External Services
-    Payments(Stripe / VNPay / PayPal)
-    EmailSMTP(Nodemailer / SMTP)
-    AIService(Python AI Microservice)
-    Pinecone[(Pinecone Vector DB)]
-    Gemini(Google Gemini API)
-
-    %% Infrastructure
-    Redis[(Redis)]
-    TiDB[(TiDB / MySQL)]
-
-    %% Define Connections
-    User <-->|HTTPS / React Router| Frontend
-    Frontend <-->|REST API / JSON| CompositionRoot
-    Frontend -.->|Error Reports| Sentry
-
-    subgraph "Node.js Backend (Modular Monolith)"
-        CompositionRoot["index.js (Composition Root)"]
-
-        subgraph "shared/"
-            Pool["db/pool.js"]
-            RedisClient["cache/redis.js"]
-            MW["middleware/"]
-            QConn["queues/connection.js"]
-        end
-
-        subgraph "modules/"
-            AuthUser["auth_user"]
-            Catalog["catalog"]
-            Orders["orders"]
-            Comm["communication"]
-            AI["ai"]
-        end
-
-        CompositionRoot --> AuthUser
-        CompositionRoot --> Catalog
-        CompositionRoot --> Orders
-        CompositionRoot --> Comm
-        CompositionRoot --> AI
-
-        AuthUser -->|facade call| Orders
-        Orders -->|facade call| Catalog
-        Orders -->|enqueue email| Comm
-        AuthUser -->|enqueue email| Comm
-        AI -->|facade call| Catalog
-        AI -->|facade call| Orders
-    end
-
-    %% Infrastructure Connections
-    Pool <-->|SQL Queries| TiDB
-    RedisClient <-->|Cache Get/Set| Redis
-    QConn -->|BullMQ Jobs| Redis
-    AI -->|Internal HTTP| AIService
-    Comm -->|Send Emails| EmailSMTP
-    Orders -->|Process Payments| Payments
-    CompositionRoot -.->|Error Reports| Sentry
-
-    subgraph "AI Pipeline"
-        AIService <-->|Embeddings and Chat| Gemini
-        AIService <-->|Vector Search| Pinecone
-    end
-
-    %% Styling
-    style User fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Frontend fill:#61dafb,stroke:#333,color:#000
-    style CompositionRoot fill:#68a063,stroke:#333,color:#fff
-    style AuthUser fill:#4a90d9,stroke:#333,color:#fff
-    style Catalog fill:#7cb342,stroke:#333,color:#fff
-    style Orders fill:#ef6c00,stroke:#333,color:#fff
-    style Comm fill:#26a69a,stroke:#333,color:#fff
-    style AI fill:#ab47bc,stroke:#333,color:#fff
-    style Redis fill:#dc382d,stroke:#333,color:#fff
-    style TiDB fill:#4479a1,stroke:#333,color:#fff
-    style AIService fill:#3776ab,stroke:#333,color:#fff
-    style Pinecone fill:#000000,stroke:#333,color:#fff
-    style Gemini fill:#ea4335,stroke:#333,color:#fff
-    style Payments fill:#6772e5,stroke:#333,color:#fff
-    style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
-    style Sentry fill:#362d59,stroke:#333,color:#fff
-    style Pool fill:#4479a1,stroke:#333,color:#fff
-    style RedisClient fill:#dc382d,stroke:#333,color:#fff
-    style MW fill:#78909c,stroke:#333,color:#fff
-    style QConn fill:#ff6b35,stroke:#333,color:#fff
-```
-
-**Hybrid RAG AI Pipeline:**
-```mermaid
-flowchart LR
-    A[User Chat Message] --> B[Gemini Structured Output]
-    B -->|SearchFilters JSON| C{Intent?}
-    C -->|STORE_INFO| D[Store Facts Prompt → Gemini]
-    C -->|GENERAL| E[General Prompt → Gemini]
-    C -->|PRODUCT_SEARCH| F[Embed search_query]
-    F -->|gemini-embedding-2| G[768-dim Vector]
-    G --> H[Pinecone Query + Metadata Filters]
-    H -->|max_price · category| I[Top-K Product Matches]
-    I --> J[Grounded Prompt + Context → Gemini]
-    J --> K[AI Response to User]
-    D --> K
-    E --> K
-
-    style A fill:#61dafb,stroke:#333,color:#000
-    style B fill:#ea4335,stroke:#333,color:#fff
-    style F fill:#ea4335,stroke:#333,color:#fff
-    style G fill:#3776ab,stroke:#333,color:#fff
-    style H fill:#000000,stroke:#333,color:#fff
-    style I fill:#000000,stroke:#333,color:#fff
-    style J fill:#ea4335,stroke:#333,color:#fff
-    style K fill:#68a063,stroke:#333,color:#fff
-```
-
-**Event-Driven Job Processing (BullMQ):**
-
-  | Queue | Module Owner | Worker | Purpose |
-  |:---|:---|:---|:---|
-  | `email` | `communication` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
-  | `stripe-webhook` | `orders` | `stripeWorker` | Idempotent Stripe payment event processing |
-  | `ai-refresh` | `ai` | `aiRefreshWorker` | Re-syncs product vectors to Pinecone |
-  | `cache-invalidate` | `catalog` | `cacheWorker` | Invalidates and warms Redis cache entries |
-  | `cart-cleanup` | `orders` | `cartCleanupWorker` | Weekly cron to purge abandoned guest carts |
-  | `reservation-cleanup` | `catalog` | `reservationCleanupWorker` | 5-minute cron to release expired inventory reservations |
-
-```mermaid
 ---
 config:
   layout: elk
@@ -293,6 +162,45 @@ flowchart LR
     style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
     style Payments fill:#6772e5,stroke:#333,color:#fff
 ```
+
+**Hybrid RAG AI Pipeline:**
+```mermaid
+flowchart LR
+    A[User Chat Message] --> B[Gemini Structured Output]
+    B -->|SearchFilters JSON| C{Intent?}
+    C -->|STORE_INFO| D[Store Facts Prompt → Gemini]
+    C -->|GENERAL| E[General Prompt → Gemini]
+    C -->|PRODUCT_SEARCH| F[Embed search_query]
+    F -->|gemini-embedding-2| G[768-dim Vector]
+    G --> H[Pinecone Query + Metadata Filters]
+    H -->|max_price · category| I[Top-K Product Matches]
+    I --> J[Grounded Prompt + Context → Gemini]
+    J --> K[AI Response to User]
+    D --> K
+    E --> K
+
+    style A fill:#61dafb,stroke:#333,color:#000
+    style B fill:#ea4335,stroke:#333,color:#fff
+    style F fill:#ea4335,stroke:#333,color:#fff
+    style G fill:#3776ab,stroke:#333,color:#fff
+    style H fill:#000000,stroke:#333,color:#fff
+    style I fill:#000000,stroke:#333,color:#fff
+    style J fill:#ea4335,stroke:#333,color:#fff
+    style K fill:#68a063,stroke:#333,color:#fff
+```
+
+**Event-Driven Job Processing (BullMQ):**
+
+  | Queue | Module Owner | Worker | Purpose |
+  |:---|:---|:---|:---|
+  | `email` | `communication` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
+  | `stripe-webhook` | `orders` | `stripeWorker` | Idempotent Stripe payment event processing |
+  | `ai-refresh` | `ai` | `aiRefreshWorker` | Re-syncs product vectors to Pinecone |
+  | `cache-invalidate` | `catalog` | `cacheWorker` | Invalidates and warms Redis cache entries |
+  | `cart-cleanup` | `orders` | `cartCleanupWorker` | Weekly cron to purge abandoned guest carts |
+  | `reservation-cleanup` | `catalog` | `reservationCleanupWorker` | 5-minute cron to release expired inventory reservations |
+
+
 
 ## 🌐 API Documentation
 
