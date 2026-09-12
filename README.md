@@ -122,7 +122,7 @@ flowchart TB
         s2
         s1
   end
- subgraph subGraph3["AI Microservice"]
+ subgraph subGraph3["AI Pipeline"]
         Gemini("Google Gemini API")
         AIService("Python AI Microservice")
         Pinecone[("Pinecone Vector DB")]
@@ -174,6 +174,77 @@ flowchart TB
     style Redis fill:#dc382d,stroke:#333,color:#fff
     style User fill:#f9f9f9,stroke:#333,stroke-width:2px
     style Frontend fill:#61dafb,stroke:#333,color:#000
+```
+
+**Hybrid RAG AI Pipeline:**
+```mermaid
+---
+config:
+  layout: fixed
+---
+flowchart LR
+    A["User Chat Message"] --> B["Structured Output"]
+    B -- SearchFilters JSON --> C{"Intent?"}
+    C -- STORE_INFO --> D["Store Facts Prompt"]
+    C -- GENERAL --> E["General Prompt"]
+    F["Embed search_query"] --> H["Pinecone Query + Metadata Filters"]
+    H --> J["Grounded Prompt + Context"]
+    J --> K["AI Response"]
+    D --> K
+    E --> K
+    C -- PRODUCT_SEARCH --> F
+
+    style A fill:#61dafb,stroke:#333,color:#000
+    style B fill:#ea4335,stroke:#333,color:#fff
+    style F fill:#ea4335,stroke:#333,color:#fff
+    style H fill:#000000,stroke:#333,color:#fff
+    style J fill:#ea4335,stroke:#333,color:#fff
+    style K fill:#68a063,stroke:#333,color:#fff
+```
+
+**Event-Driven Job Processing (BullMQ):**
+```mermaid
+flowchart LR
+    subgraph Producers
+        A[Order Placed] -->|enqueue| Q1[email queue]
+        B[Stripe Webhook] -->|enqueue| Q2[stripe-webhook queue]
+        C[Admin Refresh] -->|enqueue| Q3[ai-refresh queue]
+        D[Product Mutation] -->|enqueue| Q4[cache queue]
+        E[Weekly Cron] -->|enqueue| Q5[cart-cleanup queue]
+        F[5-min Cron] -->|enqueue| Q6[reservation-cleanup queue]
+    end
+
+    subgraph "Redis (Message Broker)"
+        Q1
+        Q2
+        Q3
+        Q4
+        Q5
+        Q6
+    end
+
+    subgraph "Module Workers"
+        Q1 --> W1["communication/emailWorker"]
+        Q2 --> W2["orders/stripeWorker"]
+        Q3 --> W3["ai/aiRefreshWorker"]
+        Q4 --> W4["catalog/cacheWorker"]
+        Q5 --> W5["orders/cartCleanupWorker"]
+        Q6 --> W6["catalog/reservationCleanupWorker"]
+    end
+
+    W1 -->|SMTP| F1[Send Email]
+    W2 -->|SQL| F2[Confirm Payment]
+    W3 -->|HTTP| F3[Sync Pinecone]
+    W4 -->|Redis DEL| F4[Invalidate Cache]
+    W5 -->|SQL| F5[Purge Stale Carts]
+    W6 -->|SQL| F6[Release Reservations]
+
+    style Q1 fill:#dc382d,stroke:#333,color:#fff
+    style Q2 fill:#dc382d,stroke:#333,color:#fff
+    style Q3 fill:#dc382d,stroke:#333,color:#fff
+    style Q4 fill:#dc382d,stroke:#333,color:#fff
+    style Q5 fill:#dc382d,stroke:#333,color:#fff
+    style Q6 fill:#dc382d,stroke:#333,color:#fff
 ```
   | Queue | Module Owner | Worker | Purpose |
   |:---|:---|:---|:---|
