@@ -190,7 +190,49 @@ flowchart LR
 ```
 
 **Event-Driven Job Processing (BullMQ):**
+```mermaid
+flowchart LR
+    subgraph Producers
+        A[Order Placed] -->|enqueue| Q1[email queue]
+        B[Stripe Webhook] -->|enqueue| Q2[stripe-webhook queue]
+        C[Admin Refresh] -->|enqueue| Q3[ai-refresh queue]
+        D[Product Mutation] -->|enqueue| Q4[cache queue]
+        E[Weekly Cron] -->|enqueue| Q5[cart-cleanup queue]
+        F[5-min Cron] -->|enqueue| Q6[reservation-cleanup queue]
+    end
 
+    subgraph "Redis (Message Broker)"
+        Q1
+        Q2
+        Q3
+        Q4
+        Q5
+        Q6
+    end
+
+    subgraph "Module Workers"
+        Q1 --> W1["communication/emailWorker"]
+        Q2 --> W2["orders/stripeWorker"]
+        Q3 --> W3["ai/aiRefreshWorker"]
+        Q4 --> W4["catalog/cacheWorker"]
+        Q5 --> W5["orders/cartCleanupWorker"]
+        Q6 --> W6["catalog/reservationCleanupWorker"]
+    end
+
+    W1 -->|SMTP| F1[Send Email]
+    W2 -->|SQL| F2[Confirm Payment]
+    W3 -->|HTTP| F3[Sync Pinecone]
+    W4 -->|Redis DEL| F4[Invalidate Cache]
+    W5 -->|SQL| F5[Purge Stale Carts]
+    W6 -->|SQL| F6[Release Reservations]
+
+    style Q1 fill:#dc382d,stroke:#333,color:#fff
+    style Q2 fill:#dc382d,stroke:#333,color:#fff
+    style Q3 fill:#dc382d,stroke:#333,color:#fff
+    style Q4 fill:#dc382d,stroke:#333,color:#fff
+    style Q5 fill:#dc382d,stroke:#333,color:#fff
+    style Q6 fill:#dc382d,stroke:#333,color:#fff
+```
   | Queue | Module Owner | Worker | Purpose |
   |:---|:---|:---|:---|
   | `email` | `communication` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
