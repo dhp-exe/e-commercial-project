@@ -99,15 +99,10 @@ config:
   layout: elk
 ---
 flowchart TB
- subgraph s1["shared/"]
-        Pool["db/pool.js"]
-        RedisClient["cache/redis.js"]
-        MW["middleware/"]
-        QConn["queues/connection.js"]
-        
-        %% Invisible links to force a 2x2 grid layout
-        Pool ~~~ MW
-        RedisClient ~~~ QConn
+ subgraph ExternalServices["External Services"]
+        Sentry("Sentry Error Tracking")
+        EmailSMTP("Nodemailer / SMTP")
+        Payments("Stripe / VNPay / PayPal")
   end
  subgraph s2["modules/"]
         AuthUser["auth_user"]
@@ -116,55 +111,69 @@ flowchart TB
         Comm["communication"]
         AI["ai"]
   end
+ subgraph s1["shared/"]
+        Pool["db/pool.js"]
+        RedisClient["cache/redis.js"]
+        MW["middleware/"]
+        QConn["queues/connection.js"]
+  end
  subgraph subGraph2["Node.js Backend (Modular Monolith)"]
         CompositionRoot["index.js (Composition Root)"]
-        s1
         s2
+        s1
   end
- subgraph subGraph3["AI Pipeline"]
+ subgraph subGraph3["AI Microservice"]
         Gemini("Google Gemini API")
         AIService("Python AI Microservice")
         Pinecone[("Pinecone Vector DB")]
   end
+ subgraph DBMS["Databases / DBMS"]
+        TiDB[("TiDB / MySQL")]
+        Redis[("Redis")]
+  end
+    Sentry ~~~ EmailSMTP & CompositionRoot
+    EmailSMTP ~~~ Payments
+    Pool ~~~ MW
+    RedisClient ~~~ QConn
     User(["User / Browser"]) <-- HTTPS / React Router --> Frontend("React + Vite Frontend")
     Frontend <-- REST API / JSON --> CompositionRoot
-    Frontend -. Error Reports .-> Sentry("Sentry Error Tracking")
     CompositionRoot --> AuthUser & Catalog & Orders & Comm & AI
     AuthUser -- facade call --> Orders
     Orders -- facade call --> Catalog
     Orders -- enqueue email --> Comm
     AuthUser -- enqueue email --> Comm
     AI -- facade call --> Catalog & Orders
-    Pool <-- SQL Queries --> TiDB[("TiDB / MySQL")]
-    RedisClient <-- Cache Get/Set --> Redis[("Redis")]
+    Catalog ~~~ Pool
+    Pool <-- SQL Queries --> TiDB
+    RedisClient <-- Cache Get/Set --> Redis
     AI -- Internal HTTP --> AIService
-    Comm -- Send Emails --> EmailSMTP("Nodemailer / SMTP")
-    Orders -- Process Payments --> Payments("Stripe / VNPay / PayPal")
     CompositionRoot -. Error Reports .-> Sentry
+    Comm -- Send Emails --> EmailSMTP
+    Orders -- Process Payments --> Payments
     AIService <-- Embeddings and Chat --> Gemini
     AIService <-- Vector Search --> Pinecone
     QConn -- BullMQ Jobs --> Redis
 
-    style Pool fill:#4479a1,stroke:#333,color:#fff
-    style RedisClient fill:#dc382d,stroke:#333,color:#fff
-    style MW fill:#78909c,stroke:#333,color:#fff
-    style QConn fill:#ff6b35,stroke:#333,color:#fff
+    style Sentry fill:#362d59,stroke:#333,color:#fff
+    style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
+    style Payments fill:#6772e5,stroke:#333,color:#fff
     style AuthUser fill:#4a90d9,stroke:#333,color:#fff
     style Catalog fill:#7cb342,stroke:#333,color:#fff
     style Orders fill:#ef6c00,stroke:#333,color:#fff
     style Comm fill:#26a69a,stroke:#333,color:#fff
     style AI fill:#ab47bc,stroke:#333,color:#fff
+    style Pool fill:#4479a1,stroke:#333,color:#fff
+    style RedisClient fill:#dc382d,stroke:#333,color:#fff
+    style MW fill:#78909c,stroke:#333,color:#fff
+    style QConn fill:#ff6b35,stroke:#333,color:#fff
     style CompositionRoot fill:#68a063,stroke:#333,color:#fff
     style Gemini fill:#ea4335,stroke:#333,color:#fff
     style AIService fill:#3776ab,stroke:#333,color:#fff
     style Pinecone fill:#000000,stroke:#333,color:#fff
-    style User fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Frontend fill:#61dafb,stroke:#333,color:#000
-    style Sentry fill:#362d59,stroke:#333,color:#fff
     style TiDB fill:#4479a1,stroke:#333,color:#fff
     style Redis fill:#dc382d,stroke:#333,color:#fff
-    style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
-    style Payments fill:#6772e5,stroke:#333,color:#fff
+    style User fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style Frontend fill:#61dafb,stroke:#333,color:#000
 ```
 
 **Hybrid RAG AI Pipeline:**
