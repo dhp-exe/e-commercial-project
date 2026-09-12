@@ -98,12 +98,16 @@ The system follows a **Modular Monolith** pattern: the Node.js backend is organi
 config:
   layout: elk
 ---
-flowchart LR
+flowchart TB
  subgraph s1["shared/"]
         Pool["db/pool.js"]
         RedisClient["cache/redis.js"]
         MW["middleware/"]
         QConn["queues/connection.js"]
+        
+        %% Invisible links to force a 2x2 grid layout
+        Pool ~~~ MW
+        RedisClient ~~~ QConn
   end
  subgraph s2["modules/"]
         AuthUser["auth_user"]
