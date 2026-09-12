@@ -165,26 +165,26 @@ flowchart LR
 
 **Hybrid RAG AI Pipeline:**
 ```mermaid
+---
+config:
+  layout: fixed
+---
 flowchart LR
-    A[User Chat Message] --> B[Gemini Structured Output]
-    B -->|SearchFilters JSON| C{Intent?}
-    C -->|STORE_INFO| D[Store Facts Prompt → Gemini]
-    C -->|GENERAL| E[General Prompt → Gemini]
-    C -->|PRODUCT_SEARCH| F[Embed search_query]
-    F -->|gemini-embedding-2| G[768-dim Vector]
-    G --> H[Pinecone Query + Metadata Filters]
-    H -->|max_price · category| I[Top-K Product Matches]
-    I --> J[Grounded Prompt + Context → Gemini]
-    J --> K[AI Response to User]
+    A["User Chat Message"] --> B["Structured Output"]
+    B -- SearchFilters JSON --> C{"Intent?"}
+    C -- STORE_INFO --> D["Store Facts Prompt"]
+    C -- GENERAL --> E["General Prompt"]
+    F["Embed search_query"] --> H["Pinecone Query + Metadata Filters"]
+    H --> J["Grounded Prompt + Context"]
+    J --> K["AI Response"]
     D --> K
     E --> K
+    C -- PRODUCT_SEARCH --> F
 
     style A fill:#61dafb,stroke:#333,color:#000
     style B fill:#ea4335,stroke:#333,color:#fff
     style F fill:#ea4335,stroke:#333,color:#fff
-    style G fill:#3776ab,stroke:#333,color:#fff
     style H fill:#000000,stroke:#333,color:#fff
-    style I fill:#000000,stroke:#333,color:#fff
     style J fill:#ea4335,stroke:#333,color:#fff
     style K fill:#68a063,stroke:#333,color:#fff
 ```
