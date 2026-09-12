@@ -1,5 +1,13 @@
 {
   "version": "1.5.0",
+  "scripts": {
+    "dev": "npm run dev --prefix dhp-store",
+    "dev:all": "npm run dev:all --prefix dhp-store",
+    "dev:server": "npm run dev:server --prefix dhp-store",
+    "dev:client": "npm run dev:client --prefix dhp-store",
+    "dev:ai": "npm run dev:ai --prefix dhp-store",
+    "start": "npm start --prefix dhp-store"
+  },
   "dependencies": {
     "dotenv": "^17.2.1",
     "express": "^5.1.0",

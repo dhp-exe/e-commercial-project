@@ -475,10 +475,22 @@ Start Redis (if not already running):
 redis-server
 ```
 
+#### Option A: Run Everything Concurrently
+From the project root or `dhp-store/`:
+```bash
+# Start Server + Client + AI Service together:
+npm run dev:all
+
+# Or start Server + Client:
+npm run dev
+```
+
+#### Option B: Run Services Individually
+
 Start the backend:
 ```bash
 cd server
-npm start
+npm start   # or: npm run dev
 ```
 
 Start the frontend (dev server):
@@ -486,11 +498,15 @@ Start the frontend (dev server):
 cd ../client
 npm run dev
 ```
+
 Start the AI service:
 ```bash
-cd ../ai-service
-source venv/bin/activate
-python main.py
+# From workspace root or dhp-store:
+npm run dev:ai
+
+# Or from dhp-store/ai-service directly:
+source venv/bin/activate   # On Windows: venv\Scripts\activate
+uvicorn main:app --port 10000 --reload
 ```
 
 Seed the Pinecone vector index (first time only):
