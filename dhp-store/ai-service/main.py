@@ -64,4 +64,9 @@ def chat_endpoint(req: ChatRequest):
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    host = os.getenv("HOST", "0.0.0.0")
+    reload = os.getenv("RELOAD", "true").lower() in ("true", "1", "yes")
+    if reload:
+        uvicorn.run("main:app", host=host, port=port, reload=True)
+    else:
+        uvicorn.run(app, host=host, port=port)
