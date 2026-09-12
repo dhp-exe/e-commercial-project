@@ -31,6 +31,8 @@ coverage/
 dhp-store/server/src/uploads/*
 
 !dhp-store/server/src/uploads/.gitkeep
+!dhp-store/server/src/uploads/systemflow_trans.svg
+!dhp-store/server/src/uploads/systemflow_dark.svg
 
 *.tex
 

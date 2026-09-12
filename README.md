@@ -93,111 +93,13 @@ The system follows a **Modular Monolith** pattern: the Node.js backend is organi
 - **AI Microservice (Python/FastAPI):** An independent service that powers the Hybrid RAG pipeline — embedding product catalogs into Pinecone, performing semantic vector search, and using Gemini for conversational synthesis with strict grounding guardrails.
 
 **System Flow:**
-```mermaid
----
-config:
-  layout: elk
----
-flowchart TB
- subgraph ExternalServices["External Services"]
-        Sentry("Sentry Error Tracking")
-        EmailSMTP("Nodemailer / SMTP")
-        Payments("Stripe / VNPay / PayPal")
-        
-        %% Force vertical stacking inside the block
-        Sentry ~~~ EmailSMTP
-        EmailSMTP ~~~ Payments
-  end
- subgraph s2["modules/"]
-        AuthUser["auth_user"]
-        Catalog["catalog"]
-        Orders["orders"]
-        Comm["communication"]
-        AI["ai"]
-  end
- subgraph s1["shared/"]
-        Pool["db/pool.js"]
-        RedisClient["cache/redis.js"]
-        MW["middleware/"]
-        QConn["queues/connection.js"]
-        
-        %% Invisible links to force a 2x2 grid layout
-        Pool ~~~ MW
-        RedisClient ~~~ QConn
-  end
- subgraph subGraph2["Node.js Backend (Modular Monolith)"]
-        CompositionRoot["index.js (Composition Root)"]
-        s2
-        s1
-  end
- subgraph subGraph3["AI Microservice"]
-        Gemini("Google Gemini API")
-        AIService("Python AI Microservice")
-        Pinecone[("Pinecone Vector DB")]
-  end
- subgraph DBMS["Databases / DBMS"]
-        TiDB[("TiDB / MySQL")]
-        Redis[("Redis")]
-  end
-
-    User(["User / Browser"]) <-- HTTPS / React Router --> Frontend("React + Vite Frontend")
-    Frontend <-- REST API / JSON --> CompositionRoot
-    
-    %% Invisible link to pull the External Services block to the left of the Composition Root
-    Sentry ~~~ CompositionRoot
-
-    CompositionRoot --> AuthUser & Catalog & Orders & Comm & AI
-    AuthUser -- interface call --> Orders
-    Orders -- interface call --> Catalog
-    Orders -- enqueue email --> Comm
-    AuthUser -- enqueue email --> Comm
-    AI -- interface call --> Catalog & Orders
-    
-    %% Invisible link to explicitly force modules above shared
-    Catalog ~~~ Pool
-    
-    Pool <-- SQL Queries --> TiDB
-    RedisClient <-- Cache Get/Set --> Redis
-    AI -- Internal HTTP --> AIService
-    
-    %% Outbound connections to External Services
-    CompositionRoot -. Error Reports .-> Sentry
-    Comm -- Send Emails --> EmailSMTP
-    Orders -- Process Payments --> Payments
-    
-    AIService <-- Embeddings and Chat --> Gemini
-    AIService <-- Vector Search --> Pinecone
-    QConn -- BullMQ Jobs --> Redis
-
-    style Pool fill:#4479a1,stroke:#333,color:#fff
-    style RedisClient fill:#dc382d,stroke:#333,color:#fff
-    style MW fill:#78909c,stroke:#333,color:#fff
-    style QConn fill:#ff6b35,stroke:#333,color:#fff
-    style AuthUser fill:#4a90d9,stroke:#333,color:#fff
-    style Catalog fill:#7cb342,stroke:#333,color:#fff
-    style Orders fill:#ef6c00,stroke:#333,color:#fff
-    style Comm fill:#26a69a,stroke:#333,color:#fff
-    style AI fill:#ab47bc,stroke:#333,color:#fff
-    style CompositionRoot fill:#68a063,stroke:#333,color:#fff
-    style Gemini fill:#ea4335,stroke:#333,color:#fff
-    style AIService fill:#3776ab,stroke:#333,color:#fff
-    style Pinecone fill:#000000,stroke:#333,color:#fff
-    style User fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Frontend fill:#61dafb,stroke:#333,color:#000
-    style Sentry fill:#362d59,stroke:#333,color:#fff
-    style TiDB fill:#4479a1,stroke:#333,color:#fff
-    style Redis fill:#dc382d,stroke:#333,color:#fff
-    style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
-    style Payments fill:#6772e5,stroke:#333,color:#fff
-
-    %% Transparent background styles for major container blocks
-    style ExternalServices fill:transparent,stroke:#333,stroke-width:3px
-    style subGraph2 fill:transparent,stroke:#333,stroke-width:3px,stroke-dasharray: 5 5
-    style s2 fill:transparent,stroke:#333,stroke-width:2px
-    style s1 fill:transparent,stroke:#333,stroke-width:2px
-    style subGraph3 fill:transparent,stroke:#333,stroke-width:3px
-    style DBMS fill:transparent,stroke:#333,stroke-width:3px
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="dhp-store/server/src/uploads/systemflow_dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="dhp-store/server/src/uploads/systemflow_trans.svg">
+    <img alt="DHP Store System Flow" src="dhp-store/server/src/uploads/systemflow_trans.svg" width="100%">
+  </picture>
+</p>
 
 **Hybrid RAG AI Pipeline:**
 ```mermaid
