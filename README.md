@@ -122,7 +122,7 @@ flowchart TB
         s2
         s1
   end
- subgraph subGraph3["AI Pipeline"]
+ subgraph subGraph3["AI Microservice"]
         Gemini("Google Gemini API")
         AIService("Python AI Microservice")
         Pinecone[("Pinecone Vector DB")]
@@ -153,8 +153,7 @@ flowchart TB
     AIService <-- Embeddings and Chat --> Gemini
     AIService <-- Vector Search --> Pinecone
     QConn -- BullMQ Jobs --> Redis
-    Frontend -. Error Reports .-> Sentry("Sentry Error Tracking")
-
+    
     style Sentry fill:#362d59,stroke:#333,color:#fff
     style EmailSMTP fill:#fbbc04,stroke:#333,color:#000
     style Payments fill:#6772e5,stroke:#333,color:#fff
