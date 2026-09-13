@@ -1,75 +1,49 @@
-# Audit Report — Direct-to-Cloudflare R2 Image Uploads
+# Audit Report — Cloudflare AI Gateway Integration for Python AI Service
 
 > **Auditor:** @qa (QA Engineer & Security Auditor)  
 > **Date:** 2026-09-13  
-> **Scope:** Code changes in `server/src/shared/middleware/upload.js`, `server/src/config.js`, and `server/package.json`  
+> **Scope:** `ai-service/recommender.py`, `ai-service/.env`  
 > **Status:** 🟢 **PASS**
 
 ---
 
 ## 1. Specification Compliance
 
-- [x] `@aws-sdk/client-s3` and `multer-s3` installed in `server/`.
-- [x] S3Client configured with Cloudflare R2 endpoint format: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`.
-- [x] Enforces `contentType: multerS3.AUTO_CONTENT_TYPE` so browsers display image assets inline rather than downloading binary streams.
-- [x] Assigns `file.filename` and `req.file.filename` to `uniqueFilename` inside the `key` callback.
-- [x] Prepends `uploads/` prefix to object keys in the R2 bucket.
-- [x] Implements graceful fallback to `multer.diskStorage` when R2 credentials are missing.
-- [x] Added non-fatal startup warning in `server/src/config.js`.
-- [x] Zero regressions to `auth_user` and `catalog` controllers and services.
-- [x] Zero ESLint warnings or errors (`npm run lint` passed cleanly).
+- [x] Reviewed client initialization in `ai-service/recommender.py` and traced inference flows in `main.py`.
+- [x] Identified SDK as Google's modern `google-genai` SDK (`genai.Client`).
+- [x] Introduced environment variable check `CF_AI_GATEWAY_URL`.
+- [x] Configured `genai.Client` to route requests through Cloudflare using `types.HttpOptions(base_url=...)` when `CF_AI_GATEWAY_URL` is set.
+- [x] Implemented seamless fallback to standard Google endpoint (`https://generativelanguage.googleapis.com/`) when `CF_AI_GATEWAY_URL` is absent.
+- [x] Preserved `GOOGLE_API_KEY` credential delivery (`x-goog-api-key` header) in both modes.
+- [x] Preserved Pinecone vector search, RAG logic, prompt structure, and Pydantic schemas without modification.
+- [x] Documented exact `CF_AI_GATEWAY_URL` format for Google AI Studio using Cloudflare Account ID and gateway ID `default`.
 
 ---
 
 ## 2. Architectural Integrity
 
-- [x] Modular Monolith design is strictly maintained. The upload abstraction remains in `server/src/shared/middleware/upload.js` as shared infrastructure.
-- [x] Neither `auth_user` nor `catalog` modules were modified; their public facades and internal services continue working without awareness of the underlying storage engine.
-- [x] Database contracts remain intact: relative path `/uploads/<filename>` is preserved in TiDB.
+- [x] Domain boundaries respected: only the outbound network transport layer of the LLM client was modified.
+- [x] RAG query pipeline (intent extraction ➔ vector search ➔ product context injection ➔ answer generation) operates identically regardless of gateway route.
 
 ---
 
-## 3. Code Quality — DRY & SRP
+## 3. Strictness & Code Quality
 
-- [x] **DRY:** Unique filename generation logic (`Date.now() + '-' + Math.round(Math.random() * 1e9) + ext`) is extracted into a helper function `generateFilename(file)` shared by both R2 and local disk storage.
-- [x] **SRP:** `upload.js` is dedicated exclusively to multipart stream handling, MIME verification, and storage engine orchestration.
-- [x] **Dead Code:** Zero dead code, unreachable branches, or unused imports.
-
----
-
-## 4. Strictness & Linter Integrity
-
-- [x] Zero `eslint-disable` or `@ts-ignore` comments.
-- [x] All callback arguments comply with `no-unused-vars` patterns (`_req`, `_file`).
-- [x] ESLint flat config executed with 0 errors and 0 warnings.
+- [x] Code conforms to PEP 8 standards with clean line wrapping (<79 characters).
+- [x] Flake8 linter clean for syntax, undefined variables, and imports.
+- [x] Zero commented-out blocks or dead code introduced.
 
 ---
 
-## 5. Security Audit
+## 4. Security Audit
 
-- [x] **MIME Whitelisting:** Retains strict MIME validation (`image/jpeg`, `image/png`, `image/webp`, `image/gif`) rejecting non-image formats.
-- [x] **File Size Bounds:** Retains strict 5 MB file size boundary (`limits.fileSize: 5 * 1024 * 1024`).
-- [x] **Credentials Safety:** R2 API tokens and keys are loaded through environment variables; no credentials are hardcoded.
-- [x] **Collision & Enumeration Prevention:** Random numeric suffix with microsecond timestamps prevents object overwriting or sequential enumeration in Cloudflare R2.
-
----
-
-## 6. Error & Fallback Handling
-
-- [x] Graceful fallback to local disk storage prevents startup crashes during offline development or test runs.
-- [x] S3Client network timeouts or bad credentials are surfaced through standard Express error pipelines.
-- [x] Non-fatal warning logged to console when R2 credentials are missing, preventing silent local disk fallback without developer awareness.
+- [x] No credentials or gateway tokens hardcoded in repository files.
+- [x] `GOOGLE_API_KEY` and optional `CF_AIG_TOKEN` are read exclusively from environment variables.
+- [x] `.rstrip("/")` prevents malformed URL concatenation attacks.
 
 ---
 
-## 7. Performance
-
-- [x] Directly streaming uploads to Cloudflare R2 eliminates local disk I/O and server disk bloat.
-- [x] Offloading images to R2 enables instant worldwide caching and delivery through Cloudflare CDN (`https://cdn.dhpstore.studio`).
-
----
-
-## 8. Audit Findings
+## 5. Audit Findings
 
 ### 🔴 FATAL (Must Fix)
 *None.*
@@ -78,9 +52,9 @@
 *None.*
 
 ### 🟢 INFO (Observation)
-1. **[upload.js:41]** Assigning both `file.filename = uniqueFilename` and `req.file.filename = uniqueFilename` cleanly protects against any differences between single-file and multi-file middleware execution in Multer.
+1. **[recommender.py:34]** Added optional support for `CF_AIG_TOKEN` via `cf-aig-authorization: Bearer <token>` in case the user has enabled "Authenticated Gateway" within their Cloudflare dashboard.
 
 ### ✅ PASSED
-- All requirements from the approved `Technical_Specification.md` implemented.
-- Node verification script passed all tests.
-- ESLint passed with zero warnings and zero errors.
+- Verified unit test matrix covering all permutations of environment flags.
+- Verified fallback behavior when gateway URL is unset.
+- Zero linter or syntax errors.
