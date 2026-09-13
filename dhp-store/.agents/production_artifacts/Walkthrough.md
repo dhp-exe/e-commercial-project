@@ -1,56 +1,52 @@
-# Walkthrough — CDN Image URL Resolution & Static Asset Caching
+# Walkthrough — Direct-to-Cloudflare R2 Image Uploads
 
 ## Summary
-Updated backend image formatting logic in `server/src/shared/utils/formatImageUrl.js` to dynamically route image requests through the Cloudflare R2 CDN (`process.env.CDN_URL`) in production with safe slash handling and raw path fallback, and added long-term browser cache-control headers (`maxAge: '30d'`, `immutable: true`) for `/uploads` in `server/src/index.js`.
+Migrated active image uploads from local disk storage (`src/uploads/`) to direct-to-Cloudflare R2 streaming via `@aws-sdk/client-s3` and `multer-s3`. 
+
+The upload middleware now automatically streams incoming files to the Cloudflare R2 bucket under the `uploads/` prefix, assigns `file.filename` and `req.file.filename` to preserve 100% compatibility with `auth_user` and `catalog` services, and falls back to local disk storage if R2 environment variables are not provided.
 
 ---
 
 ## Files Modified
 
-### Modified Files
-- `server/src/shared/utils/formatImageUrl.js`
-  - Added environment detection for `process.env.NODE_ENV === 'production'`.
-  - In production, checks `process.env.CDN_URL`. If unset, falls back directly to the raw `dbPath`.
-  - If `CDN_URL` is set, strips trailing slashes and cleanly joins with normalized path to eliminate duplicate slashes.
-  - In development, cleanly prepends `process.env.BACKEND_URL || 'http://localhost:5001'`.
-  - Preserves handling for null/empty paths and external HTTP/HTTPS URLs.
-- `server/src/index.js`
-  - Configured `express.static(path.join(process.cwd(), 'src', 'uploads'), { maxAge: '30d', immutable: true })` for `/uploads`.
+### Dependencies
+- `server/package.json` & `server/package-lock.json`: Installed `@aws-sdk/client-s3` and `multer-s3`.
+
+### Backend Code
+- `server/src/config.js`
+  - Added non-fatal startup check for Cloudflare R2 environment variables (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`).
+- `server/src/shared/middleware/upload.js`
+  - Initialized `S3Client` with Cloudflare R2 S3-compatible endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`.
+  - Configured `multerS3` with `contentType: multerS3.AUTO_CONTENT_TYPE`.
+  - Configured `key` callback to generate unique filenames, assign `file.filename = uniqueFilename`, and set bucket key to `uploads/${uniqueFilename}`.
+  - Implemented automatic fallback to `multer.diskStorage` if R2 credentials are not set.
 
 ---
 
 ## Phase Completion Log
 
-### Phase 1: Backend Image Formatting Logic (`@be`) ✅
-- Implemented environment-driven image URL formatting with fallback and slash de-duplication in `server/src/shared/utils/formatImageUrl.js`.
-- Verified with unit tests covering dev default, dev trailing slash, legacy filenames, production CDN, production CDN trailing slash, double slash inputs, missing CDN fallback, null paths, empty paths, and external URLs.
-- Lint status: ✅ Clean
+### Phase 1: Dependencies Installation (`@be`) ✅
+- Installed `@aws-sdk/client-s3` and `multer-s3` into `server/package.json`.
+- Lint & lockfile verified.
 
-### Phase 2: Express Static Asset Cache-Control Middleware (`@be`) ✅
-- Added `maxAge: '30d'` and `immutable: true` options to `express.static` serving `/uploads` in `server/src/index.js`.
-- Lint status: ✅ Clean
+### Phase 2: Configuration Validation (`@be`) ✅
+- Added non-fatal warning check in `server/src/config.js`.
 
-### Phase 3: Comprehensive Verification ✅
-- Executed `npm run lint` in `server/` with zero warnings and zero errors.
-- Verified test suite and edge cases.
-- Lint status: ✅ Clean
+### Phase 3: Centralized Upload Middleware Restructuring (`@be`) ✅
+- Refactored `server/src/shared/middleware/upload.js` for dual-mode R2 streaming and disk storage fallback.
+
+### Phase 4: Verification & Auditing ✅
+- Ran standalone Node verification script verifying S3 key generation, `file.filename` contract, `req.file.filename` assignment, MIME type filtering, and offline disk storage fallback.
+- Ran `eslint src/` with zero errors and zero warnings.
 
 ---
 
 ## Verification Results
-- **Backend Lint:** ✅ Clean (`eslint src/` passed with code 0).
-- **Unit & Edge Case Matrix:**
-  - `Dev default`: `http://localhost:5001/uploads/pic.jpg` ✅
-  - `Dev trailing slash`: `http://localhost:5001/uploads/pic.jpg` ✅
-  - `Dev legacy filename`: `http://localhost:5001/uploads/123.webp` ✅
-  - `Prod CDN`: `https://cdn.dhpstore.studio/uploads/pic.jpg` ✅
-  - `Prod CDN trailing slash`: `https://cdn.dhpstore.studio/uploads/pic.jpg` ✅
-  - `Prod double slash input`: `https://cdn.dhpstore.studio/uploads/pic.jpg` ✅
-  - `Prod fallback raw`: `/uploads/pic.jpg` ✅
-  - `Null / empty path`: `null` ✅
-  - `External URL`: `https://google.com/pic.png` ✅
-
----
-
-## Known Limitations
-- Images uploaded during development reside in `server/src/uploads` on local disk; syncing local uploads to Cloudflare R2 requires a dedicated migration script or S3/R2 client worker if production replication from local dev is needed in the future.
+- **Backend Lint:** ✅ Clean (`eslint src/` exited with code 0).
+- **Automated Verification Matrix:**
+  - `R2 Storage Initialization`: ✅ Initialized with auto region and Cloudflare R2 endpoint.
+  - `S3 Key Prefix`: ✅ Outputs `uploads/<timestamp>-<random>.<ext>`.
+  - `file.filename Contract`: ✅ Correctly assigned for downstream services.
+  - `req.file.filename Contract`: ✅ Correctly assigned for controller access.
+  - `MIME Type Filter`: ✅ Accepted valid image MIME types (`image/png`, `image/webp`); rejected non-image types (`application/pdf`).
+  - `Offline Disk Fallback`: ✅ Automatically defaults to `src/uploads/` when R2 credentials are unset.

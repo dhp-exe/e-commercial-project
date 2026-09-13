@@ -38,3 +38,9 @@ if (!process.env.GOOGLE_CLIENT_ID) {
 if (!process.env.SITE_URL) {
   console.warn('WARNING: SITE_URL not set. Sitemap will use default Vercel URL.');
 }
+
+const r2Required = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME'];
+const missingR2 = r2Required.filter((key) => !process.env[key]);
+if (missingR2.length > 0) {
+  console.warn(`WARNING: Missing Cloudflare R2 environment variables (${missingR2.join(', ')}). Image uploads will fall back to local disk storage.`);
+}

@@ -1,45 +1,45 @@
-# Implementation Plan — CDN Image URL Resolution & Static Asset Caching
+# Implementation Plan — Direct-to-Cloudflare R2 Image Uploads
 
 Based on the approved [Technical_Specification.md](file:///Users/dohuuphuoc/Dev/e-commercial-project/dhp-store/.agents/production_artifacts/Technical_Specification.md).
 
 ## Phase Breakdown
 
-### Phase 1: Backend Image Formatting Logic (`@be`)
-- **Files to modify:** `server/src/shared/utils/formatImageUrl.js`
-- **Dependencies:** None
-- **Estimated Complexity:** Low
-- **Details:**
-  - Check `process.env.NODE_ENV === 'production'`.
-  - In production:
-    - If `process.env.CDN_URL` is truthy: strip trailing slashes from `process.env.CDN_URL`, normalize `dbPath`, and concatenate ensuring exactly one `/` between host and path.
-    - If `process.env.CDN_URL` is missing: return raw `dbPath` as fallback.
-  - In development (`NODE_ENV !== 'production'`):
-    - Strip trailing slashes from `process.env.BACKEND_URL || 'http://localhost:5001'`, normalize `dbPath`, and concatenate cleanly.
-  - Retain existing behavior: `!dbPath` returns `null`, `dbPath.startsWith('http')` returns `dbPath`.
-- **Verification:** Run standalone node test script covering all branches.
+### Phase 1: Install Dependencies (`@be`)
+- Install `@aws-sdk/client-s3` and `multer-s3` in `server/`.
+- Ensure `server/package.json` reflects the new production dependencies.
 
-### Phase 2: Express Static Asset Cache-Control Middleware (`@be`)
-- **Files to modify:** `server/src/index.js`
-- **Dependencies:** None (`express.static` built-in options)
-- **Estimated Complexity:** Low
-- **Details:**
-  - Update `app.use('/uploads', express.static(...))` on line 123 to include `{ maxAge: '30d', immutable: true }`.
-- **Verification:** Run `npm run lint` in `server/`.
+### Phase 2: Configuration Validation (`@be`)
+- Update `server/src/config.js` to check for `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET_NAME`.
+- Emit a non-fatal warning if any are missing, indicating fallback to local disk storage.
 
-### Phase 3: Verification & Walkthrough Artifacts
-- Run comprehensive test script across edge cases.
+### Phase 3: Centralized Upload Middleware Restructuring (`@be`)
+- Update `server/src/shared/middleware/upload.js`:
+  - Check if R2 environment variables are configured.
+  - If configured:
+    - Initialize `S3Client` with `endpoint: https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, `region: 'auto'`, and R2 credentials.
+    - Configure `multerS3` with `s3`, `bucket: process.env.R2_BUCKET_NAME`, and `contentType: multerS3.AUTO_CONTENT_TYPE`.
+    - In `key` callback: generate `uniqueSuffix + ext`, set `file.filename = uniqueFilename`, and return `uploads/${uniqueFilename}`.
+  - If not configured:
+    - Fallback gracefully to `multer.diskStorage` targeting `'src/uploads/'`.
+  - Retain `ALLOWED_TYPES` and `limits.fileSize: 5 * 1024 * 1024`.
+
+### Phase 4: Automated Verification & Walkthrough Artifacts
+- Run standalone Node verification script testing:
+  - `S3Client` instantiation and endpoint generation.
+  - Key generation callback and `file.filename` contract.
+  - Missing-env fallback to `multer.diskStorage`.
 - Run `cd server && npm run lint` to guarantee clean ESLint status.
-- Generate `Walkthrough.md` in `.agents/production_artifacts/Walkthrough.md`.
+- Generate `Walkthrough.md` and `Audit_Report.md`.
 
 ---
 
 ## Dependency Graph
 
 ```
-Phase 1 (formatImageUrl logic) ──▶ Phase 2 (Express static middleware) ──▶ Phase 3 (Verification & Walkthrough)
+Phase 1 (Dependencies) ──▶ Phase 2 (Config check) ──▶ Phase 3 (Upload Middleware) ──▶ Phase 4 (Verification & Artifacts)
 ```
 
-Critical Path: Phase 1 ➔ Phase 2 ➔ Phase 3.
+Critical Path: Phase 1 ➔ Phase 2 ➔ Phase 3 ➔ Phase 4.
 
 ---
 
@@ -47,6 +47,6 @@ Critical Path: Phase 1 ➔ Phase 2 ➔ Phase 3.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Malformed double-slash URL concatenation (e.g. `https://cdn...//uploads`) | Medium | High | Strip trailing slash from base URLs with `.replace(/\/+$/, '')` and ensure normalized path starts with single `/`. |
-| Missing `CDN_URL` in production causing undefined URL prefix | Low | Medium | Strict fallback to return raw `dbPath` when `CDN_URL` is falsy. |
-| ESLint failures | Low | Medium | Zero tolerance: run `eslint src/` and ensure clean pass. |
+| Domain services break due to missing `file.filename` | Medium | High | Explicitly assign `file.filename = uniqueFilename` inside `multer-s3` `key` callback so `req.file.filename` is always populated. |
+| Browser downloads uploaded images as binary octet-stream | Medium | Medium | Set `contentType: multerS3.AUTO_CONTENT_TYPE` so `multer-s3` sets the correct image MIME type in R2 object metadata. |
+| Offline local development crashes if R2 creds are unset | Low | High | Implement conditional fallback to `multer.diskStorage` when R2 credentials are not present in `.env`. |
