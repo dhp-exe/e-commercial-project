@@ -120,7 +120,13 @@ app.use(express.json());
 app.use(csrfProtection);
 
 // ── Static Files (user uploads only) ────────────────────────────────
-app.use('/uploads', express.static(path.join(process.cwd(), 'src', 'uploads')));
+app.use(
+  '/uploads',
+  express.static(path.join(process.cwd(), 'src', 'uploads'), {
+    maxAge: '30d',
+    immutable: true,
+  })
+);
 
 // ── API Routes ──────────────────────────────────────────────────────
 app.use('/api/auth', authRouter);
