@@ -26,9 +26,25 @@ class Recommender:
             self.index = None
             print("WARNING: PINECONE_API_KEY not found.")
 
-        if os.getenv("GOOGLE_API_KEY"):
+        google_api_key = os.getenv("GOOGLE_API_KEY")
+        if google_api_key:
             self.model_name = os.getenv("MODEL_NAME", "gemini-2.5-flash")
-            self.genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+            cf_gateway_url = os.getenv("CF_AI_GATEWAY_URL")
+            if cf_gateway_url:
+                headers = {}
+                cf_aig_token = os.getenv("CF_AIG_TOKEN")
+                if cf_aig_token:
+                    headers["cf-aig-authorization"] = f"Bearer {cf_aig_token}"
+                http_options = types.HttpOptions(
+                    base_url=cf_gateway_url.rstrip("/"),
+                    headers=headers if headers else None,
+                )
+                self.genai_client = genai.Client(
+                    api_key=google_api_key,
+                    http_options=http_options
+                )
+            else:
+                self.genai_client = genai.Client(api_key=google_api_key)
         else:
             self.genai_client = None
 

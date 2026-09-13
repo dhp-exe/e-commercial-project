@@ -1,52 +1,31 @@
-# Walkthrough — Direct-to-Cloudflare R2 Image Uploads
+# Walkthrough — Cloudflare AI Gateway Integration for Python AI Service
 
 ## Summary
-Migrated active image uploads from local disk storage (`src/uploads/`) to direct-to-Cloudflare R2 streaming via `@aws-sdk/client-s3` and `multer-s3`. 
-
-The upload middleware now automatically streams incoming files to the Cloudflare R2 bucket under the `uploads/` prefix, assigns `file.filename` and `req.file.filename` to preserve 100% compatibility with `auth_user` and `catalog` services, and falls back to local disk storage if R2 environment variables are not provided.
+Integrated Cloudflare AI Gateway into the Python AI microservice (`ai-service/recommender.py`) to proxy Google Gemini requests through Cloudflare's edge network for observability, edge caching, and rate limiting, while ensuring 100% backward-compatible fallback to the direct Google Gemini endpoint when `CF_AI_GATEWAY_URL` is omitted.
 
 ---
 
 ## Files Modified
 
-### Dependencies
-- `server/package.json` & `server/package-lock.json`: Installed `@aws-sdk/client-s3` and `multer-s3`.
-
-### Backend Code
-- `server/src/config.js`
-  - Added non-fatal startup check for Cloudflare R2 environment variables (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`).
-- `server/src/shared/middleware/upload.js`
-  - Initialized `S3Client` with Cloudflare R2 S3-compatible endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`.
-  - Configured `multerS3` with `contentType: multerS3.AUTO_CONTENT_TYPE`.
-  - Configured `key` callback to generate unique filenames, assign `file.filename = uniqueFilename`, and set bucket key to `uploads/${uniqueFilename}`.
-  - Implemented automatic fallback to `multer.diskStorage` if R2 credentials are not set.
-
----
-
-## Phase Completion Log
-
-### Phase 1: Dependencies Installation (`@be`) ✅
-- Installed `@aws-sdk/client-s3` and `multer-s3` into `server/package.json`.
-- Lint & lockfile verified.
-
-### Phase 2: Configuration Validation (`@be`) ✅
-- Added non-fatal warning check in `server/src/config.js`.
-
-### Phase 3: Centralized Upload Middleware Restructuring (`@be`) ✅
-- Refactored `server/src/shared/middleware/upload.js` for dual-mode R2 streaming and disk storage fallback.
-
-### Phase 4: Verification & Auditing ✅
-- Ran standalone Node verification script verifying S3 key generation, `file.filename` contract, `req.file.filename` assignment, MIME type filtering, and offline disk storage fallback.
-- Ran `eslint src/` with zero errors and zero warnings.
+### Modified Files
+- `ai-service/recommender.py`
+  - Added inspection of `os.getenv("CF_AI_GATEWAY_URL")`.
+  - Configured `types.HttpOptions(base_url=cf_gateway_url.rstrip("/"), headers=...)` passed to `genai.Client`.
+  - Supported optional `CF_AIG_TOKEN` header (`cf-aig-authorization: Bearer <token>`) for authenticated Cloudflare gateways.
+  - Retained clean fallback to default Google API endpoint when `CF_AI_GATEWAY_URL` is unset.
+  - Preserved existing `GOOGLE_API_KEY` authentication, Pinecone vector store, RAG search, prompts, and Pydantic response models.
+- `ai-service/.env`
+  - Added documented configuration for `CF_AI_GATEWAY_URL`.
 
 ---
 
 ## Verification Results
-- **Backend Lint:** ✅ Clean (`eslint src/` exited with code 0).
-- **Automated Verification Matrix:**
-  - `R2 Storage Initialization`: ✅ Initialized with auto region and Cloudflare R2 endpoint.
-  - `S3 Key Prefix`: ✅ Outputs `uploads/<timestamp>-<random>.<ext>`.
-  - `file.filename Contract`: ✅ Correctly assigned for downstream services.
-  - `req.file.filename Contract`: ✅ Correctly assigned for controller access.
-  - `MIME Type Filter`: ✅ Accepted valid image MIME types (`image/png`, `image/webp`); rejected non-image types (`application/pdf`).
-  - `Offline Disk Fallback`: ✅ Automatically defaults to `src/uploads/` when R2 credentials are unset.
+- **Syntax Compilation:** ✅ `python -m py_compile` passed with zero errors across all modules.
+- **Python Linter:** ✅ `flake8` clean for all syntax, imports, and variables.
+- **Unit Verification Matrix:**
+  - `CF_AI_GATEWAY_URL` provided: Sets `base_url` to `https://gateway.ai.cloudflare.com/v1/9ae02ac45d236f8b893e839ebd26fd20/default/google-ai-studio`. ✅
+  - Trailing slash sanitation: `.rstrip("/")` cleans double slashes. ✅
+  - `CF_AIG_TOKEN` provided: Injects `cf-aig-authorization: Bearer <token>` header. ✅
+  - Fallback mode (no gateway URL): Sets default `base_url` to `https://generativelanguage.googleapis.com/`. ✅
+  - Missing `GOOGLE_API_KEY`: Leaves `self.genai_client = None`. ✅
+  - Live Direct Google Inference: Verified working chat response. ✅
