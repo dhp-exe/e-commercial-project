@@ -73,8 +73,8 @@ DHP Store is a production-grade, full-stack e-commerce platform built with a **M
 | **Payments** | Stripe API (webhooks), PayPal SDK, VNPay |
 | **Auth** | JWT, Bcrypt, Google OAuth 2.0 |
 | **Observability** | Sentry (frontend + backend) |
-| **DevOps** | Docker, Docker Compose, Nginx, GitHub Actions CI, Release Please |
-| **Utilities** | Multer (file uploads), Nodemailer (emails) |
+| **DevOps** | Docker, Docker Compose, Nginx, GitHub Actions CI, Release Please, Cloudflare (R2, CDN, AI Gateway) |
+| **Utilities** | Multer + multer-s3 (file uploads, Cloudflare R2), `@aws-sdk/client-s3`, Nodemailer (emails) |
 
 ## 🏛 Architecture
 
@@ -91,6 +91,11 @@ The system follows a **Modular Monolith** pattern: the Node.js backend is organi
 - **Database (TiDB/MySQL):** The primary source of truth for users, products, orders, and transactional data. Each module encapsulates its SQL access in a dedicated `repository.js` using the shared connection pool.
 
 - **AI Microservice (Python/FastAPI):** An independent service that powers the Hybrid RAG pipeline — embedding product catalogs into Pinecone, performing semantic vector search, and using Gemini for conversational synthesis with strict grounding guardrails.
+
+- **Cloudflare Edge Layer:** Provides three edge services that sit in front of the core application:
+  - **R2 Object Storage** — Product and user-uploaded images are stored in a Cloudflare R2 bucket (S3-compatible). In production, the upload middleware writes directly to R2 via `@aws-sdk/client-s3` + `multer-s3`.
+  - **CDN (`cdn.dhpstore.studio`)** — The R2 bucket is mapped to a custom CDN domain. The `formatImageUrl` utility conditionally prepends `CDN_URL` in production for edge-cached image delivery, falling back to localhost in development.
+  - **AI Gateway** — Outbound Google Gemini API requests from the Python AI service are optionally routed through Cloudflare AI Gateway for edge caching, analytics, and rate limiting (configured via `CF_AI_GATEWAY_URL`).
 
 **System Flow:**
 <p align="center">
@@ -306,7 +311,7 @@ dhp-store/
 │       │   │   ├── rateLimit.js              # Global, API, and Auth rate limiters
 │       │   │   ├── requireAuth.js            # JWT cookie verification + Redis user cache
 │       │   │   ├── requireRole.js            # Admin/Staff role guards
-│       │   │   └── upload.js                 # Multer disk storage configuration
+│       │   │   └── upload.js                 # Multer storage (R2 in production, disk in dev)
 │       │   ├── queues/
 │       │   │   └── connection.js             # Shared IORedis connection config for BullMQ
 │       │   ├── errors/
@@ -409,34 +414,14 @@ cd server
 npm install
 ```
 
-3. Create a `.env` file in `server/` with these variables:
+3. Create a `.env` file in `server/` from the example template:
 
-```env
-# Database
-DB_HOST=your_database_host
-DB_USER=your_database_user
-DB_PASSWORD=your_database_password
-DB_NAME=your_database_name
-
-# Auth
-JWT_SECRET=your_jwt_secret
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
-
-# Services
-REDIS_URL=redis://localhost:6379
-AI_SERVICE_URL=http://localhost:10000
-PORT=5001
-
-# Payments
-STRIPE_SECRET_KEY=sk_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# Observability
-SENTRY_DSN=your_sentry_dsn
-
-# CORS
-CORS_ORIGINS=http://localhost:5173
+```bash
+cp .env.example .env
+# Then open .env and fill in your actual values
 ```
+
+> See [`server/.env.example`](dhp-store/server/.env.example) for all required and optional variables.
 
 4. Install client dependencies:
 
@@ -444,12 +429,13 @@ CORS_ORIGINS=http://localhost:5173
 cd ../client
 npm install
 ```
-5. Create `.env` file in `client/`:
-```env
-VITE_STRIPE_PUBLIC_KEY=your_stripe_public_key
-VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
-VITE_SENTRY_DSN=your_sentry_dsn
+5. Create a `.env` file in `client/` from the example template:
+```bash
+cp .env.example .env
 ```
+
+> See [`client/.env.example`](dhp-store/client/.env.example) for all required variables.
+
 6. Set up the AI service:
 ```bash
 cd ../ai-service
@@ -457,16 +443,12 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
-7. Create a `.env` file in `ai-service/`:
-```env
-GOOGLE_API_KEY=your_gemini_api_key
-PINECONE_API_KEY=your_pinecone_api_key
-DB_HOST=your_database_host
-DB_USER=your_database_user
-DB_PASS=your_database_password
-DB_NAME=your_database_name
-DB_PORT=3306
+7. Create a `.env` file in `ai-service/` from the example template:
+```bash
+cp .env.example .env
 ```
+
+> See [`ai-service/.env.example`](dhp-store/ai-service/.env.example) for all required and optional variables (including Cloudflare AI Gateway).
 
 ### Running the Application (Local)
 
@@ -533,15 +515,16 @@ Docker flow:
           └─────────────┘
                   │
                   ▼
-          ┌─────────────┐
-          │   Backend   │  (Node.js container)
-          └─────────────┘
-           │     │     │
+          ┌─────────────┐       ┌─────────────────────────┐
+          │   Backend   │──────▶│   Cloudflare R2 / CDN   │
+          │ (Node.js)   │       │  cdn.dhpstore.studio    │
+          └─────────────┘       │  (image uploads & CDN)  │
+           │     │     │        └─────────────────────────┘
            ▼     ▼     ▼
     ┌────────┐ ┌──────────┐ ┌────────────┐
-    │ Redis  │ │  TiDB    │ │ AI Service │
-    │  Cache │ │  Cloud   │ │ (FastAPI)  │
-    │ +BullMQ│ │          │ │  +Pinecone │
+    │ Redis  │ │  TiDB    │ │ AI Service │──▶ Cloudflare
+    │  Cache │ │  Cloud   │ │ (FastAPI)  │    AI Gateway
+    │ +BullMQ│ │          │ │  +Pinecone │──▶ Google Gemini
     └────────┘ └──────────┘ └────────────┘
 ```
 
@@ -549,6 +532,7 @@ Docker flow:
 - The AI service must be running and the Pinecone index must be populated (via `/refresh`) for AI chat and recommendations to function.
 - BullMQ workers start automatically alongside the backend server — no separate worker process is required.
 - Database migrations and seed scripts can be added to `server/src` to initialize sample data.
+- In production, file uploads are written directly to **Cloudflare R2** via the S3 API. The `CDN_URL` and `R2_*` environment variables must be configured. In development, uploads fall back to local disk storage (`src/uploads/`).
 
 ### License
 This project is licensed under the MIT License.

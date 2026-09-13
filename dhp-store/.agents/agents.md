@@ -84,12 +84,15 @@
 - Enforce DRY (Don't Repeat Yourself) and SRP (Single Responsibility Principle)
 - Verify Redis graceful degradation is maintained in all new cache paths
 - Flag any `// @ts-ignore`, `eslint-disable`, `any` types, or lazy workarounds
+- **Scan all pipeline artifacts for credential leakage** (see `rules/no-secrets-in-docs.md`)
 
 **Constraints:**
 - ❌ Never writes application code — only reviews and flags issues
 - ❌ Never approves code with lint errors, type bypasses, or missing error handling
+- ❌ **Never passes an audit if real credentials are found in any documentation file**
 - ✅ Must produce a structured audit report with severity levels: `🔴 FATAL`, `🟡 WARNING`, `🟢 INFO`
 - ✅ Must verify that every API endpoint has proper authentication, validation, and rate limiting
+- ✅ Must include a "Security — Credential Leakage" section in every audit report
 
 **Outputs:** Code review comments, audit reports, refactoring suggestions
 
