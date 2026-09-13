@@ -70,7 +70,8 @@ server/src/
 | **Caching** | Redis | ^5.11.0 (`redis:alpine` in Docker) |
 | **Auth** | JWT (`jsonwebtoken` ^9) + bcryptjs ^2.4.3 + HTTP-only cookies (`cookie-parser`) |
 | **Payments** | Stripe server SDK (`stripe` ^20.2.0) |
-| **File Uploads** | Multer ^2.0.2 |
+| **File Uploads** | Multer ^2.0.2 + multer-s3 (Cloudflare R2 in production) |
+| **CDN / Object Storage** | Cloudflare R2, `@aws-sdk/client-s3` | CDN via `cdn.dhpstore.studio`, direct S3 uploads in production |
 | **Email** | Nodemailer ^7.0.13 |
 | **Security** | Helmet ^8.1.0, CORS (env-driven), `express-rate-limit` ^8.2.1 |
 | **Observability** | Sentry (`@sentry/node` ^10.69.0), Morgan (`common` format) |
@@ -205,7 +206,61 @@ graph TD
 | **Core Logic** | `recommender.py` | Hybrid RAG: Pydantic schemas, Pinecone search, Gemini chat |
 | **Vector DB** | Pinecone | Product catalog embeddings (768-dim via `gemini-embedding-2`) |
 | **LLM** | Google Gemini | Structured output for intent detection + conversational synthesis |
+| **Edge Proxy** | Cloudflare AI Gateway | Optional. Routes Gemini API calls through CF edge for caching, analytics, rate limiting |
 | **Containerized** | Docker (`Dockerfile`) | Standalone microservice on port `10000` |
+
+---
+
+## 9.5. Cloudflare Edge Infrastructure
+
+Three Cloudflare services augment the core application in production:
+
+### R2 Object Storage & CDN
+
+```
+┌──────────────┐       ┌───────────────────────┐       ┌──────────────────┐
+│   Express    │──S3──▶│   Cloudflare R2       │──CDN─▶│   Browser        │
+│   (upload)   │  API  │   (uploads/ prefix)   │       │   (edge-cached)  │
+└──────────────┘       └───────────────────────┘       └──────────────────┘
+```
+
+- **Bucket:** `dhp-store-images` with `uploads/` key prefix (mirrors the database path format `/uploads/{filename}`).
+- **CDN Domain:** `cdn.dhpstore.studio` — mapped to the R2 bucket for edge-cached image delivery.
+- **Upload Middleware (`shared/middleware/upload.js`):**
+  - **Production (R2 configured):** Uses `@aws-sdk/client-s3` + `multer-s3` to write directly to R2. The `S3Client` connects to `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`.
+  - **Development (R2 not configured):** Falls back to `multer.diskStorage` writing to `src/uploads/`.
+  - `contentType: multerS3.AUTO_CONTENT_TYPE` ensures correct MIME types for browser rendering.
+- **URL Resolution (`shared/utils/formatImageUrl.js`):**
+  - **Production:** Prepends `process.env.CDN_URL` to the database path (e.g., `https://cdn.dhpstore.studio/uploads/vintage-emo-tee.jpg`).
+  - **Development:** Prepends `BACKEND_URL` (defaults to `http://localhost:5001`).
+  - Handles slash normalization to prevent `//uploads/` duplication.
+- **Static Cache Headers:** Express serves local `/uploads` with `maxAge: '30d'` and `immutable: true`.
+
+### AI Gateway
+
+```
+┌──────────────┐       ┌──────────────────────────┐       ┌──────────────┐
+│  AI Service  │──HTTP─▶│  Cloudflare AI Gateway  │──HTTP─▶│ Google Gemini│
+│  (FastAPI)   │       │  (edge cache/analytics)  │       │  (LLM API)   │
+└──────────────┘       └──────────────────────────┘       └──────────────┘
+```
+
+- **Configuration:** `CF_AI_GATEWAY_URL` environment variable in `ai-service/.env`.
+- **URL Format:** `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/google-ai-studio`
+- **Fallback:** When `CF_AI_GATEWAY_URL` is unset, `genai.Client` connects directly to `https://generativelanguage.googleapis.com/`.
+- **Optional Auth:** `CF_AIG_TOKEN` injects `cf-aig-authorization: Bearer <token>` for authenticated gateways.
+
+### Cloudflare Environment Variables
+
+| Variable | Service | Required | Description |
+|---|---|---|---|
+| `CDN_URL` | server | Production | CDN base URL (e.g., `https://cdn.dhpstore.studio`) |
+| `R2_ACCOUNT_ID` | server | Production | Cloudflare account ID for R2 endpoint |
+| `R2_ACCESS_KEY_ID` | server | Production | R2 API token access key |
+| `R2_SECRET_ACCESS_KEY` | server | Production | R2 API token secret |
+| `R2_BUCKET_NAME` | server | Production | R2 bucket name (e.g., `dhp-store-images`) |
+| `CF_AI_GATEWAY_URL` | ai-service | Optional | Cloudflare AI Gateway endpoint URL |
+| `CF_AIG_TOKEN` | ai-service | Optional | Authenticated gateway bearer token |
 
 ---
 
@@ -285,3 +340,4 @@ Orchestrates 4 services:
 | **Phase 3** | CI/CD pipeline, production hardening, Sentry observability | `feat: implement phase 2 optimizations and phase 3 ci pipeline`, `feat: integrate Sentry for error tracking` |
 | **Phase 4** | UI modularization, responsive layouts, loading states | `refactor: modularize form component`, `feat: implement optimized full-screen video loading screen` |
 | **Phase 5** | **Modular Monolith refactoring** — restructured entire backend into `shared/` + `modules/` with strict facade encapsulation, co-located queues/workers, and zero API regressions | 8-phase incremental extraction (Phases 1–8 of refactoring plan) |
+| **Phase 6** | **Cloudflare edge integration** — R2 object storage for image uploads, CDN delivery via `cdn.dhpstore.studio`, AI Gateway proxy for Gemini requests, static asset Cache-Control headers, `.env.example` templates | CDN URL resolution, direct-to-R2 uploads, AI Gateway routing |

@@ -155,6 +155,8 @@ When the user types `/startcycle <idea>` in the chat.
 - ❌ Never skip a stage
 - ❌ Never proceed past an approval gate without explicit user confirmation
 - ❌ Never bypass lint or type-check failures
+- ❌ **Never write real credentials, API keys, tokens, passwords, or `.env` values into any documentation file** (see `rules/no-secrets-in-docs.md`)
 - ✅ Always produce all listed artifacts
 - ✅ Always maintain a clear separation of agent responsibilities
 - ✅ Always leave the codebase in a better state than you found it
+- ✅ @qa must include a "Credential Leakage" check in every Audit Report
