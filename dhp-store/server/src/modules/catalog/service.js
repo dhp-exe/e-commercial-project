@@ -289,14 +289,14 @@ export async function createProduct(data, uploadedFiles = []) {
     const variantList = Array.isArray(variants) && variants.length > 0
       ? variants
       : [
-          {
-            color_name: 'Default',
-            color_hex: '#000000',
-            size_name: 'OS',
-            price_override: null,
-            stock: Number(data.stock) || 50,
-          },
-        ];
+        {
+          color_name: 'Default',
+          color_hex: '#000000',
+          size_name: 'OS',
+          price_override: null,
+          stock: Number(data.stock) || 50,
+        },
+      ];
 
     for (const v of variantList) {
       const colorName = (v.color_name || 'Default').trim();
@@ -347,6 +347,70 @@ export async function createProduct(data, uploadedFiles = []) {
 }
 
 /**
+ * Update an existing product's details (name, description, category, base price).
+ */
+export async function updateProduct(productId, data) {
+  const prodId = Number(productId);
+  if (Number.isNaN(prodId) || prodId <= 0) {
+    throw new AppError('Invalid product ID', 400);
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    const product = await catalogRepo.findProductB1yId(prodId, false, conn);
+    if (!product) {
+      await conn.rollback();
+      return null;
+    }
+
+    const { name, description, category_id, base_price, price } = data;
+    const effectivePrice = base_price !== undefined ? base_price : price;
+
+    if (category_id !== undefined && category_id !== null) {
+      const category = await catalogRepo.findCategoryById(category_id, conn);
+      if (!category) {
+        await conn.rollback();
+        throw new AppError('Category does not exist', 400);
+      }
+    }
+
+    await conn.execute(
+      `UPDATE products 
+       SET name = COALESCE(?, name),
+           description = COALESCE(?, description),
+           category_id = COALESCE(?, category_id),
+           base_price = COALESCE(?, base_price)
+       WHERE id = ? AND is_active = true`,
+      [
+        name !== undefined ? String(name).trim() : null,
+        description !== undefined ? description : null,
+        category_id !== undefined ? category_id : null,
+        effectivePrice !== undefined ? Number(effectivePrice) : null,
+        prodId,
+      ]
+    );
+
+    await conn.commit();
+
+    // Enqueue cache invalidation and Pinecone vector sync
+    await enqueueCacheInvalidation('products:*', prodId);
+    await enqueueVectorSync(prodId);
+
+    const updated = await catalogRepo.findProductById(prodId, false, pool);
+    const hydrated = await hydrateProducts([updated], pool);
+    return hydrated[0];
+  } catch (error) {
+    if (conn) await conn.rollback();
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
+/**
  * Update stock for a single variant.
  */
 export async function updateVariantInventory(variantId, quantity) {
@@ -357,6 +421,7 @@ export async function updateVariantInventory(variantId, quantity) {
 
   await catalogRepo.upsertVariantInventory(variantId, quantity, pool);
   await enqueueCacheInvalidation('products:*', variant.product_id);
+  await enqueueVectorSync(variant.product_id);
 
   return {
     message: 'Inventory updated',
@@ -631,6 +696,7 @@ export async function updateProductStockLegacy(productId, stock) {
 
   await catalogRepo.updateStockByProductId(productId, stock, pool);
   await enqueueCacheInvalidation('products:*', productId);
+  await enqueueVectorSync(productId);
 
   return { message: 'Stock updated', productId, stock };
 }

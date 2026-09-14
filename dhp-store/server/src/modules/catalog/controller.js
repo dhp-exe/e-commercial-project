@@ -117,6 +117,39 @@ export async function createProduct(req, res) {
 }
 
 /**
+ * PUT /api/products/:id
+ */
+export async function updateProduct(req, res) {
+  const productId = Number(req.params.id);
+  if (Number.isNaN(productId) || productId <= 0) {
+    return res.status(400).json({ message: 'Invalid product ID' });
+  }
+
+  let data = req.body;
+  if (typeof req.body.data === 'string') {
+    try {
+      data = JSON.parse(req.body.data);
+    } catch {
+      return res.status(400).json({ message: 'Invalid JSON in data field' });
+    }
+  }
+
+  try {
+    const product = await catalogService.updateProduct(productId, data);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    res.json(product);
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    console.error('Update product error:', error);
+    res.status(500).json({ message: 'Server error updating product' });
+  }
+}
+
+/**
  * PUT /api/products/variants/:variantId/inventory
  */
 export async function updateVariantInventory(req, res) {

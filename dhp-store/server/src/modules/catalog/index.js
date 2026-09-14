@@ -26,4 +26,5 @@ export {
   restoreInventory,
   getAvailableStock,
   getActiveProductSummaries,
+  updateProduct,
 } from './service.js';
