@@ -134,8 +134,10 @@ export async function updateProduct(req, res) {
     }
   }
 
+  const uploadedFiles = req.files || (req.file ? [req.file] : []);
+
   try {
-    const product = await catalogService.updateProduct(productId, data);
+    const product = await catalogService.updateProduct(productId, data, uploadedFiles);
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }

@@ -35,6 +35,7 @@ router.put(
   '/:id',
   requireAuth,
   verifyAdmin,
+  upload.array('images', 10),
   catalogController.updateProduct
 );
 

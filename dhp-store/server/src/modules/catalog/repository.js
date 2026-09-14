@@ -228,22 +228,14 @@ export async function findProductById(id, activeOnly = true, conn = pool) {
 }
 
 /**
- * Insert a new product with continuous sequential ID (MAX(id) + 1).
+ * Insert a new product.
  */
-export async function insertProduct({ id, name, description, basePrice, categoryId }, conn = pool) {
-  let productId = id;
-  if (!productId) {
-    const [rows] = await conn.execute(
-      'SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM products FOR UPDATE'
-    );
-    productId = Number(rows[0]?.next_id) || 1;
-  }
-
-  await conn.execute(
-    'INSERT INTO products (id, name, description, base_price, category_id, is_active) VALUES (?, ?, ?, ?, ?, true)',
-    [productId, name, description || '', basePrice, categoryId]
+export async function insertProduct({ name, description, basePrice, categoryId }, conn = pool) {
+  const [result] = await conn.execute(
+    'INSERT INTO products (name, description, base_price, category_id, is_active) VALUES (?, ?, ?, ?, true)',
+    [name, description || '', basePrice, categoryId]
   );
-  return productId;
+  return result.insertId;
 }
 
 /**

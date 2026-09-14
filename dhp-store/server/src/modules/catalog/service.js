@@ -349,10 +349,10 @@ export async function createProduct(data, uploadedFiles = []) {
         : null;
 
       // Deterministic SKU with collision avoidance
-      let sku = generateSku(categoryName, productName, colorName, sizeName);
-      const skuCheck = await catalogRepo.findVariantBySku(sku, null, conn);
-      if (skuCheck) {
-        sku = `${sku}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const baseSku = generateSku(categoryName, productName, colorName, sizeName);
+      let sku = baseSku;
+      while (await catalogRepo.findVariantBySku(sku, null, conn)) {
+        sku = `${baseSku}-${Math.floor(1000 + Math.random() * 9000)}`;
       }
 
       // Insert variant
@@ -397,7 +397,7 @@ export async function createProduct(data, uploadedFiles = []) {
 /**
  * Update an existing product's details (name, description, category, base price).
  */
-export async function updateProduct(productId, data) {
+export async function updateProduct(productId, data, uploadedFiles = []) {
   const prodId = Number(productId);
   if (Number.isNaN(prodId) || prodId <= 0) {
     throw new AppError('Invalid product ID', 400);
@@ -440,6 +440,80 @@ export async function updateProduct(productId, data) {
         prodId,
       ]
     );
+
+    // Process uploaded files or image URLs matching createProduct
+    const savedImageUrls = [];
+    const hasFiles = uploadedFiles && uploadedFiles.length > 0;
+    const hasUrls = Array.isArray(data.image_urls) && data.image_urls.length > 0;
+
+    if (hasFiles || hasUrls) {
+      const existingImages = await catalogRepo.findImagesByProductIds([prodId], conn);
+      const hasExistingPrimary = existingImages.some((img) => img.is_primary);
+
+      const primaryIdx = data.primary_image_index !== undefined && Number(data.primary_image_index) >= 0
+        ? Number(data.primary_image_index)
+        : (hasExistingPrimary ? -1 : 0);
+
+      if (primaryIdx >= 0 && hasExistingPrimary) {
+        await conn.execute(
+          'UPDATE product_images SET is_primary = false WHERE product_id = ?',
+          [prodId]
+        );
+      }
+
+      const startSortOrder = existingImages.length;
+
+      if (hasFiles) {
+        for (let i = 0; i < uploadedFiles.length; i++) {
+          const file = uploadedFiles[i];
+          const filename = file.key ? path.basename(file.key) : file.filename;
+          const imgUrl = `/uploads/${filename}`;
+          savedImageUrls.push(imgUrl);
+          const isPrimary = i === primaryIdx;
+          await catalogRepo.insertProductImage(
+            { productId: prodId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : startSortOrder + i + 1 },
+            conn
+          );
+        }
+      } else if (hasUrls) {
+        for (let i = 0; i < data.image_urls.length; i++) {
+          const imgUrl = data.image_urls[i];
+          savedImageUrls.push(imgUrl);
+          const isPrimary = i === primaryIdx;
+          await catalogRepo.insertProductImage(
+            { productId: prodId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : startSortOrder + i + 1 },
+            conn
+          );
+        }
+      }
+
+      // Assign variant images if variant image index mappings are provided
+      if (Array.isArray(data.variants)) {
+        for (const v of data.variants) {
+          const variantId = v.variant_id || v.id;
+          if (variantId && v.image_index !== undefined && v.image_index !== null && v.image_index !== '') {
+            const imgIdx = Number(v.image_index);
+            if (!Number.isNaN(imgIdx) && savedImageUrls[imgIdx]) {
+              await catalogRepo.insertVariantImage(
+                { variantId, imageUrl: savedImageUrls[imgIdx], isPrimary: true, sortOrder: 0 },
+                conn
+              );
+            }
+          }
+        }
+      }
+    } else if (Array.isArray(data.variants)) {
+      // Direct variant image assignments if provided
+      for (const v of data.variants) {
+        const variantId = v.variant_id || v.id;
+        if (variantId && v.image_url) {
+          await catalogRepo.insertVariantImage(
+            { variantId, imageUrl: v.image_url, isPrimary: true, sortOrder: 0 },
+            conn
+          );
+        }
+      }
+    }
 
     await conn.commit();
 
@@ -659,11 +733,11 @@ export async function createVariant(productId, { color_id, color_name, color_hex
     throw new AppError('A variant with this color and size already exists on this product.', 400);
   }
 
-  // 4. Generate SKU
-  let sku = generateSku(product.category_name, product.name, finalColorName, finalSizeName);
-  const skuCheck = await catalogRepo.findVariantBySku(sku, null, pool);
-  if (skuCheck) {
-    sku = `${sku}-${Date.now().toString().slice(-4)}`;
+  // 4. Generate SKU with robust collision avoidance
+  const baseSku = generateSku(product.category_name, product.name, finalColorName, finalSizeName);
+  let sku = baseSku;
+  while (await catalogRepo.findVariantBySku(sku, null, pool)) {
+    sku = `${baseSku}-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 
   // 5. Resolve Price Override & Stock
