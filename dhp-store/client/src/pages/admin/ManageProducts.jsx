@@ -21,13 +21,33 @@ export default function ManageProducts() {
   });
 
   const [variants, setVariants] = useState([
-    { color_name: 'Default', color_hex: '#000000', size_name: 'M', price_override: '', stock: 50 },
+    {
+      colorMode: 'existing',
+      color_id: '',
+      color_name: 'Default',
+      color_hex: '#000000',
+      size_name: 'M',
+      price_override: '',
+      stock: 50,
+      image_index: null,
+    },
   ]);
 
   const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [primaryImageIndex, setPrimaryImageIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [colors, setColors] = useState([]);
+
+  // Generate object URLs for image preview & clean up on unmount/change
+  useEffect(() => {
+    const urls = imageFiles.map((f) => URL.createObjectURL(f));
+    setImagePreviews(urls);
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [imageFiles]);
 
   // Edit Variant Modal State
   const [editingVariant, setEditingVariant] = useState(null);
@@ -61,6 +81,22 @@ export default function ManageProducts() {
       setProducts(prodRes.data);
       setCategories(catRes.data);
       setColors(colRes.data);
+
+      if (colRes.data.length > 0) {
+        setVariants((prev) =>
+          prev.map((v) =>
+            !v.color_id && v.colorMode === 'existing'
+              ? {
+                ...v,
+                color_id: colRes.data[0].id,
+                color_name: colRes.data[0].name,
+                color_hex: colRes.data[0].hex_code || '#000000',
+              }
+              : v
+          )
+        );
+      }
+
       if (showSpinner) showToast('Products refreshed', 'info');
     } catch (err) {
       console.error('Failed to load products/categories/colors:', err);
@@ -73,9 +109,19 @@ export default function ManageProducts() {
   // --- Variant Form Handlers ---
 
   function handleAddVariantRow() {
+    const defaultColor = colors.length > 0 ? colors[0] : { id: '', name: 'Default', hex_code: '#000000' };
     setVariants((prev) => [
       ...prev,
-      { color_name: 'Default', color_hex: '#000000', size_name: 'M', price_override: '', stock: 50 },
+      {
+        colorMode: 'existing',
+        color_id: defaultColor.id || '',
+        color_name: defaultColor.name || 'Default',
+        color_hex: defaultColor.hex_code || '#000000',
+        size_name: 'M',
+        price_override: '',
+        stock: 50,
+        image_index: null,
+      },
     ]);
   }
 
@@ -101,18 +147,35 @@ export default function ManageProducts() {
       return;
     }
 
+    // Validate no duplicate variant rows (same color and size)
+    const seenVariantKeys = new Set();
+    for (const v of variants) {
+      const cKey = v.colorMode === 'existing' && v.color_id ? `id:${v.color_id}` : `name:${(v.color_name || 'Default').trim().toLowerCase()}`;
+      const sKey = (v.size_name || 'OS').trim().toUpperCase();
+      const comboKey = `${cKey}__${sKey}`;
+      if (seenVariantKeys.has(comboKey)) {
+        const displayColor = v.colorMode === 'existing' && v.color_id ? (colors.find((c) => c.id === Number(v.color_id))?.name || v.color_name) : v.color_name;
+        showToast(`Duplicate variant: Color "${displayColor || 'Default'}" with Size "${sKey}". Each variant must have a unique color/size combination.`, 'warning');
+        return;
+      }
+      seenVariantKeys.add(comboKey);
+    }
+
     setIsSubmitting(true);
     const payloadData = {
       name: productData.name.trim(),
       description: productData.description.trim(),
       category_id: Number(productData.category_id),
       base_price: Number(productData.base_price),
+      primary_image_index: primaryImageIndex,
       variants: variants.map((v) => ({
+        color_id: v.colorMode === 'existing' && v.color_id ? Number(v.color_id) : undefined,
         color_name: v.color_name.trim() || 'Default',
         color_hex: v.color_hex || '#000000',
         size_name: v.size_name.trim().toUpperCase(),
         price_override: v.price_override !== '' ? Number(v.price_override) : null,
         stock: Number(v.stock) || 0,
+        image_index: v.image_index !== null && v.image_index !== undefined ? Number(v.image_index) : null,
       })),
     };
 
@@ -129,8 +192,21 @@ export default function ManageProducts() {
       });
       showToast('Product with variants successfully created!', 'success');
       setProductData({ name: '', description: '', category_id: '', base_price: '' });
-      setVariants([{ color_name: 'Default', color_hex: '#000000', size_name: 'M', price_override: '', stock: 50 }]);
+      const defaultColor = colors.length > 0 ? colors[0] : { id: '', name: 'Default', hex_code: '#000000' };
+      setVariants([
+        {
+          colorMode: 'existing',
+          color_id: defaultColor.id || '',
+          color_name: defaultColor.name || 'Default',
+          color_hex: defaultColor.hex_code || '#000000',
+          size_name: 'M',
+          price_override: '',
+          stock: 50,
+          image_index: null,
+        },
+      ]);
       setImageFiles([]);
+      setPrimaryImageIndex(0);
       loadData();
     } catch (err) {
       console.error('Create product error:', err);
@@ -235,6 +311,25 @@ export default function ManageProducts() {
       payload.color_hex = newVariantData.new_color_hex || '#000000';
     } else {
       payload.color_id = Number(newVariantData.color_id);
+    }
+
+    // Check if addingVariantProduct already has this color + size combination
+    const targetSizeName = (newVariantData.size_name || 'OS').trim().toUpperCase();
+    const isDuplicate = addingVariantProduct.variants?.some((v) => {
+      const vSize = (v.size?.name || v.size || '').trim().toUpperCase();
+      if (vSize !== targetSizeName) return false;
+      if (newVariantData.colorMode === 'new') {
+        const vColorName = (v.color?.name || v.color_name || '').trim().toLowerCase();
+        return vColorName === payload.color_name.toLowerCase();
+      }
+      const vColorId = v.color?.id || v.color_id;
+      return Number(vColorId) === payload.color_id;
+    });
+
+    if (isDuplicate) {
+      showToast(`A variant with this color and size (${targetSizeName}) already exists on this product. Please edit the existing variant's stock instead.`, 'warning');
+      setIsSavingVariant(false);
+      return;
     }
 
     try {
@@ -345,18 +440,83 @@ export default function ManageProducts() {
             {/* Multiple Images Upload */}
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                Product Images (Upload up to 10; the 1st will be primary):
+                Product Images (Upload up to 10; #1 will be primary):
               </label>
               <input
                 type="file"
                 multiple
                 accept="image/*"
-                onChange={(e) => setImageFiles(Array.from(e.target.files))}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setImageFiles(files);
+                  setPrimaryImageIndex(0);
+                }}
                 style={{ fontSize: 13 }}
               />
               {imageFiles.length > 0 && (
-                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                  {imageFiles.length} file(s) selected
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, color: '#4a5568', fontWeight: 600 }}>
+                      {imageFiles.length} file(s) selected
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {imageFiles.map((file, fIdx) => {
+                      const isPrimary = fIdx === primaryImageIndex;
+                      return (
+                        <div
+                          key={fIdx}
+                          onClick={() => setPrimaryImageIndex(fIdx)}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            padding: 6,
+                            background: isPrimary ? '#ebf8ff' : '#edf2f7',
+                            borderRadius: 6,
+                            border: isPrimary ? '2px solid #2b6cb0' : '1px solid #cbd5e0',
+                            position: 'relative',
+                            cursor: 'pointer',
+                            boxShadow: isPrimary ? '0 2px 6px rgba(43, 108, 176, 0.25)' : 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={isPrimary ? 'Current Primary (Default) Image' : 'Click to set as Primary Image'}
+                        >
+                          <img
+                            src={imagePreviews[fIdx]}
+                            alt={file.name}
+                            style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 4 }}
+                          />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                            <input
+                              type="radio"
+                              name="primary_image_choice"
+                              checked={isPrimary}
+                              onChange={() => setPrimaryImageIndex(fIdx)}
+                              style={{ cursor: 'pointer', accentColor: '#2b6cb0' }}
+                            />
+                            <span style={{ fontSize: 11, fontWeight: 700, color: isPrimary ? '#2b6cb0' : '#4a5568' }}>
+                              #{fIdx + 1} {isPrimary ? '★ Primary' : ''}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: '#718096',
+                              maxWidth: 70,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              marginTop: 2,
+                            }}
+                            title={file.name}
+                          >
+                            {file.name}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -383,35 +543,127 @@ export default function ManageProducts() {
                 </button>
               </div>
 
+              {/* Table Column Headers */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '2.4fr 1fr 1.1fr 1fr 2fr 36px',
+                  gap: 8,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#4a5568',
+                  marginBottom: 6,
+                  padding: '0 2px',
+                }}
+              >
+                <div>Color (Choose or Add)</div>
+                <div>Size</div>
+                <div>Override ($)</div>
+                <div>Stock</div>
+                <div>Assign Image</div>
+                <div></div>
+              </div>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {variants.map((v, idx) => (
                   <div
                     key={idx}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '2fr 60px 1fr 1fr 1fr 40px',
+                      gridTemplateColumns: '2.4fr 1fr 1.1fr 1fr 2fr 36px',
                       gap: 8,
                       alignItems: 'center',
                     }}
                   >
-                    <input
-                      placeholder="Color (e.g. Black)"
-                      value={v.color_name}
-                      onChange={(e) => handleVariantChange(idx, 'color_name', e.target.value)}
-                      required
-                      style={{ padding: '8px 10px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
-                    />
-                    <input
-                      type="color"
-                      value={v.color_hex}
-                      onChange={(e) => handleVariantChange(idx, 'color_hex', e.target.value)}
-                      title="Pick hex color"
-                      style={{ height: 36, width: '100%', padding: 2, borderRadius: 4, cursor: 'pointer' }}
-                    />
+                    {/* Color selection */}
+                    {v.colorMode === 'new' ? (
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <input
+                          placeholder="Color Name"
+                          value={v.color_name}
+                          onChange={(e) => handleVariantChange(idx, 'color_name', e.target.value)}
+                          required
+                          style={{ flex: 1, padding: '8px 8px', borderRadius: 4, border: '1px solid #2563eb', fontSize: 13 }}
+                        />
+                        <input
+                          type="color"
+                          value={v.color_hex}
+                          onChange={(e) => handleVariantChange(idx, 'color_hex', e.target.value)}
+                          title="Pick hex color"
+                          style={{ height: 36, width: 36, padding: 2, borderRadius: 4, cursor: 'pointer', border: '1px solid #ccc' }}
+                        />
+                        <button
+                          type="button"
+                          title="Switch back to existing colors"
+                          onClick={() => {
+                            const defaultColor = colors[0] || { id: '', name: 'Default', hex_code: '#000000' };
+                            handleVariantChange(idx, 'colorMode', 'existing');
+                            handleVariantChange(idx, 'color_id', defaultColor.id);
+                            handleVariantChange(idx, 'color_name', defaultColor.name);
+                            handleVariantChange(idx, 'color_hex', defaultColor.hex_code || '#000000');
+                          }}
+                          style={{
+                            background: '#f1f5f9',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: 4,
+                            padding: '6px 8px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            color: '#475569',
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <select
+                          value={v.color_id || ''}
+                          onChange={(e) => {
+                            if (e.target.value === '__NEW__') {
+                              handleVariantChange(idx, 'colorMode', 'new');
+                              handleVariantChange(idx, 'color_id', '');
+                              handleVariantChange(idx, 'color_name', '');
+                              handleVariantChange(idx, 'color_hex', '#000000');
+                            } else {
+                              const selected = colors.find((c) => String(c.id) === e.target.value);
+                              handleVariantChange(idx, 'colorMode', 'existing');
+                              handleVariantChange(idx, 'color_id', selected ? selected.id : '');
+                              handleVariantChange(idx, 'color_name', selected ? selected.name : '');
+                              handleVariantChange(idx, 'color_hex', selected ? (selected.hex_code || '#000000') : '#000000');
+                            }
+                          }}
+                          style={{ flex: 1, padding: '8px 8px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
+                        >
+                          <option value="" disabled>Select Color</option>
+                          {colors.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                          <option value="__NEW__" style={{ fontWeight: 600, color: '#2563eb' }}>
+                            + Add New Color...
+                          </option>
+                        </select>
+                        <div
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            backgroundColor: v.color_hex || '#000000',
+                            border: '1px solid #cbd5e1',
+                            flexShrink: 0,
+                          }}
+                          title={v.color_hex || '#000000'}
+                        />
+                      </div>
+                    )}
+
+                    {/* Size */}
                     <select
                       value={v.size_name}
                       onChange={(e) => handleVariantChange(idx, 'size_name', e.target.value)}
-                      style={{ padding: '8px 10px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
+                      style={{ padding: '8px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
                     >
                       {STANDARD_SIZES.map((sz) => (
                         <option key={sz} value={sz}>
@@ -420,22 +672,77 @@ export default function ManageProducts() {
                       ))}
                       <option value="OS">OS</option>
                     </select>
+
+                    {/* Override Price */}
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="Override Price"
+                      placeholder="Optional"
                       value={v.price_override}
                       onChange={(e) => handleVariantChange(idx, 'price_override', e.target.value)}
-                      style={{ padding: '8px 10px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
+                      style={{ padding: '8px 8px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
                     />
+
+                    {/* Stock */}
                     <input
                       type="number"
                       placeholder="Stock"
                       value={v.stock}
                       onChange={(e) => handleVariantChange(idx, 'stock', e.target.value)}
                       required
-                      style={{ padding: '8px 10px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
+                      style={{ padding: '8px 8px', borderRadius: 4, border: '1px solid #ccc', fontSize: 13 }}
                     />
+
+                    {/* Assign Image */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {v.image_index !== null && v.image_index !== undefined && imagePreviews[v.image_index] ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                          <img
+                            src={imagePreviews[v.image_index]}
+                            alt={`Variant`}
+                            style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 4, border: '1px solid #2563eb', flexShrink: 0 }}
+                          />
+                          <select
+                            value={v.image_index}
+                            onChange={(e) => handleVariantChange(idx, 'image_index', e.target.value === '' ? null : Number(e.target.value))}
+                            style={{ flex: 1, padding: '6px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12 }}
+                          >
+                            <option value="">Default (Primary: Image #{primaryImageIndex + 1})</option>
+                            {imageFiles.map((file, fIdx) => (
+                              <option key={fIdx} value={fIdx}>
+                                #{fIdx + 1}: {file.name.length > 14 ? file.name.slice(0, 11) + '...' : file.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <select
+                          value=""
+                          onChange={(e) => handleVariantChange(idx, 'image_index', e.target.value === '' ? null : Number(e.target.value))}
+                          disabled={imageFiles.length === 0}
+                          style={{
+                            width: '100%',
+                            padding: '8px 8px',
+                            borderRadius: 4,
+                            border: '1px dashed #cbd5e1',
+                            fontSize: 12,
+                            color: imageFiles.length === 0 ? '#94a3b8' : '#334155',
+                            background: imageFiles.length === 0 ? '#f8fafc' : '#ffffff',
+                            cursor: imageFiles.length === 0 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          <option value="">
+                            {imageFiles.length === 0 ? 'Upload image first' : '📷 Assign Image...'}
+                          </option>
+                          {imageFiles.map((file, fIdx) => (
+                            <option key={fIdx} value={fIdx}>
+                              #{fIdx + 1}: {file.name.length > 18 ? file.name.slice(0, 15) + '...' : file.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => handleRemoveVariantRow(idx)}

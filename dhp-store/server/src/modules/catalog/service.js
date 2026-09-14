@@ -1,3 +1,4 @@
+import path from 'path';
 import * as Sentry from '@sentry/node';
 import { pool } from '../../shared/db/pool.js';
 import redis from '../../shared/cache/redis.js';
@@ -99,6 +100,7 @@ export async function hydrateProducts(products, conn = pool) {
       reserved_quantity: v.reserved_quantity,
       available_stock: v.available_stock,
       is_active: Boolean(v.is_active),
+      image_url: v.image_url ? formatImageUrl(v.image_url) : null,
     });
   }
 
@@ -264,22 +266,28 @@ export async function createProduct(data, uploadedFiles = []) {
     );
 
     // 2. Insert uploaded files or image URLs
+    const savedImageUrls = [];
+    const primaryIdx = Number(data.primary_image_index) >= 0 ? Number(data.primary_image_index) : 0;
+
     if (uploadedFiles && uploadedFiles.length > 0) {
       for (let i = 0; i < uploadedFiles.length; i++) {
         const file = uploadedFiles[i];
-        const imgUrl = `/uploads/${file.filename}`;
-        const isPrimary = i === 0;
+        const filename = file.key ? path.basename(file.key) : file.filename;
+        const imgUrl = `/uploads/${filename}`;
+        savedImageUrls.push(imgUrl);
+        const isPrimary = i === primaryIdx;
         await catalogRepo.insertProductImage(
-          { productId, imageUrl: imgUrl, isPrimary, sortOrder: i },
+          { productId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : i + 1 },
           conn
         );
       }
     } else if (Array.isArray(data.image_urls) && data.image_urls.length > 0) {
       for (let i = 0; i < data.image_urls.length; i++) {
         const imgUrl = data.image_urls[i];
-        const isPrimary = i === 0;
+        savedImageUrls.push(imgUrl);
+        const isPrimary = i === primaryIdx;
         await catalogRepo.insertProductImage(
-          { productId, imageUrl: imgUrl, isPrimary, sortOrder: i },
+          { productId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : i + 1 },
           conn
         );
       }
@@ -298,25 +306,54 @@ export async function createProduct(data, uploadedFiles = []) {
         },
       ];
 
+    const insertedCombinations = new Set();
+
     for (const v of variantList) {
-      const colorName = (v.color_name || 'Default').trim();
-      const colorHex = v.color_hex || '#000000';
+      let colorId;
+      let colorName = (v.color_name || 'Default').trim();
+
+      if (v.color_id) {
+        const existingColor = await catalogRepo.findColorById(v.color_id, conn);
+        if (existingColor) {
+          colorId = existingColor.id;
+          colorName = existingColor.name;
+        }
+      }
+
+      if (!colorId) {
+        const colorHex = v.color_hex || '#000000';
+        const color = await catalogRepo.upsertColor(colorName, colorHex, conn);
+        colorId = color.id;
+        colorName = color.name;
+      }
+
+      // Upsert size
       const sizeName = (v.size_name || 'OS').trim().toUpperCase();
+      const size = await catalogRepo.upsertSize(sizeName, 99, conn);
+      const sizeId = size.id;
+
+      // Uniqueness check for color + size
+      const comboKey = `${colorId}__${sizeId}`;
+      if (insertedCombinations.has(comboKey)) {
+        await conn.rollback();
+        throw new AppError(
+          `Duplicate variant detected: Color "${colorName}" with Size "${sizeName}". Each variant must have a unique color/size combination.`,
+          400
+        );
+      }
+      insertedCombinations.add(comboKey);
+
       const stockQty = Math.max(0, Number(v.stock) || 0);
       const priceOverride = v.price_override !== undefined && v.price_override !== null
         ? Number(v.price_override)
         : null;
 
-      // Upsert color
-      const color = await catalogRepo.upsertColor(colorName, colorHex, conn);
-      const colorId = color.id;
-
-      // Upsert size
-      const size = await catalogRepo.upsertSize(sizeName, 99, conn);
-      const sizeId = size.id;
-
-      // Deterministic SKU
-      const sku = generateSku(categoryName, productName, colorName, sizeName);
+      // Deterministic SKU with collision avoidance
+      let sku = generateSku(categoryName, productName, colorName, sizeName);
+      const skuCheck = await catalogRepo.findVariantBySku(sku, null, conn);
+      if (skuCheck) {
+        sku = `${sku}-${Math.floor(1000 + Math.random() * 9000)}`;
+      }
 
       // Insert variant
       const variantId = await catalogRepo.insertProductVariant(
@@ -326,6 +363,17 @@ export async function createProduct(data, uploadedFiles = []) {
 
       // Insert inventory
       await catalogRepo.insertInventory({ variantId, quantity: stockQty }, conn);
+
+      // Insert variant image if assigned
+      if (v.image_index !== undefined && v.image_index !== null && v.image_index !== '') {
+        const imgIdx = Number(v.image_index);
+        if (!Number.isNaN(imgIdx) && savedImageUrls[imgIdx]) {
+          await catalogRepo.insertVariantImage(
+            { variantId, imageUrl: savedImageUrls[imgIdx], isPrimary: true, sortOrder: 0 },
+            conn
+          );
+        }
+      }
     }
 
     await conn.commit();
@@ -360,7 +408,7 @@ export async function updateProduct(productId, data) {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    const product = await catalogRepo.findProductB1yId(prodId, false, conn);
+    const product = await catalogRepo.findProductById(prodId, false, conn);
     if (!product) {
       await conn.rollback();
       return null;

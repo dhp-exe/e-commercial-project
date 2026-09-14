@@ -14,8 +14,17 @@ const isR2Configured = Boolean(
 );
 
 function generateFilename(file) {
-  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-  return uniqueSuffix + path.extname(file.originalname).toLowerCase();
+  const ext = path.extname(file.originalname).toLowerCase();
+  const rawBaseName = path.parse(file.originalname).name;
+  const sanitized = rawBaseName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'image';
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000); // 4-digit suffix (1000-9999)
+  return `${sanitized}-${randomSuffix}${ext}`;
 }
 
 let storage;
@@ -34,15 +43,9 @@ if (isR2Configured) {
     s3,
     bucket: process.env.R2_BUCKET_NAME,
     contentType: multerS3.AUTO_CONTENT_TYPE,
-    key: function (req, file, cb) {
+    key: function (_req, file, cb) {
       const uniqueFilename = generateFilename(file);
       file.filename = uniqueFilename;
-      if (req) {
-        if (!req.file) {
-          req.file = file;
-        }
-        req.file.filename = uniqueFilename;
-      }
       cb(null, `uploads/${uniqueFilename}`);
     },
   });
