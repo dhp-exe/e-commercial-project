@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.5.0...v1.6.0) (2026-09-14)
+
+
+### Features
+
+* add Cloudflare AI Gateway support to Python AI service client ([#35](https://github.com/dhp-exe/e-commercial-project/issues/35)) ([b4c2713](https://github.com/dhp-exe/e-commercial-project/commit/b4c2713392e99a4dd3f4b5301e9c3a9719c864f9))
+* add incremental product vector sync and deletion on catalog mut… ([#38](https://github.com/dhp-exe/e-commercial-project/issues/38)) ([f105b74](https://github.com/dhp-exe/e-commercial-project/commit/f105b7441a103bcc4c1ea075946229e70873a19f))
+
 ## [1.5.0](https://github.com/dhp-exe/e-commercial-project/compare/v1.4.0...v1.5.0) (2026-09-07)
 
 
