@@ -6,6 +6,7 @@ import { formatImageUrl } from '../../shared/utils/formatImageUrl.js';
 import { generateSku } from '../../shared/utils/generateSku.js';
 import { cacheQueue } from './queues/cacheQueue.js';
 import * as catalogRepo from './repository.js';
+import { enqueueProductVectorSync, enqueueProductVectorDelete } from '../ai/index.js';
 
 /**
  * Enqueue background cache invalidation.
@@ -22,6 +23,31 @@ async function enqueueCacheInvalidation(pattern = 'products:*', productId = null
     Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
   }
 }
+
+/**
+ * Enqueue background vector sync to Pinecone.
+ */
+async function enqueueVectorSync(productId) {
+  try {
+    await enqueueProductVectorSync(productId);
+  } catch (err) {
+    console.error(`Failed to enqueue vector sync for product ${productId}:`, err.message);
+    Sentry.captureException(err, { tags: { queue: 'ai-refresh', action: 'sync-product' } });
+  }
+}
+
+/**
+ * Enqueue background vector deletion from Pinecone.
+ */
+async function enqueueVectorDelete(productId) {
+  try {
+    await enqueueProductVectorDelete(productId);
+  } catch (err) {
+    console.error(`Failed to enqueue vector deletion for product ${productId}:`, err.message);
+    Sentry.captureException(err, { tags: { queue: 'ai-refresh', action: 'delete-product' } });
+  }
+}
+
 
 /**
  * Hydrates an array of product rows with their variants, colors, sizes, inventory, and images.
@@ -304,8 +330,9 @@ export async function createProduct(data, uploadedFiles = []) {
 
     await conn.commit();
 
-    // Enqueue cache invalidation
+    // Enqueue cache invalidation and Pinecone vector sync
     await enqueueCacheInvalidation('products:*', productId);
+    await enqueueVectorSync(productId);
 
     // Fetch and hydrate newly created product
     const newProduct = await catalogRepo.findProductById(productId, false, pool);
@@ -436,6 +463,7 @@ export async function updateVariant(variantId, { price_override, color_id, color
     console.error('Redis delete error in updateVariant:', err.message);
   }
   await enqueueCacheInvalidation('products:*', currentVariant.product_id);
+  await enqueueVectorSync(currentVariant.product_id);
 
   return {
     message: 'Variant updated successfully',
@@ -548,6 +576,7 @@ export async function createVariant(productId, { color_id, color_name, color_hex
     console.error('Redis delete error in createVariant:', err.message);
   }
   await enqueueCacheInvalidation('products:*', productId);
+  await enqueueVectorSync(productId);
 
   return {
     message: 'Variant created successfully',
@@ -586,6 +615,7 @@ export async function deleteVariant(variantId) {
     console.error('Redis delete error in deleteVariant:', err.message);
   }
   await enqueueCacheInvalidation('products:*', variant.product_id);
+  await enqueueVectorSync(variant.product_id);
 
   return { message: 'Variant deleted successfully', variantId };
 }
@@ -616,6 +646,7 @@ export async function deleteProduct(productId) {
 
   await catalogRepo.softDeleteProductById(productId, pool);
   await enqueueCacheInvalidation('products:*', productId);
+  await enqueueVectorDelete(productId);
 
   return { message: 'Product deleted successfully' };
 }

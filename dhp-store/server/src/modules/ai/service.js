@@ -169,6 +169,33 @@ export async function triggerModelRefresh() {
 }
 
 /**
+ * Queue an incremental vector upsert for a single product.
+ */
+export async function enqueueProductVectorSync(productId) {
+  if (!productId) return null;
+  const job = await aiRefreshQueue.add('sync-product', {
+    type: 'sync-product',
+    action: 'upsert',
+    productId: Number(productId),
+  });
+  return { message: 'Product vector sync queued', jobId: job.id, productId: Number(productId) };
+}
+
+/**
+ * Queue an incremental vector deletion for a single product.
+ */
+export async function enqueueProductVectorDelete(productId) {
+  if (!productId) return null;
+  const job = await aiRefreshQueue.add('delete-product', {
+    type: 'delete-product',
+    action: 'delete',
+    productId: Number(productId),
+  });
+  return { message: 'Product vector deletion queued', jobId: job.id, productId: Number(productId) };
+}
+
+
+/**
  * Send a message to the AI chatbot service.
  */
 export async function chatWithAI(message) {
