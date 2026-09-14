@@ -173,8 +173,8 @@ export default function ProductDetails() {
   const currentMaxStock = activeVariant
     ? activeVariant.available_stock
     : product.available_stock !== undefined
-    ? product.available_stock
-    : product.stock;
+      ? product.available_stock
+      : product.stock;
 
   const handleQuantityChange = (delta) => {
     setQuantity((prev) => {
@@ -407,8 +407,8 @@ export default function ProductDetails() {
                 {activeVariant.available_stock > 10
                   ? '● In Stock'
                   : activeVariant.available_stock > 0
-                  ? `● Low Stock (${activeVariant.available_stock} left)`
-                  : '● Out of Stock'}
+                    ? `● Low Stock (${activeVariant.available_stock} left)`
+                    : '● Out of Stock'}
               </span>
             )}
           </div>
