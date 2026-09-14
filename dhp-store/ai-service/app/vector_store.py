@@ -3,10 +3,26 @@ from google import genai
 from google.genai import types
 from pinecone import Pinecone
 import mysql.connector
+from mysql.connector import pooling
 
 class VectorStore:
     def __init__(self, db_config):
         self.db_config = db_config
+
+        # ── Initialize MySQL Connection Pool 
+        pool_size = int(os.getenv("DB_POOL_SIZE", 5))
+        try:
+            self.pool = pooling.MySQLConnectionPool(
+                pool_name="vector_store_pool",
+                pool_size=pool_size,
+                pool_reset_session=True,
+                **self.db_config
+            )
+            print(f"MySQL connection pool initialized (size: {pool_size})")
+        except Exception as e:
+            print(f"WARNING: Failed to initialize MySQL pool: {e}. Falling back to direct connections.")
+            self.pool = None
+
         pinecone_key = os.getenv("PINECONE_API_KEY")
         index_name = os.getenv("PINECONE_INDEX_NAME", "dhp-store")
         if not pinecone_key:
@@ -38,6 +54,12 @@ class VectorStore:
         else:
             print("WARNING: GOOGLE_API_KEY not found.")
             self.genai_client = None
+
+    def _get_connection(self):
+        if self.pool:
+            return self.pool.get_connection()
+        return mysql.connector.connect(**self.db_config)
+
             
     def get_embedding(self, text: str):
         if not self.genai_client:
@@ -55,27 +77,29 @@ class VectorStore:
 
     def sync_products_to_pinecone(self):
         print("Syncing products to Pinecone...")
-        conn = mysql.connector.connect(**self.db_config)
-        cursor = conn.cursor(dictionary=True)
-        
-        query = """
-            SELECT 
-              p.id, p.name, p.description, p.base_price, c.name as category,
-              GROUP_CONCAT(DISTINCT s.name ORDER BY s.sort_order SEPARATOR ', ') as available_sizes,
-              GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') as available_colors,
-              MIN(COALESCE(pv.price_override, p.base_price)) as min_price,
-              MAX(COALESCE(pv.price_override, p.base_price)) as max_price
-            FROM products p 
-            JOIN categories c ON p.category_id = c.id
-            LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = TRUE
-            LEFT JOIN sizes s ON pv.size_id = s.id
-            LEFT JOIN colors cl ON pv.color_id = cl.id
-            WHERE p.is_active = TRUE
-            GROUP BY p.id, p.name, p.description, p.base_price, c.name
-        """
-        cursor.execute(query)
-        products = cursor.fetchall()
-        conn.close()
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor(dictionary=True)
+            query = """
+                SELECT 
+                  p.id, p.name, p.description, p.base_price, c.name as category,
+                  GROUP_CONCAT(DISTINCT s.name ORDER BY s.sort_order SEPARATOR ', ') as available_sizes,
+                  GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') as available_colors,
+                  MIN(COALESCE(pv.price_override, p.base_price)) as min_price,
+                  MAX(COALESCE(pv.price_override, p.base_price)) as max_price
+                FROM products p 
+                JOIN categories c ON p.category_id = c.id
+                LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = TRUE
+                LEFT JOIN sizes s ON pv.size_id = s.id
+                LEFT JOIN colors cl ON pv.color_id = cl.id
+                WHERE p.is_active = TRUE
+                GROUP BY p.id, p.name, p.description, p.base_price, c.name
+            """
+            cursor.execute(query)
+            products = cursor.fetchall()
+            cursor.close()
+        finally:
+            conn.close()
         
         vectors = []
         for p in products:
@@ -122,26 +146,29 @@ class VectorStore:
             return False
 
         try:
-            conn = mysql.connector.connect(**self.db_config)
-            cursor = conn.cursor(dictionary=True)
-            query = """
-                SELECT 
-                  p.id, p.name, p.description, p.base_price, c.name as category,
-                  GROUP_CONCAT(DISTINCT s.name ORDER BY s.sort_order SEPARATOR ', ') as available_sizes,
-                  GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') as available_colors,
-                  MIN(COALESCE(pv.price_override, p.base_price)) as min_price,
-                  MAX(COALESCE(pv.price_override, p.base_price)) as max_price
-                FROM products p 
-                JOIN categories c ON p.category_id = c.id
-                LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = TRUE
-                LEFT JOIN sizes s ON pv.size_id = s.id
-                LEFT JOIN colors cl ON pv.color_id = cl.id
-                WHERE p.id = %s AND p.is_active = TRUE
-                GROUP BY p.id, p.name, p.description, p.base_price, c.name
-            """
-            cursor.execute(query, (product_id,))
-            p = cursor.fetchone()
-            conn.close()
+            conn = self._get_connection()
+            try:
+                cursor = conn.cursor(dictionary=True)
+                query = """
+                    SELECT 
+                      p.id, p.name, p.description, p.base_price, c.name as category,
+                      GROUP_CONCAT(DISTINCT s.name ORDER BY s.sort_order SEPARATOR ', ') as available_sizes,
+                      GROUP_CONCAT(DISTINCT cl.name SEPARATOR ', ') as available_colors,
+                      MIN(COALESCE(pv.price_override, p.base_price)) as min_price,
+                      MAX(COALESCE(pv.price_override, p.base_price)) as max_price
+                    FROM products p 
+                    JOIN categories c ON p.category_id = c.id
+                    LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = TRUE
+                    LEFT JOIN sizes s ON pv.size_id = s.id
+                    LEFT JOIN colors cl ON pv.color_id = cl.id
+                    WHERE p.id = %s AND p.is_active = TRUE
+                    GROUP BY p.id, p.name, p.description, p.base_price, c.name
+                """
+                cursor.execute(query, (product_id,))
+                p = cursor.fetchone()
+                cursor.close()
+            finally:
+                conn.close()
 
             if not p:
                 print(f"Product {product_id} not found or inactive. Removing from Pinecone...")
