@@ -44,39 +44,57 @@ export default function ProductDetails() {
     return Array.from(map.values());
   }, [product]);
 
-  // Set default color when product loads
-  useEffect(() => {
-    if (colors.length > 0 && !selectedColor) {
-      setSelectedColor(colors[0]);
+  // Derive active color synchronously to avoid initial null render that causes key collisions and orphaned DOM nodes
+  const currentColor = useMemo(() => {
+    if (selectedColor && colors.some((c) => c.id === selectedColor.id)) {
+      return selectedColor;
     }
+    return colors[0] || null;
   }, [colors, selectedColor]);
 
-  // Available sizes for the currently selected color
+  // Available sizes for the currently selected color (deduplicated by size name)
   const availableSizesForColor = useMemo(() => {
     if (!product?.variants || product.variants.length === 0) {
-      return product?.sizes
-        ? product.sizes.split(',').map((s) => ({
-            name: s.trim(),
-            sort_order: 0,
-            available_stock: product.stock,
-          }))
-        : [];
+      if (!product?.sizes) return [];
+      return product.sizes.split(',').map((s) => ({
+        name: s.trim(),
+        sort_order: 0,
+        available_stock: product.stock,
+      }));
     }
-    return product.variants
-      .filter((v) => !selectedColor || v.color?.id === selectedColor.id)
-      .map((v) => ({
-        name: v.size?.name || v.size,
-        sort_order: v.size?.sort_order || 0,
-        available_stock: v.available_stock !== undefined ? v.available_stock : v.stock,
-        variant: v,
-      }))
-      .sort((a, b) => a.sort_order - b.sort_order);
-  }, [product, selectedColor]);
 
-  // Reset or initialize size when color changes
+    const filteredVariants = currentColor
+      ? product.variants.filter((v) => v.color?.id === currentColor.id || v.color_id === currentColor.id)
+      : product.variants;
+
+    const sizeMap = new Map();
+    for (const v of filteredVariants) {
+      const sizeName = (v.size?.name || v.size || 'OS').toString().trim();
+      const sortOrder = v.size?.sort_order ?? 0;
+      const stock = v.available_stock !== undefined ? v.available_stock : (v.stock ?? 0);
+
+      if (!sizeMap.has(sizeName)) {
+        sizeMap.set(sizeName, {
+          name: sizeName,
+          sort_order: sortOrder,
+          available_stock: stock,
+          variant: v,
+        });
+      } else {
+        const item = sizeMap.get(sizeName);
+        item.available_stock += stock;
+        if (stock > 0 && (!item.variant || item.variant.available_stock <= 0)) {
+          item.variant = v;
+        }
+      }
+    }
+
+    return Array.from(sizeMap.values()).sort((a, b) => a.sort_order - b.sort_order);
+  }, [product, currentColor]);
+
+  // Reset or initialize size when available sizes change
   useEffect(() => {
     if (availableSizesForColor.length > 0) {
-      // If current selectedSize is not in the new available sizes, select the first in-stock or first available
       const exists = availableSizesForColor.some((s) => s.name === selectedSize);
       if (!exists) {
         const inStockFirst = availableSizesForColor.find((s) => s.available_stock > 0) || availableSizesForColor[0];
@@ -85,17 +103,51 @@ export default function ProductDetails() {
     }
   }, [availableSizesForColor, selectedSize]);
 
-  // Active variant matching selectedColor + selectedSize
+  // Active variant matching currentColor + selectedSize
   const activeVariant = useMemo(() => {
     if (!product?.variants || product.variants.length === 0) return null;
     return (
       product.variants.find(
         (v) =>
-          (!selectedColor || v.color?.id === selectedColor.id) &&
-          (v.size?.name === selectedSize || v.size === selectedSize)
+          (!currentColor || v.color?.id === currentColor.id || v.color_id === currentColor.id) &&
+          ((v.size?.name || v.size) === selectedSize)
       ) || null
     );
-  }, [product, selectedColor, selectedSize]);
+  }, [product, currentColor, selectedSize]);
+
+  // Update main image when active variant changes and has an assigned image
+  useEffect(() => {
+    if (activeVariant?.image_url) {
+      setSelectedImage(activeVariant.image_url);
+    }
+  }, [activeVariant]);
+
+  // Deduplicate gallery images so the same image is never displayed twice
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+    const list = [];
+    const seen = new Set();
+
+    if (Array.isArray(product.images)) {
+      for (const img of product.images) {
+        if (img?.image_url && !seen.has(img.image_url)) {
+          seen.add(img.image_url);
+          list.push(img);
+        }
+      }
+    }
+
+    if (Array.isArray(product.variants)) {
+      for (const v of product.variants) {
+        if (v?.image_url && !seen.has(v.image_url)) {
+          seen.add(v.image_url);
+          list.push({ id: `variant-${v.id}`, image_url: v.image_url });
+        }
+      }
+    }
+
+    return list;
+  }, [product]);
 
   // Reset active image when product changes
   useEffect(() => {
@@ -104,6 +156,16 @@ export default function ProductDetails() {
     }
   }, [product]);
 
+  const handleColorSelect = (color) => {
+    setSelectedColor(color);
+    const variantWithImg = product?.variants?.find(
+      (v) => (v.color?.id === color.id || v.color_id === color.id) && v.image_url
+    );
+    if (variantWithImg?.image_url) {
+      setSelectedImage(variantWithImg.image_url);
+    }
+  };
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}>Loading product...</div>;
   if (!product) return <div style={{ padding: 40, textAlign: 'center' }}>Product not found.</div>;
 
@@ -111,8 +173,8 @@ export default function ProductDetails() {
   const currentMaxStock = activeVariant
     ? activeVariant.available_stock
     : product.available_stock !== undefined
-    ? product.available_stock
-    : product.stock;
+      ? product.available_stock
+      : product.stock;
 
   const handleQuantityChange = (delta) => {
     setQuantity((prev) => {
@@ -315,9 +377,9 @@ export default function ProductDetails() {
             <img ref={productImgRef} src={currentMainImage} alt={product.name} className="pdp-image" />
           </div>
 
-          {Array.isArray(product.images) && product.images.length > 1 && (
+          {galleryImages.length > 1 && (
             <div className="pdp-thumbnails">
-              {product.images.map((img) => (
+              {galleryImages.map((img) => (
                 <button
                   key={img.id}
                   className={`pdp-thumb ${selectedImage === img.image_url ? 'active' : ''}`}
@@ -345,8 +407,8 @@ export default function ProductDetails() {
                 {activeVariant.available_stock > 10
                   ? '● In Stock'
                   : activeVariant.available_stock > 0
-                  ? `● Low Stock (${activeVariant.available_stock} left)`
-                  : '● Out of Stock'}
+                    ? `● Low Stock (${activeVariant.available_stock} left)`
+                    : '● Out of Stock'}
               </span>
             )}
           </div>
@@ -355,14 +417,14 @@ export default function ProductDetails() {
           {colors.length > 0 && (
             <div className="color-section">
               <h4>
-                Color: <strong>{selectedColor?.name || 'Default'}</strong>
+                Color: <strong>{currentColor?.name || 'Default'}</strong>
               </h4>
               <div className="color-swatches">
                 {colors.map((c) => (
                   <button
                     key={c.id}
-                    className={`color-swatch-btn ${selectedColor?.id === c.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedColor(c)}
+                    className={`color-swatch-btn ${currentColor?.id === c.id ? 'selected' : ''}`}
+                    onClick={() => handleColorSelect(c)}
                     title={c.name}
                   >
                     <span className="color-dot" style={{ backgroundColor: c.hex_code || '#000000' }}></span>

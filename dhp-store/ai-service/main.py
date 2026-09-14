@@ -54,6 +54,23 @@ def refresh_model(background_tasks: BackgroundTasks):
     background_tasks.add_task(background_refresh)
     return {"status": "Refresh started"}
 
+@app.post("/sync/product/{product_id}")
+def sync_product(product_id: int):
+    """Sync a single product vector into Pinecone and clear recommendation cache"""
+    success = vector_store.sync_single_product(product_id)
+    rec_engine.get_similar.cache_clear()
+    if not success:
+        return {"status": "error", "message": f"Failed to sync product {product_id}"}
+    return {"status": "success", "product_id": product_id}
+
+@app.delete("/sync/product/{product_id}")
+def delete_product_vector(product_id: int):
+    """Delete a single product vector from Pinecone and clear recommendation cache"""
+    success = vector_store.delete_single_product(product_id)
+    rec_engine.get_similar.cache_clear()
+    return {"status": "success", "product_id": product_id}
+
+
 class ChatRequest(BaseModel):
     message: str
 

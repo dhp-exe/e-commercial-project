@@ -9,7 +9,7 @@ export async function findImagesByProductIds(productIds, conn = pool) {
     `SELECT id, product_id, image_url, is_primary, sort_order
      FROM product_images
      WHERE product_id IN (?)
-     ORDER BY sort_order ASC, id ASC`,
+     ORDER BY is_primary DESC, sort_order ASC, id ASC`,
     [productIds]
   );
   return rows;
@@ -35,11 +35,13 @@ export async function findVariantsWithDetailsByProductIds(productIds, conn = poo
        s.sort_order AS size_sort_order,
        COALESCE(i.quantity, 0) AS stock,
        COALESCE(i.reserved_quantity, 0) AS reserved_quantity,
-       GREATEST(0, COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0)) AS available_stock
+       GREATEST(0, COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0)) AS available_stock,
+       vi.image_url AS image_url
      FROM product_variants pv
      JOIN colors c ON pv.color_id = c.id
      JOIN sizes s ON pv.size_id = s.id
      LEFT JOIN inventory i ON i.variant_id = pv.id
+     LEFT JOIN variant_images vi ON vi.variant_id = pv.id AND vi.is_primary = true
      WHERE pv.product_id IN (?)
      ORDER BY s.sort_order ASC, c.name ASC`,
     [productIds]
@@ -243,6 +245,16 @@ export async function insertProductImage({ productId, imageUrl, isPrimary, sortO
   await conn.execute(
     'INSERT INTO product_images (product_id, image_url, is_primary, sort_order) VALUES (?, ?, ?, ?)',
     [productId, imageUrl, isPrimary, sortOrder]
+  );
+}
+
+/**
+ * Insert a variant image.
+ */
+export async function insertVariantImage({ variantId, imageUrl, isPrimary = true, sortOrder = 0 }, conn = pool) {
+  await conn.execute(
+    'INSERT INTO variant_images (variant_id, image_url, is_primary, sort_order) VALUES (?, ?, ?, ?)',
+    [variantId, imageUrl, isPrimary, sortOrder]
   );
 }
 

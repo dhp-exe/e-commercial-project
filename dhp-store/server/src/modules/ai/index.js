@@ -15,5 +15,8 @@ export {
   getSimilarProducts,
   getUserRecommendations,
   triggerModelRefresh,
+  enqueueProductVectorSync,
+  enqueueProductVectorDelete,
   chatWithAI,
 } from './service.js';
+

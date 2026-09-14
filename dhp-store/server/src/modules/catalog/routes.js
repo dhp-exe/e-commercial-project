@@ -30,6 +30,15 @@ router.post(
   catalogController.createProduct
 );
 
+// PUT /api/products/:id - Update product details (admin only)
+router.put(
+  '/:id',
+  requireAuth,
+  verifyAdmin,
+  upload.array('images', 10),
+  catalogController.updateProduct
+);
+
 // PUT /api/products/variants/:variantId/inventory - Update variant stock (staff and admin)
 router.put(
   '/variants/:variantId/inventory',

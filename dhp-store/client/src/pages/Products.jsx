@@ -16,7 +16,8 @@ function useQueryParams() { const { search } = useLocation(); return Object.from
 const CATEGORY_MAP = {
   1: 'Tees',
   2: 'Hoodies/Jackets',
-  3: 'Jeans/Pants'
+  3: 'Jeans/Pants',
+  4: 'Accessories',
 };
 
 export default function Products() {

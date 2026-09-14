@@ -51,7 +51,7 @@ DHP Store is a production-grade, full-stack e-commerce platform built with a **M
   |:---|:---|:---|:---|
   | `email` | `communication` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
   | `stripe-webhook` | `orders` | `stripeWorker` | Idempotent Stripe payment event processing |
-  | `ai-refresh` | `ai` | `aiRefreshWorker` | Re-syncs product vectors to Pinecone |
+  | `ai-refresh` | `ai` | `aiRefreshWorker` | Syncs product vectors to Pinecone (full re-sync & incremental upsert/delete) |
   | `cache-invalidate` | `catalog` | `cacheWorker` | Invalidates and warms Redis cache entries |
   | `cart-cleanup` | `orders` | `cartCleanupWorker` | Weekly cron to purge abandoned guest carts |
   | `reservation-cleanup` | `catalog` | `reservationCleanupWorker` | 5-minute cron to release expired inventory reservations |
@@ -180,7 +180,7 @@ flowchart LR
   |:---|:---|:---|:---|
   | `email` | `communication` | `emailWorker` | Order confirmation & password-reset emails (Nodemailer) |
   | `stripe-webhook` | `orders` | `stripeWorker` | Idempotent Stripe payment event processing |
-  | `ai-refresh` | `ai` | `aiRefreshWorker` | Re-syncs product vectors to Pinecone |
+  | `ai-refresh` | `ai` | `aiRefreshWorker` | Syncs product vectors to Pinecone (full re-sync & incremental upsert/delete) |
   | `cache-invalidate` | `catalog` | `cacheWorker` | Invalidates and warms Redis cache entries |
   | `cart-cleanup` | `orders` | `cartCleanupWorker` | Weekly cron to purge abandoned guest carts |
   | `reservation-cleanup` | `catalog` | `reservationCleanupWorker` | 5-minute cron to release expired inventory reservations |

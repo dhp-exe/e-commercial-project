@@ -1,3 +1,4 @@
+import path from 'path';
 import * as Sentry from '@sentry/node';
 import { pool } from '../../shared/db/pool.js';
 import redis from '../../shared/cache/redis.js';
@@ -6,6 +7,7 @@ import { formatImageUrl } from '../../shared/utils/formatImageUrl.js';
 import { generateSku } from '../../shared/utils/generateSku.js';
 import { cacheQueue } from './queues/cacheQueue.js';
 import * as catalogRepo from './repository.js';
+import { enqueueProductVectorSync, enqueueProductVectorDelete } from '../ai/index.js';
 
 /**
  * Enqueue background cache invalidation.
@@ -22,6 +24,31 @@ async function enqueueCacheInvalidation(pattern = 'products:*', productId = null
     Sentry.captureException(queueErr, { tags: { queue: 'cache-invalidate' } });
   }
 }
+
+/**
+ * Enqueue background vector sync to Pinecone.
+ */
+async function enqueueVectorSync(productId) {
+  try {
+    await enqueueProductVectorSync(productId);
+  } catch (err) {
+    console.error(`Failed to enqueue vector sync for product ${productId}:`, err.message);
+    Sentry.captureException(err, { tags: { queue: 'ai-refresh', action: 'sync-product' } });
+  }
+}
+
+/**
+ * Enqueue background vector deletion from Pinecone.
+ */
+async function enqueueVectorDelete(productId) {
+  try {
+    await enqueueProductVectorDelete(productId);
+  } catch (err) {
+    console.error(`Failed to enqueue vector deletion for product ${productId}:`, err.message);
+    Sentry.captureException(err, { tags: { queue: 'ai-refresh', action: 'delete-product' } });
+  }
+}
+
 
 /**
  * Hydrates an array of product rows with their variants, colors, sizes, inventory, and images.
@@ -73,6 +100,7 @@ export async function hydrateProducts(products, conn = pool) {
       reserved_quantity: v.reserved_quantity,
       available_stock: v.available_stock,
       is_active: Boolean(v.is_active),
+      image_url: v.image_url ? formatImageUrl(v.image_url) : null,
     });
   }
 
@@ -238,22 +266,28 @@ export async function createProduct(data, uploadedFiles = []) {
     );
 
     // 2. Insert uploaded files or image URLs
+    const savedImageUrls = [];
+    const primaryIdx = Number(data.primary_image_index) >= 0 ? Number(data.primary_image_index) : 0;
+
     if (uploadedFiles && uploadedFiles.length > 0) {
       for (let i = 0; i < uploadedFiles.length; i++) {
         const file = uploadedFiles[i];
-        const imgUrl = `/uploads/${file.filename}`;
-        const isPrimary = i === 0;
+        const filename = file.key ? path.basename(file.key) : file.filename;
+        const imgUrl = `/uploads/${filename}`;
+        savedImageUrls.push(imgUrl);
+        const isPrimary = i === primaryIdx;
         await catalogRepo.insertProductImage(
-          { productId, imageUrl: imgUrl, isPrimary, sortOrder: i },
+          { productId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : i + 1 },
           conn
         );
       }
     } else if (Array.isArray(data.image_urls) && data.image_urls.length > 0) {
       for (let i = 0; i < data.image_urls.length; i++) {
         const imgUrl = data.image_urls[i];
-        const isPrimary = i === 0;
+        savedImageUrls.push(imgUrl);
+        const isPrimary = i === primaryIdx;
         await catalogRepo.insertProductImage(
-          { productId, imageUrl: imgUrl, isPrimary, sortOrder: i },
+          { productId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : i + 1 },
           conn
         );
       }
@@ -263,34 +297,63 @@ export async function createProduct(data, uploadedFiles = []) {
     const variantList = Array.isArray(variants) && variants.length > 0
       ? variants
       : [
-          {
-            color_name: 'Default',
-            color_hex: '#000000',
-            size_name: 'OS',
-            price_override: null,
-            stock: Number(data.stock) || 50,
-          },
-        ];
+        {
+          color_name: 'Default',
+          color_hex: '#000000',
+          size_name: 'OS',
+          price_override: null,
+          stock: Number(data.stock) || 50,
+        },
+      ];
+
+    const insertedCombinations = new Set();
 
     for (const v of variantList) {
-      const colorName = (v.color_name || 'Default').trim();
-      const colorHex = v.color_hex || '#000000';
+      let colorId;
+      let colorName = (v.color_name || 'Default').trim();
+
+      if (v.color_id) {
+        const existingColor = await catalogRepo.findColorById(v.color_id, conn);
+        if (existingColor) {
+          colorId = existingColor.id;
+          colorName = existingColor.name;
+        }
+      }
+
+      if (!colorId) {
+        const colorHex = v.color_hex || '#000000';
+        const color = await catalogRepo.upsertColor(colorName, colorHex, conn);
+        colorId = color.id;
+        colorName = color.name;
+      }
+
+      // Upsert size
       const sizeName = (v.size_name || 'OS').trim().toUpperCase();
+      const size = await catalogRepo.upsertSize(sizeName, 99, conn);
+      const sizeId = size.id;
+
+      // Uniqueness check for color + size
+      const comboKey = `${colorId}__${sizeId}`;
+      if (insertedCombinations.has(comboKey)) {
+        await conn.rollback();
+        throw new AppError(
+          `Duplicate variant detected: Color "${colorName}" with Size "${sizeName}". Each variant must have a unique color/size combination.`,
+          400
+        );
+      }
+      insertedCombinations.add(comboKey);
+
       const stockQty = Math.max(0, Number(v.stock) || 0);
       const priceOverride = v.price_override !== undefined && v.price_override !== null
         ? Number(v.price_override)
         : null;
 
-      // Upsert color
-      const color = await catalogRepo.upsertColor(colorName, colorHex, conn);
-      const colorId = color.id;
-
-      // Upsert size
-      const size = await catalogRepo.upsertSize(sizeName, 99, conn);
-      const sizeId = size.id;
-
-      // Deterministic SKU
-      const sku = generateSku(categoryName, productName, colorName, sizeName);
+      // Deterministic SKU with collision avoidance
+      const baseSku = generateSku(categoryName, productName, colorName, sizeName);
+      let sku = baseSku;
+      while (await catalogRepo.findVariantBySku(sku, null, conn)) {
+        sku = `${baseSku}-${Math.floor(1000 + Math.random() * 9000)}`;
+      }
 
       // Insert variant
       const variantId = await catalogRepo.insertProductVariant(
@@ -300,16 +363,166 @@ export async function createProduct(data, uploadedFiles = []) {
 
       // Insert inventory
       await catalogRepo.insertInventory({ variantId, quantity: stockQty }, conn);
+
+      // Insert variant image if assigned
+      if (v.image_index !== undefined && v.image_index !== null && v.image_index !== '') {
+        const imgIdx = Number(v.image_index);
+        if (!Number.isNaN(imgIdx) && savedImageUrls[imgIdx]) {
+          await catalogRepo.insertVariantImage(
+            { variantId, imageUrl: savedImageUrls[imgIdx], isPrimary: true, sortOrder: 0 },
+            conn
+          );
+        }
+      }
     }
 
     await conn.commit();
 
-    // Enqueue cache invalidation
+    // Enqueue cache invalidation and Pinecone vector sync
     await enqueueCacheInvalidation('products:*', productId);
+    await enqueueVectorSync(productId);
 
     // Fetch and hydrate newly created product
     const newProduct = await catalogRepo.findProductById(productId, false, pool);
     const hydrated = await hydrateProducts([newProduct], pool);
+    return hydrated[0];
+  } catch (error) {
+    if (conn) await conn.rollback();
+    throw error;
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
+/**
+ * Update an existing product's details (name, description, category, base price).
+ */
+export async function updateProduct(productId, data, uploadedFiles = []) {
+  const prodId = Number(productId);
+  if (Number.isNaN(prodId) || prodId <= 0) {
+    throw new AppError('Invalid product ID', 400);
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    const product = await catalogRepo.findProductById(prodId, false, conn);
+    if (!product) {
+      await conn.rollback();
+      return null;
+    }
+
+    const { name, description, category_id, base_price, price } = data;
+    const effectivePrice = base_price !== undefined ? base_price : price;
+
+    if (category_id !== undefined && category_id !== null) {
+      const category = await catalogRepo.findCategoryById(category_id, conn);
+      if (!category) {
+        await conn.rollback();
+        throw new AppError('Category does not exist', 400);
+      }
+    }
+
+    await conn.execute(
+      `UPDATE products 
+       SET name = COALESCE(?, name),
+           description = COALESCE(?, description),
+           category_id = COALESCE(?, category_id),
+           base_price = COALESCE(?, base_price)
+       WHERE id = ? AND is_active = true`,
+      [
+        name !== undefined ? String(name).trim() : null,
+        description !== undefined ? description : null,
+        category_id !== undefined ? category_id : null,
+        effectivePrice !== undefined ? Number(effectivePrice) : null,
+        prodId,
+      ]
+    );
+
+    // Process uploaded files or image URLs matching createProduct
+    const savedImageUrls = [];
+    const hasFiles = uploadedFiles && uploadedFiles.length > 0;
+    const hasUrls = Array.isArray(data.image_urls) && data.image_urls.length > 0;
+
+    if (hasFiles || hasUrls) {
+      const existingImages = await catalogRepo.findImagesByProductIds([prodId], conn);
+      const hasExistingPrimary = existingImages.some((img) => img.is_primary);
+
+      const primaryIdx = data.primary_image_index !== undefined && Number(data.primary_image_index) >= 0
+        ? Number(data.primary_image_index)
+        : (hasExistingPrimary ? -1 : 0);
+
+      if (primaryIdx >= 0 && hasExistingPrimary) {
+        await conn.execute(
+          'UPDATE product_images SET is_primary = false WHERE product_id = ?',
+          [prodId]
+        );
+      }
+
+      const startSortOrder = existingImages.length;
+
+      if (hasFiles) {
+        for (let i = 0; i < uploadedFiles.length; i++) {
+          const file = uploadedFiles[i];
+          const filename = file.key ? path.basename(file.key) : file.filename;
+          const imgUrl = `/uploads/${filename}`;
+          savedImageUrls.push(imgUrl);
+          const isPrimary = i === primaryIdx;
+          await catalogRepo.insertProductImage(
+            { productId: prodId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : startSortOrder + i + 1 },
+            conn
+          );
+        }
+      } else if (hasUrls) {
+        for (let i = 0; i < data.image_urls.length; i++) {
+          const imgUrl = data.image_urls[i];
+          savedImageUrls.push(imgUrl);
+          const isPrimary = i === primaryIdx;
+          await catalogRepo.insertProductImage(
+            { productId: prodId, imageUrl: imgUrl, isPrimary, sortOrder: isPrimary ? 0 : startSortOrder + i + 1 },
+            conn
+          );
+        }
+      }
+
+      // Assign variant images if variant image index mappings are provided
+      if (Array.isArray(data.variants)) {
+        for (const v of data.variants) {
+          const variantId = v.variant_id || v.id;
+          if (variantId && v.image_index !== undefined && v.image_index !== null && v.image_index !== '') {
+            const imgIdx = Number(v.image_index);
+            if (!Number.isNaN(imgIdx) && savedImageUrls[imgIdx]) {
+              await catalogRepo.insertVariantImage(
+                { variantId, imageUrl: savedImageUrls[imgIdx], isPrimary: true, sortOrder: 0 },
+                conn
+              );
+            }
+          }
+        }
+      }
+    } else if (Array.isArray(data.variants)) {
+      // Direct variant image assignments if provided
+      for (const v of data.variants) {
+        const variantId = v.variant_id || v.id;
+        if (variantId && v.image_url) {
+          await catalogRepo.insertVariantImage(
+            { variantId, imageUrl: v.image_url, isPrimary: true, sortOrder: 0 },
+            conn
+          );
+        }
+      }
+    }
+
+    await conn.commit();
+
+    // Enqueue cache invalidation and Pinecone vector sync
+    await enqueueCacheInvalidation('products:*', prodId);
+    await enqueueVectorSync(prodId);
+
+    const updated = await catalogRepo.findProductById(prodId, false, pool);
+    const hydrated = await hydrateProducts([updated], pool);
     return hydrated[0];
   } catch (error) {
     if (conn) await conn.rollback();
@@ -330,6 +543,7 @@ export async function updateVariantInventory(variantId, quantity) {
 
   await catalogRepo.upsertVariantInventory(variantId, quantity, pool);
   await enqueueCacheInvalidation('products:*', variant.product_id);
+  await enqueueVectorSync(variant.product_id);
 
   return {
     message: 'Inventory updated',
@@ -436,6 +650,7 @@ export async function updateVariant(variantId, { price_override, color_id, color
     console.error('Redis delete error in updateVariant:', err.message);
   }
   await enqueueCacheInvalidation('products:*', currentVariant.product_id);
+  await enqueueVectorSync(currentVariant.product_id);
 
   return {
     message: 'Variant updated successfully',
@@ -518,11 +733,11 @@ export async function createVariant(productId, { color_id, color_name, color_hex
     throw new AppError('A variant with this color and size already exists on this product.', 400);
   }
 
-  // 4. Generate SKU
-  let sku = generateSku(product.category_name, product.name, finalColorName, finalSizeName);
-  const skuCheck = await catalogRepo.findVariantBySku(sku, null, pool);
-  if (skuCheck) {
-    sku = `${sku}-${Date.now().toString().slice(-4)}`;
+  // 4. Generate SKU with robust collision avoidance
+  const baseSku = generateSku(product.category_name, product.name, finalColorName, finalSizeName);
+  let sku = baseSku;
+  while (await catalogRepo.findVariantBySku(sku, null, pool)) {
+    sku = `${baseSku}-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 
   // 5. Resolve Price Override & Stock
@@ -548,6 +763,7 @@ export async function createVariant(productId, { color_id, color_name, color_hex
     console.error('Redis delete error in createVariant:', err.message);
   }
   await enqueueCacheInvalidation('products:*', productId);
+  await enqueueVectorSync(productId);
 
   return {
     message: 'Variant created successfully',
@@ -586,6 +802,7 @@ export async function deleteVariant(variantId) {
     console.error('Redis delete error in deleteVariant:', err.message);
   }
   await enqueueCacheInvalidation('products:*', variant.product_id);
+  await enqueueVectorSync(variant.product_id);
 
   return { message: 'Variant deleted successfully', variantId };
 }
@@ -601,6 +818,7 @@ export async function updateProductStockLegacy(productId, stock) {
 
   await catalogRepo.updateStockByProductId(productId, stock, pool);
   await enqueueCacheInvalidation('products:*', productId);
+  await enqueueVectorSync(productId);
 
   return { message: 'Stock updated', productId, stock };
 }
@@ -616,6 +834,7 @@ export async function deleteProduct(productId) {
 
   await catalogRepo.softDeleteProductById(productId, pool);
   await enqueueCacheInvalidation('products:*', productId);
+  await enqueueVectorDelete(productId);
 
   return { message: 'Product deleted successfully' };
 }

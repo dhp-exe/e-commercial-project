@@ -6,10 +6,8 @@ export function formatImageUrl(dbPath) {
   if (!dbPath) return null;
   if (dbPath.startsWith('http')) return dbPath;
 
-  if (process.env.NODE_ENV === 'production') {
-    const cdnUrl = process.env.CDN_URL;
-    if (!cdnUrl) return dbPath;
-
+  const cdnUrl = process.env.CDN_URL;
+  if (cdnUrl) {
     const base = cdnUrl.replace(/\/+$/, '');
     const cleanPath = dbPath.startsWith('/')
       ? dbPath.replace(/^\/+/, '/')

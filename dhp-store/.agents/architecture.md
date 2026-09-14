@@ -88,9 +88,9 @@ Each module is a vertical slice owning its routes, controllers, services, reposi
 | Module | Domain Responsibility | Owned Database Tables | Key Facade Exports |
 |---|---|---|---|
 | **`auth_user`** | Authentication, sessions, JWT, OAuth, password management, profile CRUD, user roles | `users`, `refresh_tokens`, `password_resets` | `authRouter` |
-| **`catalog`** | Products, categories, variants, colors, sizes, inventory, product images, SKU generation, sitemap, cache invalidation | `products`, `categories`, `product_variants`, `colors`, `sizes`, `inventory`, `product_images`, `inventory_reservations` | `catalogRouter`, `sitemapRouter`, `hydrateProducts`, `getProductsByIds`, `getProductById`, `getProducts`, `getVariantPrice`, `getProductBasePrice`, `deductInventory`, `restoreInventory`, `getAvailableStock`, `getActiveProductSummaries`, `cacheQueue`, `reservationCleanupQueue`, `scheduleReservationCleanup` |
+| **`catalog`** | Products, categories, variants, colors, sizes, inventory, product images, SKU generation, sitemap, cache invalidation | `products`, `categories`, `product_variants`, `colors`, `sizes`, `inventory`, `product_images`, `inventory_reservations` | `catalogRouter`, `sitemapRouter`, `hydrateProducts`, `getProductsByIds`, `getProductById`, `getProducts`, `getVariantPrice`, `getProductBasePrice`, `deductInventory`, `restoreInventory`, `getAvailableStock`, `getActiveProductSummaries`, `updateProduct`, `cacheQueue`, `reservationCleanupQueue`, `scheduleReservationCleanup` |
 | **`orders`** | Shopping cart, order lifecycle, checkout, payment intents, Stripe webhooks, order items | `carts`, `cart_items`, `orders`, `order_items` | `ordersRouter`, `cartRouter`, `webhooksRouter`, `stripeQueue`, `cartCleanupQueue`, `scheduleCartCleanup`, `getOrderStatsByUserId`, `getLastPurchasedProductId` |
-| **`ai`** | AI recommendation proxy, chat proxy, AI model refresh triggers | None (stateless proxy to Python service) | `recommendRouter`, `chatRouter`, `aiRefreshQueue` |
+| **`ai`** | AI recommendation proxy, chat proxy, AI model refresh triggers, incremental vector sync | None (stateless proxy to Python service) | `recommendRouter`, `chatRouter`, `aiRefreshQueue`, `triggerModelRefresh`, `enqueueProductVectorSync`, `enqueueProductVectorDelete` |
 | **`communication`** | Email transporter, email templates, email sending, user feedback | `feedback` | `emailQueue`, `feedbackRouter` |
 
 ---
@@ -122,6 +122,7 @@ graph TD
 
     CAT -->|"uses"| DB
     CAT -->|"uses"| Cache
+    CAT -->|"enqueues vector sync"| AI
 
     ORD -->|"uses"| DB
     ORD -->|"calls facade"| CAT
@@ -148,6 +149,7 @@ graph TD
 | `orders/service.js` | `catalog/index.js` | `getVariantPrice()`, `deductInventory()`, `restoreInventory()`, `getAvailableStock()` | Checkout price verification and inventory management |
 | `orders/controller.js` | `communication/index.js` | `emailQueue.add()` | Order confirmation emails |
 | `auth_user/service.js` | `communication/index.js` | `emailQueue.add()` | Password reset emails |
+| `catalog/service.js` | `ai/index.js` | `enqueueProductVectorSync()`, `enqueueProductVectorDelete()` | Incremental Pinecone vector sync & delete on product mutations |
 | `ai/service.js` | `catalog/index.js` | `getProductsByIds()`, `getProductById()`, `getProducts()` | Recommendation hydration and relational category fallback |
 | `ai/service.js` | `orders/index.js` | `getLastPurchasedProductId()` | Personalized recommendations |
 
@@ -178,7 +180,7 @@ graph TD
 | `email` | `communication/queues/` | `emailWorker` | `communication/workers/` | `auth_user`, `orders` | communication |
 | `stripe-webhook` | `orders/queues/` | `stripeWorker` | `orders/workers/` | `orders/webhooks.js` | orders |
 | `cache-invalidate` | `catalog/queues/` | `cacheWorker` | `catalog/workers/` | `catalog/controller.js` | catalog |
-| `ai-refresh` | `ai/queues/` | `aiRefreshWorker` | `ai/workers/` | `ai/routes/recommendations.js` | ai |
+| `ai-refresh` | `ai/queues/` | `aiRefreshWorker` | `ai/workers/` | `ai/routes/recommendations.js` (full), `catalog/service.js` (incremental) | ai |
 | `cart-cleanup` | `orders/queues/` | `cartCleanupWorker` | `orders/workers/` | `index.js` (cron schedule) | orders |
 | `reservation-cleanup` | `catalog/queues/` | `reservationCleanupWorker` | `catalog/workers/` | `index.js` (cron schedule) | catalog |
 
@@ -208,6 +210,8 @@ graph TD
 | **LLM** | Google Gemini | Structured output for intent detection + conversational synthesis |
 | **Edge Proxy** | Cloudflare AI Gateway | Optional. Routes Gemini API calls through CF edge for caching, analytics, rate limiting |
 | **Containerized** | Docker (`Dockerfile`) | Standalone microservice on port `10000` |
+| **Sync Endpoints** | `POST /refresh`, `POST /sync/product/{id}`, `DELETE /sync/product/{id}` | Full catalog re-indexing vs. instant single-product vector upsert and deletion |
+
 
 ---
 

@@ -18,13 +18,25 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:10000';
 const aiRefreshWorker = new Worker(
   'ai-refresh',
   async (job) => {
-    console.log(`🤖 Processing AI refresh job ${job.id}`);
+    const { action, productId } = job.data || {};
+    console.log(`🤖 Processing AI refresh job ${job.id} (type: ${job.name || job.data?.type})`);
 
-    const response = await axios.post(`${AI_SERVICE_URL}/refresh`, null, {
-      timeout: 15000,
-    });
-
-    console.log(`🤖 AI refresh triggered (status: ${response.status}):`, response.data);
+    if (job.name === 'sync-product' || action === 'upsert') {
+      const response = await axios.post(`${AI_SERVICE_URL}/sync/product/${productId}`, null, {
+        timeout: 15000,
+      });
+      console.log(`🤖 Single product vector synced for ID ${productId}:`, response.data);
+    } else if (job.name === 'delete-product' || action === 'delete') {
+      const response = await axios.delete(`${AI_SERVICE_URL}/sync/product/${productId}`, {
+        timeout: 15000,
+      });
+      console.log(`🤖 Single product vector deleted for ID ${productId}:`, response.data);
+    } else {
+      const response = await axios.post(`${AI_SERVICE_URL}/refresh`, null, {
+        timeout: 15000,
+      });
+      console.log(`🤖 AI refresh triggered (status: ${response.status}):`, response.data);
+    }
   },
   {
     connection,
