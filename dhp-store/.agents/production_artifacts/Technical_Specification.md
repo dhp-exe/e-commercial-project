@@ -2,6 +2,7 @@
 
 > **Scope:** 100% structural & architectural. Zero UI/UX/CSS changes.
 > **Generated:** 2026-09-15 — Based on exhaustive audit of `dhp-store/client/src/`
+> **Updated:** 2026-09-19 — Enforced `output: 'standalone'`, middleware-based route protection, `useSearchParams` Suspense boundaries, resolved all open questions.
 
 ---
 
@@ -48,7 +49,7 @@
 | `ChatBot.jsx` | ai | `App.jsx` (global) |
 | `CartDrawer.jsx` | orders | Home, Products, ProductDetails, Cart |
 | `LoadingScreen.jsx` | — (UI) | `App.jsx` (Suspense fallback), `AuthContext` |
-| `ProtectedRoute.jsx` | auth | `App.jsx` (admin routes) |
+| `ProtectedRoute.jsx` | auth | `App.jsx` (admin routes) — **to be replaced by `middleware.js`** |
 | `RecommendRow.jsx` | ai/catalog | Products, ProductDetails |
 | `Form.jsx` | — (UI) | Login, Feedback |
 | `GoogleLoginButton.jsx` | auth | Login |
@@ -117,7 +118,7 @@ Based on the backend's 5 modules (`auth_user`, `catalog`, `orders`, `communicati
 | `<Routes>` + `<Route>` declarations in `App.jsx` | 🔴 **Remove entirely** | Replaced by `app/` directory file conventions |
 | `useNavigate()` | 🟡 **Replace all** | → `useRouter()` from `next/navigation` |
 | `useParams()` | 🟡 **Replace all** | → `params` prop in page components or `useParams()` from `next/navigation` |
-| `useSearchParams()` | 🟢 **Minimal change** | → `useSearchParams()` from `next/navigation` (near-identical API) |
+| `useSearchParams()` | 🟡 **Replace + wrap in Suspense** | → `useSearchParams()` from `next/navigation`. **Must be wrapped in `<Suspense>` boundary** to prevent the entire route from de-optimizing to client-side rendering. See §2.7. |
 | `useLocation()` | 🟡 **Replace** | → `usePathname()` + `useSearchParams()` from `next/navigation` |
 | `<Link to="...">` | 🟡 **Replace all** | → `<Link href="...">` from `next/link` |
 | `<Navigate to="..." replace />` | 🟡 **Replace** | → `redirect()` from `next/navigation` |
@@ -164,7 +165,8 @@ Based on the backend's 5 modules (`auth_user`, `catalog`, `orders`, `communicati
 
 ```
 client/
-├── next.config.mjs              # Next.js configuration (API rewrites, images)
+├── next.config.mjs              # Next.js configuration (API rewrites, images, standalone output)
+├── middleware.js                  # [NEW] Edge middleware for auth/role-based route protection
 ├── package.json                  # Updated dependencies
 ├── .env.local                    # NEXT_PUBLIC_* env vars
 ├── public/                       # Static assets (favicon, loading-screen.webm)
@@ -201,7 +203,7 @@ client/
     │   │   └── page.jsx          # "/reset-password" → imports ResetPassword feature
     │   │
     │   └── admin/
-    │       ├── layout.jsx        # Admin layout with sidebar (ProtectedRoute logic)
+    │       ├── layout.jsx        # Admin layout with sidebar (auth handled by middleware.js)
     │       ├── page.jsx          # "/admin" → imports AdminDashboard
     │       ├── orders/
     │       │   └── page.jsx      # "/admin/orders" → imports ManageOrders
@@ -212,8 +214,7 @@ client/
     │   │
     │   ├── auth/                 # ══ Auth Domain ══
     │   │   ├── components/
-    │   │   │   ├── GoogleLoginButton.jsx
-    │   │   │   └── ProtectedRoute.jsx
+    │   │   │   └── GoogleLoginButton.jsx
     │   │   ├── context/
     │   │   │   └── AuthContext.jsx
     │   │   ├── pages/
@@ -484,12 +485,16 @@ JSON-LD will move from `<Helmet>` to inline `<script>` tags within the Client Co
 // Remove only the <Helmet> wrapper around it.
 ```
 
-### 2.4 next.config.mjs — API Proxy & Image Domains
+### 2.4 next.config.mjs — API Proxy, Image Domains & Standalone Output
 
 ```js
 // next.config.mjs
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // DECISION: Standalone output for Docker deployments and future SSR/ISR.
+  // Produces a self-contained Node.js server at .next/standalone/server.js.
+  output: 'standalone',
+
   // Replicate Vite dev proxy behavior
   async rewrites() {
     return [
@@ -508,6 +513,165 @@ const nextConfig = {
 
 export default nextConfig;
 ```
+
+### 2.7 Route Protection via Edge Middleware
+
+> [!IMPORTANT]
+> **Design Decision:** Route protection is handled at the **Edge Middleware** layer (`middleware.js`) instead of inside Client Components. This runs *before* any page code is sent to the browser, preventing protected pages from even being downloaded by unauthorized users.
+
+The current `ProtectedRoute.jsx` component (which uses `useAuth()` + `<Navigate>`) is **removed**. It is replaced by a root `middleware.js` file that inspects the JWT cookie on every request.
+
+#### Why Middleware Over Client Components?
+
+| Aspect | Client-Side (`ProtectedRoute.jsx`) | Edge Middleware (`middleware.js`) |
+|---|---|---|
+| **Execution** | After page JS is downloaded + React hydration | Before any response is sent |
+| **Security** | Page HTML/JS is sent to browser, then redirected | Unauthorized users never receive page content |
+| **UX** | Flash of loading state → redirect | Instant 302 redirect, no layout shift |
+| **SSR Compatibility** | Breaks Server Components | Works seamlessly with RSC |
+
+#### Implementation
+
+```js
+// client/middleware.js  (lives at project root, NOT inside src/)
+import { NextResponse } from 'next/server';
+
+// Routes that require authentication
+const PROTECTED_ROUTES = ['/account', '/checkout'];
+// Routes that require admin/staff role
+const ADMIN_ROUTES = ['/admin'];
+// Routes that authenticated users should not see
+const AUTH_ROUTES = ['/login'];
+
+export function middleware(request) {
+  const { pathname } = request.nextUrl;
+
+  // Read the access token from the HTTP-only cookie
+  // (cookie name must match what the backend sets)
+  const token = request.cookies.get('accessToken')?.value;
+
+  // --- Protected routes: require auth ---
+  const isProtected = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
+  const isAdmin = ADMIN_ROUTES.some(route => pathname.startsWith(route));
+
+  if ((isProtected || isAdmin) && !token) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // --- Admin routes: verify role claim from JWT ---
+  if (isAdmin && token) {
+    try {
+      // Decode JWT payload (middleware cannot verify signature — that's the
+      // backend's job). We only read the `role` claim for client-side gating.
+      const payload = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64').toString()
+      );
+      if (!['admin', 'staff'].includes(payload.role)) {
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    } catch {
+      // Malformed token — redirect to login
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+
+  // --- Auth routes: redirect logged-in users away from /login ---
+  const isAuthRoute = AUTH_ROUTES.some(route => pathname.startsWith(route));
+  if (isAuthRoute && token) {
+    return NextResponse.redirect(new URL('/account', request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  // Only run middleware on page routes, not on static assets or API calls
+  matcher: [
+    '/account/:path*',
+    '/checkout/:path*',
+    '/admin/:path*',
+    '/login',
+  ],
+};
+```
+
+> [!NOTE]
+> The middleware **does not cryptographically verify** the JWT — that is the backend's responsibility on every API call. The middleware only reads the JWT payload to make a fast routing decision at the edge. The `AuthContext` still performs the full auth check on mount via `GET /auth/profile`.
+
+### 2.8 `useSearchParams` Suspense Boundary Requirement
+
+> [!WARNING]
+> In Next.js App Router, any component that calls `useSearchParams()` **must** be wrapped in a `<Suspense>` boundary. Without this, Next.js will de-optimize the **entire route** to client-side rendering (disabling static generation and SSR for that page).
+
+#### Affected Components
+
+| Component | Current `useSearchParams` Usage | Migration Action |
+|---|---|---|
+| `ResetPasswordPage.jsx` | `useSearchParams()` to read `?token=` and `?email=` | Extract into a child component, wrap with `<Suspense>` |
+| `ProductsPage.jsx` | `useLocation().search` → `useSearchParams()` | Extract query-reading logic into a child component, wrap with `<Suspense>` |
+
+#### Pattern: Extract + Wrap
+
+```jsx
+// BEFORE (de-optimizes entire route)
+"use client";
+import { useSearchParams } from 'next/navigation';
+
+export default function ResetPasswordPage() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
+  // ...
+}
+```
+
+```jsx
+// AFTER (Suspense boundary prevents de-optimization)
+"use client";
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+function ResetPasswordContent() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
+  const email = searchParams.get('email');
+  // ... rest of the component logic (unchanged)
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40 }}>Loading...</div>}>
+      <ResetPasswordContent />
+    </Suspense>
+  );
+}
+```
+
+```jsx
+// ProductsPage.jsx — same pattern
+"use client";
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+function ProductsContent() {
+  const searchParams = useSearchParams();
+  const q = searchParams.get('q') || '';
+  const categoryId = searchParams.get('categoryId') || '';
+  // ... rest of product listing logic (unchanged)
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div>Loading products...</div>}>
+      <ProductsContent />
+    </Suspense>
+  );
+}
+```
+
+> [!TIP]
+> **Rule of thumb:** Any time you need `useSearchParams()`, create a `*Content` inner component that uses the hook, and wrap it with `<Suspense>` in the outer page component. This keeps the page eligible for static/SSR optimization.
 
 ### 2.5 Feature Module Rules (Mirroring Backend)
 
@@ -565,7 +729,7 @@ graph TD
 > - `catalog/pages/*` may import `ai/hooks/useRecommendations` (product-based and user-based recommendations)
 > - `orders/context/CartContext` may import `auth/context/AuthContext` (to check auth state for server vs. local cart)
 > - `admin/pages/*` may import `auth/context/AuthContext` (role checking)
-> - `admin/layout.jsx` uses `auth/components/ProtectedRoute` logic
+> - Route protection is handled by root `middleware.js` (not by feature-level components)
 
 ---
 
@@ -676,7 +840,7 @@ mkdir -p src/shared/{api,components,context,providers,styles,pages}
 |---|---|
 | `context/AuthContext.jsx` | `features/auth/context/AuthContext.jsx` |
 | `components/GoogleLoginButton.jsx` | `features/auth/components/GoogleLoginButton.jsx` |
-| `components/ProtectedRoute.jsx` | `features/auth/components/ProtectedRoute.jsx` |
+| `components/ProtectedRoute.jsx` | 🔴 **DELETE** — replaced by root `middleware.js` |
 | `pages/Login.jsx` + `pages/Login.css` | `features/auth/pages/LoginPage.jsx` + `Login.css` |
 | `pages/Account.jsx` + `pages/Account.css` | `features/auth/pages/AccountPage.jsx` + `Account.css` |
 | `pages/ResetPassword.jsx` | `features/auth/pages/ResetPasswordPage.jsx` |
@@ -751,7 +915,7 @@ After moving, systematically update all `import` statements. Use the `@/` alias:
 // src/features/auth/index.js
 export { AuthProvider, useAuth } from './context/AuthContext';
 export { default as GoogleLoginButton } from './components/GoogleLoginButton';
-export { default as ProtectedRoute } from './components/ProtectedRoute';
+// ProtectedRoute removed — route protection handled by middleware.js
 ```
 
 ```js
@@ -796,24 +960,18 @@ export { generateMetadata } from './metadata'; // or inline
 export default function Page() { return <ProductDetailsPage />; }
 ```
 
-#### 4b. Admin layout with protection
+#### 4b. Admin layout (auth handled by middleware)
+
+Since `middleware.js` already gates `/admin/*` routes (redirecting unauthenticated users to `/login` and non-admin users to `/`), the admin layout is now a **pure layout component** with no auth logic:
 
 ```jsx
 // src/app/admin/layout.jsx
 "use client";
-import { useAuth } from '@/features/auth/context/AuthContext';
-import { redirect } from 'next/navigation';
 import AdminSidebar from '@/features/admin/components/AdminSidebar';
 
+// NOTE: Auth/role checking is handled by middleware.js BEFORE this
+// layout ever renders. No need for useAuth() or redirect() here.
 export default function AdminLayout({ children }) {
-  const { user, loading } = useAuth();
-
-  if (loading) return <div>Loading...</div>;
-  if (!user) redirect('/login');
-  if (!['admin', 'staff'].includes(user.role)) {
-    return <div style={{ padding: 50 }}>Access Denied: You are not authorized.</div>;
-  }
-
   return (
     <div className="admin-container" style={{ display: 'flex', minHeight: '100vh' }}>
       <AdminSidebar />
@@ -832,7 +990,7 @@ export default function AdminLayout({ children }) {
 | `import { Link } from 'react-router-dom'` | `import Link from 'next/link'` | Change `to=` → `href=` |
 | `import { useNavigate } from 'react-router-dom'` | `import { useRouter } from 'next/navigation'` | `navigate('/path')` → `router.push('/path')` |
 | `import { useParams } from 'react-router-dom'` | `import { useParams } from 'next/navigation'` | API is compatible |
-| `import { useSearchParams } from 'react-router-dom'` | `import { useSearchParams } from 'next/navigation'` | Slightly different API (no setter) |
+| `import { useSearchParams } from 'react-router-dom'` | `import { useSearchParams } from 'next/navigation'` | **Must be wrapped in `<Suspense>`** — see §2.8. Slightly different API (no setter). |
 | `import { useLocation } from 'react-router-dom'` | `import { usePathname, useSearchParams } from 'next/navigation'` | Split into two hooks |
 | `<Navigate to="/login" replace />` | `redirect('/login')` | Use in components or server functions |
 | `navigate(-1)` | `router.back()` | Direct equivalent |
@@ -882,13 +1040,15 @@ npm install @sentry/nextjs
 | `index.html` | Next.js generates its own HTML |
 | `src/main.jsx` | Replaced by `app/layout.jsx` |
 | `src/App.jsx` | Route definitions moved to `app/` directory |
-| `vercel.json` | May need updating for Next.js (rewrites are in `next.config.mjs`) |
+| `src/components/ProtectedRoute.jsx` | Replaced by root `middleware.js` |
+| `vercel.json` | **Delete entirely.** Next.js on Vercel handles routing natively; rewrites are in `next.config.mjs`. No custom headers/redirects are needed. |
 | `nginx.conf` | Docker deployment needs updating for Next.js |
 | `.eslintrc.cjs` | Replace with `eslint.config.mjs` (Next.js ESLint integration) |
 
 #### 5d. Docker updates
 
-The `Dockerfile` must change from Nginx static serving to a Node.js Next.js server:
+The `Dockerfile` must change from Nginx static serving to a Node.js Next.js server.
+`output: 'standalone'` is already enforced in `next.config.mjs` (see §2.4).
 
 ```dockerfile
 # Stage 1 - Builder
@@ -909,8 +1069,6 @@ COPY --from=builder /app/public ./public
 EXPOSE 3000
 CMD ["node", "server.js"]
 ```
-
-This requires `output: 'standalone'` in `next.config.mjs`.
 
 ---
 
@@ -933,6 +1091,9 @@ cd client && npm run dev
 
 - [ ] All 12 public routes render correctly and look visually identical
 - [ ] Admin routes (`/admin`, `/admin/orders`, `/admin/products`) are protected and functional
+- [ ] Middleware redirects unauthenticated users from `/account`, `/checkout`, `/admin` to `/login`
+- [ ] Middleware redirects non-admin users from `/admin` to `/`
+- [ ] Middleware redirects authenticated users from `/login` to `/account`
 - [ ] Login/Register flow works (email + Google OAuth)
 - [ ] Cart operations work (add, update, remove) for both guest and authenticated users
 - [ ] Checkout with Stripe payment completes successfully
@@ -941,28 +1102,24 @@ cd client && npm run dev
 - [ ] Search functionality works from Navbar and in-page
 - [ ] Toast notifications appear correctly
 - [ ] 404 page renders for invalid routes
-- [ ] Password reset flow works end-to-end
+- [ ] Password reset flow works end-to-end (verify `useSearchParams` Suspense fallback renders)
+- [ ] Products page loads without full client-side de-optimization (verify `useSearchParams` Suspense boundary)
 - [ ] Page metadata renders correctly (check `<head>` in dev tools)
 - [ ] JSON-LD structured data present on Home and ProductDetails pages
-- [ ] Docker build succeeds with the updated Dockerfile
+- [ ] Docker build succeeds with the updated Dockerfile (`output: 'standalone'`)
 - [ ] All environment variables work with `NEXT_PUBLIC_` prefix
 
 ---
 
-## Open Questions
+## Resolved Decisions
 
-> [!IMPORTANT]
-> **Q1: GitHub Pages deployment.** The current codebase has a `HashRouter` fallback for `github.io`. Since Next.js on Vercel handles routing natively, should we **drop GitHub Pages support entirely**? The `gh-pages` package and `homepage` field in `package.json` would be removed.
-
-> [!IMPORTANT]
-> **Q2: Static export vs. Node.js server.** Next.js can run as:
-> - **Option A:** `output: 'standalone'` — Full Node.js server (enables API routes, ISR, SSR in the future)
-> - **Option B:** `output: 'export'` — Static HTML export (similar to current Vite build, but no SSR/ISR)
->
-> Since this is currently a pure SPA with all data fetched client-side, **Option B** would be the most conservative migration. However, **Option A** positions us for future SSR/ISR optimizations. Which approach do you prefer?
-
-> [!WARNING]
-> **Q3: `vercel.json` rewrites.** The current `vercel.json` has SPA fallback rewrites. For Next.js on Vercel, these are handled automatically by the framework. Should we delete `vercel.json` entirely or keep it for custom headers/redirects?
+| Decision | Resolution |
+|---|---|
+| **GitHub Pages** | 🔴 **Dropped.** `gh-pages` package removed, `homepage` field deleted from `package.json`. Deployment is exclusively via Vercel + Next.js standalone server. |
+| **Output mode** | ✅ **`output: 'standalone'`** enforced in `next.config.mjs`. Produces a self-contained Node.js server for Docker. Enables future SSR/ISR. |
+| **`vercel.json`** | 🔴 **Deleted entirely.** Next.js on Vercel handles routing natively. API rewrites are in `next.config.mjs`. |
+| **Route protection** | ✅ **Edge Middleware** (`middleware.js`). Replaces client-side `ProtectedRoute.jsx`. Auth gating runs before any page content is sent. |
+| **`useSearchParams` SSR** | ✅ **`<Suspense>` boundaries** required around all `useSearchParams()` consumers to prevent SSR de-optimization. |
 
 ---
 
