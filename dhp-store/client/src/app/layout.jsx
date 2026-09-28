@@ -5,8 +5,6 @@ import ChatBot from '@/features/ai/components/ChatBot';
 
 /* ── Global CSS (order matters) ── */
 import '@/shared/styles/main.css';
-import '@/shared/styles/layout.css';
-import '@/shared/styles/components.css';
 import '@/shared/styles/globals.css';
 
 export const metadata = {
